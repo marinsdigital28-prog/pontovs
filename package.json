@@ -1,0 +1,28 @@
+{
+  "name": "ponto-progredir",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "prisma:studio": "prisma studio",
+    "seed": "node scripts/seed.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "@types/react": "19.2.18",
+    "prisma": "^4.16.2",
+    "typescript": "5.8.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^4.16.2",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "next": "^15.0.0",
+    "next-auth": "^4.24.15",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zod": "^4.4.3"
+  }
+}
