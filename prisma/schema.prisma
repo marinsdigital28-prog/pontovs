@@ -3,10 +3,14 @@ generator client {
 }
 
 
+
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+
 
 
 model Unit {
@@ -19,6 +23,8 @@ model Unit {
   punches   Punch[]
   settings  UnitSettings?
 }
+
+
 
 
 model User {
@@ -44,6 +50,8 @@ model User {
 }
 
 
+
+
 model Punch {
   id              String       @id @default(cuid())
   userId          String
@@ -67,13 +75,3 @@ model Punch {
   @@index([userId, timestamp])
   @@index([unitId, timestamp])
   @@index([status])
-}
-
-
-model PunchAudit {
-  id          String   @id @default(cuid())
-  punchId     String
-  punch       Punch    @relation(fields: [punchId], references: [id])
-  changedById String
-  changedBy   User     @relation("AuditAuthor", fields: [changedById], references: [id])
-  field       String   // ex: "timestamp", "type", "status"
