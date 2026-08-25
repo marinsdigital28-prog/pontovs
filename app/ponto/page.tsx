@@ -16,6 +16,7 @@ export default function Page() {
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const autoLookupRef = React.useRef('');
+  const pendingClientIdRef = React.useRef<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
@@ -97,7 +98,7 @@ export default function Page() {
     const payload = {
       employeeNumber: employee.employeeNumber,
       clientTimestamp: new Date().toISOString(),
-      clientId: crypto?.randomUUID?.() ?? `${Date.now()}`,
+      clientId: pendingClientIdRef.current ?? (pendingClientIdRef.current = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       photo: photoOverride ?? photo ?? null,
     };
 
@@ -112,6 +113,7 @@ export default function Page() {
       localStorage.setItem('lastPunch', JSON.stringify(json));
       setLastPunch(json);
       setNextType(nextAfter(json.type));
+      pendingClientIdRef.current = null;
       setConfirmation({
         type: json.type,
         timestamp: json.timestamp,
@@ -168,6 +170,7 @@ export default function Page() {
     setConfirmation(null);
     setStatusMsg(null);
     autoLookupRef.current = '';
+    pendingClientIdRef.current = null;
   }
 
   function nextAfter(type: string): 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null {
@@ -222,10 +225,10 @@ export default function Page() {
     const sourceX = (video.videoWidth - size) / 2;
     const sourceY = (video.videoHeight - size) / 2;
     const canvas = document.createElement('canvas');
-    canvas.width = 720;
-    canvas.height = 720;
-    canvas.getContext('2d')?.drawImage(video, sourceX, sourceY, size, size, 0, 0, 720, 720);
-    const capturedPhoto = canvas.toDataURL('image/jpeg', 0.86);
+    canvas.width = 480;
+    canvas.height = 480;
+    canvas.getContext('2d')?.drawImage(video, sourceX, sourceY, size, size, 0, 0, 480, 480);
+    const capturedPhoto = canvas.toDataURL('image/jpeg', 0.78);
     setPhoto(capturedPhoto);
     closeCamera();
     setStatusMsg('Foto capturada. Confirmando marcação...');

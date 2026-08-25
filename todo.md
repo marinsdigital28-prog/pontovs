@@ -35,3 +35,7 @@
 - [x] Corrigir travamento após captura quando a marcação não é salva
 - [x] Garantir persistência da foto e da batida no PostgreSQL
 - [x] Confirmar que a batida salva aparece no `/admin`
+- [x] Diagnosticar a falha atual de não registro no `/ponto`
+- [x] Garantir persistência idempotente da batida e da foto no PostgreSQL
+- [x] Confirmar sucesso somente após o banco responder com o registro criado
+- [x] Validar que o registro aparece no `/admin` e publicar a correção
