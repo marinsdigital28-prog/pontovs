@@ -264,8 +264,8 @@ export default function Page() {
         )}
 
         {step === 'register' && employee && (
-          <div style={{ marginTop: 18 }}>
-            <div className="summary" style={{ marginTop: 0 }}>
+          <div className="register-stage">
+            <div className="summary recognized-summary" style={{ marginTop: 0 }}>
               <div style={{ fontWeight: 800, color: 'var(--gold)' }}>Funcionário reconhecido</div>
               <div style={{ marginTop: 6, fontSize: '1.05rem', fontWeight: 700 }}>{employee.name}</div>
               <div className="small-muted" style={{ marginTop: 4 }}>Matrícula: {employee.employeeNumber}</div>
@@ -273,7 +273,7 @@ export default function Page() {
 
             {!confirmation && (
               <>
-                <div style={{ marginTop: 16 }}>
+                <div className="next-type-stage">
                   <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Próxima batida</div>
                   <div className="summary" style={{ marginTop: 0, textAlign: 'center' }}>
                     <div style={{ fontSize: '1.35rem', fontWeight: 800, color: nextType ? 'var(--gold)' : 'var(--success)' }}>
@@ -291,8 +291,8 @@ export default function Page() {
                 </div>
 
                 {cameraOpen && (
-                  <div style={{ marginTop: 16, textAlign: 'center' }}>
-                    <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Câmera frontal</div>
+                  <div className="camera-stage">
+                    <div className="small-muted" style={{ marginBottom: 6, fontWeight: 700 }}>Câmera frontal</div>
                     <div className="camera-preview-large">
                       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                     </div>
@@ -328,7 +328,7 @@ export default function Page() {
             )}
 
             {confirmation && (
-              <div className="summary" style={{ marginTop: 16, borderColor: 'rgba(46,211,138,0.5)', background: 'rgba(46,211,138,0.08)' }}>
+              <div className="summary confirmation-summary" style={{ marginTop: 12, borderColor: 'rgba(46,211,138,0.5)', background: 'rgba(46,211,138,0.08)' }}>
                 <div style={{ fontWeight: 800, color: 'var(--success)' }}>✓ Ponto registrado</div>
                 <div style={{ marginTop: 8, fontWeight: 700 }}>Tipo: {confirmation.type}</div>
                 <div className="small-muted" style={{ marginTop: 4 }}>{new Date(confirmation.timestamp).toLocaleTimeString()} • {new Date(confirmation.timestamp).toLocaleDateString()}</div>
