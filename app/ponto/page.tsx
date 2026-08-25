@@ -8,7 +8,7 @@ export default function Page() {
   const [lastPunch, setLastPunch] = useState<any>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [step, setStep] = useState<'lookup' | 'register'>('lookup');
-  const [matricula, setMatricula] = useState('4041');
+  const [matricula, setMatricula] = useState('');
   const [employee, setEmployee] = useState<any>(null);
   const [nextType, setNextType] = useState<'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null>('ENTRADA');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -68,10 +68,12 @@ export default function Page() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Matrícula não encontrada');
+      const recognizedNextType = data.nextType || 'ENTRADA';
       setEmployee(data);
-      setNextType(data.nextType || 'ENTRADA');
+      setNextType(recognizedNextType);
       setStep('register');
-      setStatusMsg('Funcionário reconhecido');
+      setStatusMsg(`Funcionário reconhecido. Abrindo a câmera para ${recognizedNextType}...`);
+      window.setTimeout(() => { void handlePhotoSelection(); }, 120);
     } catch (err: any) {
       setStatusMsg(err?.message || 'Matrícula inválida');
     } finally {
@@ -105,7 +107,8 @@ export default function Page() {
         type: json.type,
         timestamp: json.timestamp,
       });
-      setStatusMsg('Ponto registrado e sincronizado');
+      setStatusMsg('Ponto registrado e sincronizado. Preparando a próxima matrícula...');
+      window.setTimeout(() => resetForNextCollaborator(), 2200);
     } catch (err: any) {
       const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
       offline.push(payload);
@@ -140,6 +143,18 @@ export default function Page() {
 
   const dayString = now ? now.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
   const timeString = now ? now.toLocaleTimeString() : '--:--:--';
+
+  function resetForNextCollaborator() {
+    closeCamera();
+    setStep('lookup');
+    setMatricula('');
+    setEmployee(null);
+    setNextType('ENTRADA');
+    setPhoto(null);
+    setConfirmation(null);
+    setStatusMsg(null);
+    autoLookupRef.current = '';
+  }
 
   function nextAfter(type: string): 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null {
     const order = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'];
@@ -276,7 +291,7 @@ export default function Page() {
                 {cameraOpen && (
                   <div style={{ marginTop: 16, textAlign: 'center' }}>
                     <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Câmera frontal</div>
-                    <div style={{ width: 'min(100%, 320px)', aspectRatio: '1 / 1', margin: '0 auto', overflow: 'hidden', border: '4px solid var(--gold)', borderRadius: 18, background: '#071D13' }}>
+                    <div className="camera-preview-large">
                       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                     </div>
                     <div className="small-muted" style={{ marginTop: 8 }}>Mantenha o rosto centralizado</div>
@@ -287,8 +302,8 @@ export default function Page() {
 
                 {photo && !cameraOpen && (
                   <>
-                    <div style={{ marginTop: 16 }}>
-                      <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Foto confirmada</div>
+<div className="photo-confirmed-block">
+                  <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Foto confirmada</div>
                       <img src={photo} alt="Foto do usuário" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 12 }} />
                     </div>
 
@@ -323,7 +338,7 @@ export default function Page() {
             )}
             {statusMsg && <div className="status-msg">{statusMsg}</div>}
 
-            <button type="button" className="small-muted" style={{ marginTop: 12, background: 'transparent', border: 'none', padding: 0, color: 'var(--gold)', fontWeight: 700 }} onClick={() => { setStep('lookup'); setEmployee(null); setStatusMsg(null); setConfirmation(null); setPhoto(null); }}>
+            <button type="button" className="small-muted" style={{ marginTop: 12, background: 'transparent', border: 'none', padding: 0, color: 'var(--gold)', fontWeight: 700 }} onClick={resetForNextCollaborator}>
               Voltar para matrícula
             </button>
           </div>
