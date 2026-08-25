@@ -1,4 +1,10 @@
+import React from 'react';
+
 import prisma from '@/lib/prisma';
+
+
+
+const h = React.createElement;
 
 
 
@@ -10,9 +16,7 @@ export default async function AdminPage() {
     
     select: { name: true, email: true, role: true },
     
-  }) ?? { name: 'Gestor', email: '', role: 'ADMIN' as const };
-  
-
+  });
   
   const today = new Date();
   
@@ -30,17 +34,91 @@ export default async function AdminPage() {
     
   ]);
   
-
+  const summary = (label: string, value: number) => h('div', { className: 'summary' }, h('div', { className: 'small-muted' }, label), h('strong', { style: { fontSize: 28 } }, value));
   
-  return <main className="container" style={{ maxWidth: 1180 }}><div className="header-row"><div><div className="header-brand">Ponto Progredir</div>div><div className="header-greeting">Painel do gestor</div>div></div>div><div className="small-muted">{manager.name}</div>div></div>div>
+  const rows = recentPunches.map((punch) => h('tr', { key: punch.id, style: { borderTop: '1px solid var(--border)' } },
+                                              
+    h('td', { style: { padding: 10 } }, punch.user.name),
+                                              
+    h('td', { style: { padding: 10 } }, punch.user.employeeNumber || '—'),
+                                              
+    h('td', { style: { padding: 10 } }, punch.type),
+                                              
+    h('td', { style: { padding: 10 } }, new Date(punch.timestamp).toLocaleString('pt-BR')),
+                                              
+    h('td', { style: { padding: 10 } }, punch.status)
+                                              
+  ));
   
-    <section className="card" style={{ marginBottom: 18 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}><div><h1 style={{ margin: 0 }}>Visão geral</h1>h1><p className="small-muted">Os dados abaixo vêm do mesmo banco usado pelo /ponto.</p>p></div>div><a className="btn-secondary" href="/ponto">Abrir ponto</a>a></div>div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 18 }}><div className="summary"><div className="small-muted">Colaboradores ativos</div>div><strong style={{ fontSize: 28 }}>{employees}</strong>strong></div>div><div className="summary"><div className="small-muted">Marcações hoje</div>div><strong style={{ fontSize: 28 }}>{punchesToday}</strong>strong></div>div><div className="summary"><div className="small-muted">Inconsistências abertas</div>div><strong style={{ fontSize: 28 }}>{openInconsistencies}</strong>strong></div>div></div>div></section>section>
+  const header = h('div', { className: 'header-row' },
+                   
+    h('div', null, h('div', { className: 'header-brand' }, 'Ponto Progredir'), h('div', { className: 'header-greeting' }, 'Painel do gestor')),
+                   
+    h('div', { className: 'small-muted' }, manager?.name || 'Gestor')
+                   
+  );
   
-    <section className="card"><h2>Últimas marcações</h2>h2><div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th style={{ textAlign: 'left', padding: 10 }}>Colaborador</th>th><th style={{ textAlign: 'left', padding: 10 }}>Matrícula</th>th><th style={{ textAlign: 'left', padding: 10 }}>Tipo</th>th><th style={{ textAlign: 'left', padding: 10 }}>Data e hora</th>th><th style={{ textAlign: 'left', padding: 10 }}>Status</th>th></tr>tr></thead>thead><tbody>{recentPunches.map((punch) => <tr key={punch.id} style={{ borderTop: '1px solid var(--border)' }}><td style={{ padding: 10 }}>{punch.user.name}</td>td><td style={{ padding: 10 }}>{punch.user.employeeNumber || '—'}</td>td><td style={{ padding: 10 }}>{punch.type}</td>td><td style={{ padding: 10 }}>{new Date(punch.timestamp).toLocaleString('pt-BR')}</td>td><td style={{ padding: 10 }}>{punch.status}</td>td></tr>tr>)}</tbody>tbody></table>table></div>div></section>section></main>main>;
+  const overview = h('section', { className: 'card', style: { marginBottom: 18 } },
+                     
+    h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' } },
+      
+      h('div', null, h('h1', { style: { margin: 0 } }, 'Visão geral'), h('p', { className: 'small-muted' }, 'Os dados abaixo vêm do mesmo banco usado pelo /ponto.')),
+      
+      h('a', { className: 'btn-secondary', href: '/ponto' }, 'Abrir ponto')
+      
+    ),
+                     
+    h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 18 } },
+      
+      summary('Colaboradores ativos', employees), summary('Marcações hoje', punchesToday), summary('Inconsistências abertas', openInconsistencies)
+      
+    )
+                     
+  );
+  
+  const table = h('section', { className: 'card' }, h('h2', null, 'Últimas marcações'), h('div', { style: { overflowX: 'auto' } },
+                                                                                          
+    h('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+      
+      h('thead', null, h('tr', null, ...['Colaborador', 'Matrícula', 'Tipo', 'Data e hora', 'Status'].map((label) => h('th', { key: label, style: { textAlign: 'left', padding: 10 } }, label))),
+        
+      h('tbody', null, ...rows)
+        
+    )
+      
+  ));
+  
+  return h('main', { className: 'container', style: { maxWidth: 1180 } }, header, overview, table);
   
 }
 
-</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
