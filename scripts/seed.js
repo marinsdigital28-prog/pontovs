@@ -3,42 +3,20 @@ const bcrypt = require('bcryptjs');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-async function main(){
-  const email = 'admin@local';
-  const employeeNumber = '4041';
-  const hash = await bcrypt.hash('password', 10);
-
-  const existingByEmail = await prisma.user.findUnique({ where: { email } });
-  const existingByNumber = await prisma.user.findUnique({ where: { employeeNumber } });
-  const existing = existingByEmail || existingByNumber;
-
+async function main() {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!email || !password) throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required');
+  const hash = await bcrypt.hash(password, 12);
+  const existing = await prisma.user.findUnique({ where: { email } });
+  const data = { name: 'Gestor do Sistema', email, passwordHash: hash, role: 'MANAGER', active: true };
   if (existing) {
-    const updated = await prisma.user.update({
-      where: { id: existing.id },
-      data: {
-        name: 'Maicon Fernandes Marins',
-        employeeNumber,
-        email,
-        passwordHash: hash,
-        role: 'EMPLOYEE',
-      },
-    });
-    console.log('Updated user:', updated.name, 'matrícula:', updated.employeeNumber, 'cargo: Auxiliar Administrativo');
-    return;
+    await prisma.user.update({ where: { id: existing.id }, data });
+    console.log('Manager updated:', email);
+  } else {
+    await prisma.user.create({ data });
+    console.log('Manager created:', email);
   }
-
-  const user = await prisma.user.create({
-    data: {
-      name: 'Maicon Fernandes Marins',
-      employeeNumber,
-      email,
-      passwordHash: hash,
-      role: 'EMPLOYEE',
-    }
-  });
-  console.log('Created user:', user.name, 'matrícula:', user.employeeNumber, 'cargo: Auxiliar Administrativo');
 }
 
-main()
-  .catch((e)=>{ console.error(e); process.exit(1); })
-  .finally(async ()=>{ await prisma.$disconnect(); });
+main().catch((e) => { console.error(e); process.exit(1); }).finally(async () => { await prisma.$disconnect(); });
