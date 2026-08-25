@@ -12,3 +12,5 @@
 - [ ] Após registrar, retornar automaticamente à matrícula vazia para o próximo colaborador
 - [ ] Ao reconhecer a matrícula, abrir automaticamente câmera grande e seleção do tipo de batida
 - [ ] Reorganizar o `/ponto` para exibir todas as etapas principais em uma única tela sem rolagem
+- [ ] Confirmar a marcação automaticamente ao capturar a foto, sem segundo botão
+- [ ] Exibir a foto capturada ocupando quase toda a tela com confirmação destacada

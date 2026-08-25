@@ -81,7 +81,7 @@ export default function Page() {
     }
   }
 
-  async function handlePunch() {
+  async function handlePunch(photoOverride?: string | null) {
     if (!employee) return;
     setLoading(true);
     setStatusMsg('Registrando ponto com foto...');
@@ -89,7 +89,7 @@ export default function Page() {
       employeeNumber: employee.employeeNumber,
       clientTimestamp: new Date().toISOString(),
       clientId: crypto?.randomUUID?.() ?? `${Date.now()}`,
-      photo: photo || null,
+      photo: photoOverride ?? photo ?? null,
     };
 
     try {
@@ -198,7 +198,7 @@ export default function Page() {
     setCameraOpen(false);
   }
 
-  function capturePhoto() {
+  async function capturePhoto() {
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) {
       setStatusMsg('A câmera ainda está iniciando. Aguarde um instante.');
@@ -211,9 +211,11 @@ export default function Page() {
     canvas.width = 720;
     canvas.height = 720;
     canvas.getContext('2d')?.drawImage(video, sourceX, sourceY, size, size, 0, 0, 720, 720);
-    setPhoto(canvas.toDataURL('image/jpeg', 0.82));
+    const capturedPhoto = canvas.toDataURL('image/jpeg', 0.86);
+    setPhoto(capturedPhoto);
     closeCamera();
-    setStatusMsg('Foto capturada. Toque em Registrar ponto para confirmar.');
+    setStatusMsg('Foto capturada. Confirmando marcação...');
+    await handlePunch(capturedPhoto);
   }
 
   return (
@@ -295,7 +297,7 @@ export default function Page() {
                       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                     </div>
                     <div className="small-muted" style={{ marginTop: 8 }}>Mantenha o rosto centralizado</div>
-                    <button type="button" className="primary-btn" style={{ marginTop: 12 }} onClick={capturePhoto}>Registrar ponto</button>
+                    <button type="button" className="primary-btn" style={{ marginTop: 12 }} onClick={() => void capturePhoto()}>Capturar e registrar</button>
                     <button type="button" className="small-muted" style={{ marginTop: 8, background: 'transparent', border: 'none', padding: 0 }} onClick={closeCamera}>Cancelar câmera</button>
                   </div>
                 )}
@@ -317,7 +319,7 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <button className="primary-btn" style={{ marginTop: 16 }} onClick={handlePunch} disabled={loading}>
+                    <button className="primary-btn" style={{ marginTop: 16 }} onClick={() => void handlePunch()} disabled={loading}>
                       {loading ? 'Processando...' : 'REGISTRAR PONTO'}
                     </button>
                   </>
@@ -332,7 +334,7 @@ export default function Page() {
                 <div className="small-muted" style={{ marginTop: 4 }}>{new Date(confirmation.timestamp).toLocaleTimeString()} • {new Date(confirmation.timestamp).toLocaleDateString()}</div>
 
                 {photo && (
-                  <img src={photo} alt="Foto registrada" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 12, marginTop: 12 }} />
+                  <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />
                 )}
               </div>
             )}
