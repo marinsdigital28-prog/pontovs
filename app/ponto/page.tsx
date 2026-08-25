@@ -264,85 +264,29 @@ export default function Page() {
         )}
 
         {step === 'register' && employee && (
-          <div className="register-stage">
-            <div className="summary recognized-summary" style={{ marginTop: 0 }}>
-              <div style={{ fontWeight: 800, color: 'var(--gold)' }}>Funcionário reconhecido</div>
-              <div style={{ marginTop: 6, fontSize: '1.05rem', fontWeight: 700 }}>{employee.name}</div>
-              <div className="small-muted" style={{ marginTop: 4 }}>Matrícula: {employee.employeeNumber}</div>
-            </div>
-
-            {!confirmation && (
+          <div className="register-stage register-stage-minimal">
+            {!confirmation ? (
               <>
-                <div className="next-type-stage">
-                  <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Próxima batida</div>
-                  <div className="summary" style={{ marginTop: 0, textAlign: 'center' }}>
-                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: nextType ? 'var(--gold)' : 'var(--success)' }}>
-                      {nextType || 'Jornada encerrada'}
-                    </div>
-                    <div className="small-muted" style={{ marginTop: 6 }}>
-                      O sistema define automaticamente a sequência da jornada.
-                    </div>
-                  </div>
-                  {nextType && (
-                    <button type="button" className="primary-btn" style={{ marginTop: 12 }} onClick={handlePhotoSelection}>
-                      Tirar foto para {nextType}
-                    </button>
-                  )}
-                </div>
-
-                {cameraOpen && (
-                  <div className="camera-stage">
-                    <div className="small-muted" style={{ marginBottom: 6, fontWeight: 700 }}>Câmera frontal</div>
-                    <div className="camera-preview-large">
+                {cameraOpen ? (
+                  <div className="camera-stage camera-stage-minimal">
+                    <div className="camera-preview-large camera-preview-minimal">
                       <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
                     </div>
-                    <div className="small-muted" style={{ marginTop: 8 }}>Mantenha o rosto centralizado</div>
-                    <button type="button" className="primary-btn" style={{ marginTop: 12 }} onClick={() => void capturePhoto()}>Capturar e registrar</button>
-                    <button type="button" className="small-muted" style={{ marginTop: 8, background: 'transparent', border: 'none', padding: 0 }} onClick={closeCamera}>Cancelar câmera</button>
-                  </div>
-                )}
-
-                {photo && !cameraOpen && (
-                  <>
-<div className="photo-confirmed-block">
-                  <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Foto confirmada</div>
-                      <img src={photo} alt="Foto do usuário" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 12 }} />
-                    </div>
-
-                    <div className="location-row" style={{ marginTop: 16 }}>
-                      <div>
-                      <div className="location-title">📷 Evidência fotográfica</div>
-                      <div className="location-sub">Foto capturada e pronta para validação do registro</div>
-                      </div>
-                      <div className="location-dot">
-                        <span style={{color:'var(--success)'}}>●</span>
-                      </div>
-                    </div>
-
-                    <button className="primary-btn" style={{ marginTop: 16 }} onClick={() => void handlePunch()} disabled={loading}>
-                      {loading ? 'Processando...' : 'REGISTRAR PONTO'}
+                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void capturePhoto()} disabled={loading}>
+                      {loading ? 'Registrando...' : `Marcar + Foto (${nextType || 'PONTO'})`}
                     </button>
-                  </>
-                )}
+                  </div>
+                ) : null}
               </>
-            )}
-
-            {confirmation && (
-              <div className="summary confirmation-summary" style={{ marginTop: 12, borderColor: 'rgba(46,211,138,0.5)', background: 'rgba(46,211,138,0.08)' }}>
-                <div style={{ fontWeight: 800, color: 'var(--success)' }}>✓ Ponto registrado</div>
-                <div style={{ marginTop: 8, fontWeight: 700 }}>Tipo: {confirmation.type}</div>
-                <div className="small-muted" style={{ marginTop: 4 }}>{new Date(confirmation.timestamp).toLocaleTimeString()} • {new Date(confirmation.timestamp).toLocaleDateString()}</div>
-
-                {photo && (
-                  <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />
-                )}
+            ) : (
+              <div className="summary confirmation-summary confirmation-minimal">
+                <div className="confirmation-title">✓ Ponto registrado</div>
+                <div className="confirmation-name">{employee.name}</div>
+                <div className="confirmation-type">{confirmation.type} · {new Date(confirmation.timestamp).toLocaleTimeString()}</div>
+                {photo && <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />}
               </div>
             )}
-            {statusMsg && <div className="status-msg">{statusMsg}</div>}
-
-            <button type="button" className="small-muted" style={{ marginTop: 12, background: 'transparent', border: 'none', padding: 0, color: 'var(--gold)', fontWeight: 700 }} onClick={resetForNextCollaborator}>
-              Voltar para matrícula
-            </button>
+            {statusMsg && !confirmation && <div className="status-msg minimal-status">{statusMsg}</div>}
           </div>
         )}
 

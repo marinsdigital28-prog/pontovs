@@ -1,62 +1,23 @@
 export const dynamic = 'force-dynamic';
 
-import React from 'react';
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import PunchesPanel from './punches-panel';
-
-const h = React.createElement;
+import AdminDashboard from './admin-dashboard';
 
 export default async function AdminPage() {
   const session = (await getServerSession(authOptions as any)) as any;
   const sessionUserId = session?.user?.id;
   if (!sessionUserId) redirect('/auth/signin?callbackUrl=/admin');
-
-  const manager = await prisma.user.findFirst({
-    where: { id: sessionUserId, active: true, role: { in: ['ADMIN', 'MANAGER'] } },
-    select: { name: true, email: true, role: true },
-  });
+  const manager = await prisma.user.findFirst({ where: { id: sessionUserId, active: true, role: { in: ['ADMIN', 'MANAGER'] } }, select: { name: true } });
   if (!manager) redirect('/ponto');
-
+  const start = new Date(); start.setHours(0, 0, 0, 0);
   const [employeeCount, punchesToday, openInconsistencies, employeeOptions] = await Promise.all([
     prisma.user.count({ where: { active: true, role: 'EMPLOYEE' } }).catch(() => 0),
-    prisma.punch.count({ where: { timestamp: { gte: startOfToday() } } }).catch(() => 0),
+    prisma.punch.count({ where: { timestamp: { gte: start } } }).catch(() => 0),
     prisma.inconsistency.count({ where: { status: 'OPEN' } }).catch(() => 0),
-    prisma.user.findMany({ where: { active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true }, orderBy: { name: 'asc' } }).catch(() => []),
+    prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true }, orderBy: { name: 'asc' } }).catch(() => []),
   ]);
-
-  return h('main', { className: 'container', style: { maxWidth: 1180 } },
-    h('div', { className: 'header-row' },
-      h('div', null,
-        h('div', { className: 'header-brand' }, 'Ponto Progredir'),
-        h('div', { className: 'header-greeting' }, 'Painel do gestor')
-      ),
-      h('div', { className: 'small-muted' }, manager.name)
-    ),
-    h('section', { className: 'card' },
-      h('h1', null, 'Painel administrativo'),
-      h('p', { className: 'small-muted' }, 'Área restrita a gestores autenticados.'),
-      h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginTop: 18 } },
-        summary('Colaboradores ativos', employeeCount),
-        summary('Marcações hoje', punchesToday),
-        summary('Inconsistências abertas', openInconsistencies)
-      )
-    ),
-    h(PunchesPanel, { employees: employeeOptions })
-  );
-}
-
-function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function summary(label: string, value: number) {
-  return h('div', { className: 'summary' },
-    h('div', { className: 'small-muted' }, label),
-    h('strong', { style: { fontSize: 28 } }, value)
-  );
+  return <main className="admin-container"><header className="admin-header"><div><div className="header-brand">PONTO PROGREDIR</div><h1>Central administrativa</h1><p className="small-muted">Gestão operacional · {manager.name}</p></div><a className="ghost-btn" href="/ponto">Abrir ponto</a></header><AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: true }))} stats={{ employeeCount, punchesToday, openInconsistencies }} /><footer className="admin-footer">Desenvolvido por Marins Digital</footer></main>;
 }

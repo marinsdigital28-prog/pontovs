@@ -15,3 +15,12 @@
 - [x] Confirmar a marcação automaticamente ao capturar a foto, sem segundo botão
 - [x] Exibir a foto capturada ocupando quase toda a tela com confirmação destacada
 - [x] Fazer a segunda tela de registro caber inteira na viewport, sem rolagem vertical
+- [ ] Criar dashboard administrativo completo com indicadores e visão operacional
+- [ ] Criar gestão de colaboradores com cadastro, edição, ativação e matrícula
+- [ ] Criar gestão de turnos, jornada e dias trabalhados
+- [ ] Aprimorar gestão de registros de ponto com filtros, detalhes e fotos
+- [ ] Criar área de inconsistências, auditoria e ações administrativas
+- [ ] Validar segurança, responsividade, banco e publicar a área administrativa completa
+- [x] Simplificar a segunda etapa para exibir somente câmera e botão único “Marcar + Foto”
+- [x] Mostrar confirmação imediata na mesma tela após captura e envio
+- [x] Remover blocos extras e manter o fluxo rápido sem rolagem
