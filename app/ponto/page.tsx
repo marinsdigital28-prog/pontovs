@@ -18,6 +18,7 @@ export default function Page() {
   const autoLookupRef = React.useRef('');
   const pendingClientIdRef = React.useRef<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [journeyClosed, setJourneyClosed] = useState(false);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
 
@@ -61,6 +62,7 @@ export default function Page() {
   async function handleLookup() {
     setLoading(true);
     setStatusMsg(null);
+    setJourneyClosed(false);
     try {
       const r = await fetch('/api/identify', {
         method: 'POST',
@@ -71,12 +73,17 @@ export default function Page() {
       if (!r.ok) throw new Error(data.error || 'Matrícula não encontrada');
       const recognizedNextType = data.nextType as 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null;
       if (!recognizedNextType) {
+        closeCamera();
         setEmployee(null);
         setNextType('ENTRADA');
         setStep('lookup');
         setMatricula('');
+        setPhoto(null);
+        setConfirmation(null);
         autoLookupRef.current = '';
-        setStatusMsg('A jornada de hoje já foi encerrada para este colaborador.');
+        setJourneyClosed(true);
+        setStatusMsg('Jornada encerrada — todas as marcações de hoje já foram registradas.');
+        window.setTimeout(() => setJourneyClosed(false), 4500);
         return;
       }
       setEmployee(data);
@@ -121,6 +128,22 @@ export default function Page() {
       setStatusMsg('Ponto registrado e sincronizado. Preparando a próxima matrícula...');
       window.setTimeout(() => resetForNextCollaborator(), 2200);
     } catch (err: any) {
+      const errorMessage = err?.message || 'Não foi possível registrar a marcação. Tente novamente.';
+      if (/jornada.*encerrad|todas.*marcaç|todas.*batida/i.test(errorMessage)) {
+        closeCamera();
+        setPhoto(null);
+        setConfirmation(null);
+        setEmployee(null);
+        setNextType('ENTRADA');
+        setStep('lookup');
+        setMatricula('');
+        pendingClientIdRef.current = null;
+        autoLookupRef.current = '';
+        setJourneyClosed(true);
+        setStatusMsg('Jornada encerrada — todas as marcações de hoje já foram registradas.');
+        window.setTimeout(() => setJourneyClosed(false), 4500);
+        return;
+      }
       const isNetworkFailure = err instanceof TypeError || !navigator.onLine;
       if (isNetworkFailure) {
         const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
@@ -128,7 +151,7 @@ export default function Page() {
         localStorage.setItem('offlinePunches', JSON.stringify(offline));
         setStatusMsg('Sem conexão — salvo localmente e será reenviado quando online');
       } else {
-        setStatusMsg(err?.message || 'Não foi possível registrar a marcação. Tente novamente.');
+        setStatusMsg(errorMessage);
       }
     } finally {
       setLoading(false);
@@ -169,6 +192,7 @@ export default function Page() {
     setPhoto(null);
     setConfirmation(null);
     setStatusMsg(null);
+    setJourneyClosed(false);
     autoLookupRef.current = '';
     pendingClientIdRef.current = null;
   }
@@ -253,6 +277,12 @@ export default function Page() {
 
         {step === 'lookup' && (
           <div style={{ marginTop: 18 }}>
+            {journeyClosed && statusMsg && (
+              <div className="journey-closed-notice" role="status">
+                <strong>Jornada encerrada</strong>
+                <span>{statusMsg}</span>
+              </div>
+            )}
             <div className="small-muted" style={{ marginBottom: 10, fontWeight: 700 }}>Digite sua matrícula</div>
             <div className="matricula-shell">
               <div className="matricula-label">MATRÍCULA</div>
@@ -276,7 +306,7 @@ export default function Page() {
             <button className="primary-btn" style={{ marginTop: 18 }} onClick={handleLookup} disabled={loading || !matricula.trim()}>
               {loading ? 'Buscando...' : 'Continuar'}
             </button>
-            {statusMsg && <div className="status-msg">{statusMsg}</div>}
+            {statusMsg && !journeyClosed && <div className="status-msg">{statusMsg}</div>}
           </div>
         )}
 

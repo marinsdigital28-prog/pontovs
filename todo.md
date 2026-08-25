@@ -44,3 +44,5 @@
 - [x] Validar filtros de período, colaborador e tipo de batida
 - [x] Confirmar exibição correta de horário, status, origem e foto
 - [ ] Corrigir divergências e publicar a revisão dos relatórios
+- [x] Exibir mensagem clara quando todas as batidas do dia já estiverem concluídas
+- [x] Impedir abertura da câmera em jornada encerrada e retornar à matrícula após feedback
