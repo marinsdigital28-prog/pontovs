@@ -27,3 +27,11 @@
 - [x] Diagnosticar por que o `/ponto` mostra “Sem conexão” e fica sem a etapa da câmera
 - [x] Corrigir o tratamento de erros para diferenciar offline, câmera e falha da API
 - [x] Validar o fluxo de matrícula, câmera, registro e confirmação após a correção
+- [ ] Criar gestão administrativa completa de usuários, perfis e status de acesso
+- [ ] Criar relatórios de marcações, jornada, faltas e inconsistências
+- [ ] Adicionar filtros por período, colaborador, setor e tipo de batida
+- [ ] Adicionar exportação de relatórios em CSV
+- [ ] Validar permissões, consultas, responsividade e publicação
+- [x] Corrigir travamento após captura quando a marcação não é salva
+- [x] Garantir persistência da foto e da batida no PostgreSQL
+- [x] Confirmar que a batida salva aparece no `/admin`

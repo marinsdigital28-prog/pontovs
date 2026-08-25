@@ -68,7 +68,16 @@ export default function Page() {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Matrícula não encontrada');
-      const recognizedNextType = data.nextType || 'ENTRADA';
+      const recognizedNextType = data.nextType as 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null;
+      if (!recognizedNextType) {
+        setEmployee(null);
+        setNextType('ENTRADA');
+        setStep('lookup');
+        setMatricula('');
+        autoLookupRef.current = '';
+        setStatusMsg('A jornada de hoje já foi encerrada para este colaborador.');
+        return;
+      }
       setEmployee(data);
       setNextType(recognizedNextType);
       setStep('register');
