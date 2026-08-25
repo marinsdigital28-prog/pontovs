@@ -39,3 +39,8 @@
 - [x] Garantir persistência idempotente da batida e da foto no PostgreSQL
 - [x] Confirmar sucesso somente após o banco responder com o registro criado
 - [x] Validar que o registro aparece no `/admin` e publicar a correção
+- [ ] Publicar na Vercel o commit 4d3c627 da correção definitiva do salvamento
+- [x] Revisar a tela de relatórios administrativos e sua consulta de registros
+- [x] Validar filtros de período, colaborador e tipo de batida
+- [x] Confirmar exibição correta de horário, status, origem e foto
+- [ ] Corrigir divergências e publicar a revisão dos relatórios
