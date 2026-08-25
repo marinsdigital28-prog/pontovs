@@ -1,5 +1,6 @@
 import Providers from '../components/Providers';
 import './globals.css';
+import PwaRegister from '@/components/PwaRegister';
 
 export default function RootLayout({
   children,
@@ -10,6 +11,7 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body>
         <Providers>
+          <PwaRegister />
           {children}
         </Providers>
       </body>

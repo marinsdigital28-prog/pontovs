@@ -5,17 +5,18 @@ import React, { useEffect, useState } from 'react';
 export default function Page() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [locationState, setLocationState] = useState<'unknown' | 'getting' | 'valid' | 'failed'>('unknown');
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [lastPunch, setLastPunch] = useState<any>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [step, setStep] = useState<'lookup' | 'register'>('lookup');
   const [matricula, setMatricula] = useState('4041');
   const [employee, setEmployee] = useState<any>(null);
-  const [selectedType, setSelectedType] = useState<'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO'>('ENTRADA');
+  const [nextType, setNextType] = useState<'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null>('ENTRADA');
   const [photo, setPhoto] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{ type: string; timestamp: string; location?: { lat: number; lng: number } | null } | null>(null);
-  const photoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+  const streamRef = React.useRef<MediaStream | null>(null);
+  const autoLookupRef = React.useRef('');
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
 
@@ -42,26 +43,19 @@ export default function Page() {
     if (saved) setLastPunch(JSON.parse(saved));
   }, []);
 
-  async function acquireLocation() {
-    setLocationState('getting');
-    setStatusMsg('Obtendo localização...');
-    try {
-      const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!('geolocation' in navigator)) return reject(new Error('Geolocation not supported'));
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
-      });
-      const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      setLocation(coords);
-      setLocationState('valid');
-      setStatusMsg('Localização validada');
-      return coords;
-    } catch (err: any) {
-      setLocation(null);
-      setLocationState('failed');
-      setStatusMsg(err?.message || 'Não foi possível validar sua localização');
-      return null;
+  useEffect(() => {
+    const value = matricula.replace(/\D/g, '').trim();
+    if (step !== 'lookup' || value.length < 4) {
+      autoLookupRef.current = '';
+      return;
     }
-  }
+    if (autoLookupRef.current === value || loading) return;
+    const timer = window.setTimeout(() => {
+      autoLookupRef.current = value;
+      void handleLookup();
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [matricula, step, loading]);
 
   async function handleLookup() {
     setLoading(true);
@@ -75,6 +69,7 @@ export default function Page() {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Matrícula não encontrada');
       setEmployee(data);
+      setNextType(data.nextType || 'ENTRADA');
       setStep('register');
       setStatusMsg('Funcionário reconhecido');
     } catch (err: any) {
@@ -87,16 +82,12 @@ export default function Page() {
   async function handlePunch() {
     if (!employee) return;
     setLoading(true);
-    setStatusMsg('Capturando localização e registrando ponto...');
-    const coords = await acquireLocation();
+    setStatusMsg('Registrando ponto com foto...');
     const payload = {
-      type: selectedType,
       employeeNumber: employee.employeeNumber,
-      timestamp: new Date().toISOString(),
       clientTimestamp: new Date().toISOString(),
       clientId: crypto?.randomUUID?.() ?? `${Date.now()}`,
       photo: photo || null,
-      location: coords ? { lat: coords.lat, lng: coords.lng } : null,
     };
 
     try {
@@ -109,10 +100,10 @@ export default function Page() {
       if (!r.ok) throw new Error(json.error || 'Erro ao registrar ponto');
       localStorage.setItem('lastPunch', JSON.stringify(json));
       setLastPunch(json);
+      setNextType(nextAfter(json.type));
       setConfirmation({
-        type: payload.type,
-        timestamp: payload.timestamp,
-        location: payload.location ?? null,
+        type: json.type,
+        timestamp: json.timestamp,
       });
       setStatusMsg('Ponto registrado e sincronizado');
     } catch (err: any) {
@@ -120,7 +111,6 @@ export default function Page() {
       offline.push(payload);
       localStorage.setItem('offlinePunches', JSON.stringify(offline));
       setStatusMsg('Sem conexão — salvo localmente e será reenviado quando online');
-      setLocationState(location ? 'valid' : 'failed');
     } finally {
       setLoading(false);
       if (!confirmation) {
@@ -151,26 +141,64 @@ export default function Page() {
   const dayString = now ? now.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
   const timeString = now ? now.toLocaleTimeString() : '--:--:--';
 
-  function handlePhotoTypeSelection(option: 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO') {
-    setSelectedType(option);
-    setPhoto(null);
-    setConfirmation(null);
-    setStatusMsg('Abrindo câmera do dispositivo...');
-    setTimeout(() => {
-      photoInputRef.current?.click();
-    }, 180);
+  function nextAfter(type: string): 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null {
+    const order = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'];
+    const index = order.indexOf(type);
+    return index >= 0 && index < order.length - 1 ? order[index + 1] as 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' : null;
   }
 
-  function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPhoto(String(reader.result));
-      setStatusMsg('Foto capturada. Localização e registro em andamento...');
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
     };
-    reader.readAsDataURL(file);
-    event.target.value = '';
+  }, []);
+
+  useEffect(() => {
+    if (!cameraOpen || !streamRef.current || !videoRef.current) return;
+    videoRef.current.srcObject = streamRef.current;
+    void videoRef.current.play().catch(() => undefined);
+  }, [cameraOpen]);
+
+  async function handlePhotoSelection() {
+    setPhoto(null);
+    setConfirmation(null);
+    setStatusMsg('Solicitando câmera frontal...');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setStatusMsg('Este navegador não permite câmera interna. Abra o endereço em HTTPS no celular.');
+      return;
+    }
+    try {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } }, audio: false });
+      setCameraOpen(true);
+      setStatusMsg('Câmera pronta. Posicione o rosto no quadrado e toque em Registrar ponto.');
+    } catch {
+      setStatusMsg('Permita o acesso à câmera frontal para continuar.');
+    }
+  }
+
+  function closeCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  }
+
+  function capturePhoto() {
+    const video = videoRef.current;
+    if (!video || video.videoWidth === 0) {
+      setStatusMsg('A câmera ainda está iniciando. Aguarde um instante.');
+      return;
+    }
+    const size = Math.min(video.videoWidth, video.videoHeight);
+    const sourceX = (video.videoWidth - size) / 2;
+    const sourceY = (video.videoHeight - size) / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 720;
+    canvas.getContext('2d')?.drawImage(video, sourceX, sourceY, size, size, 0, 0, 720, 720);
+    setPhoto(canvas.toDataURL('image/jpeg', 0.82));
+    closeCamera();
+    setStatusMsg('Foto capturada. Toque em Registrar ponto para confirmar.');
   }
 
   return (
@@ -229,42 +257,35 @@ export default function Page() {
             {!confirmation && (
               <>
                 <div style={{ marginTop: 16 }}>
-                  <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Tipo de marcação</div>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {(['ENTRADA', 'SAIDA', 'INTERVALO', 'RETORNO'] as const).map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => handlePhotoTypeSelection(option)}
-                        style={{
-                          width: '100%',
-                          padding: '11px 12px',
-                          borderRadius: 10,
-                          border: selectedType === option ? '1px solid rgba(212, 175, 55, 0.9)' : '1px solid var(--border)',
-                          background: selectedType === option ? 'rgba(212, 175, 55, 0.12)' : 'rgba(255,255,255,0.02)',
-                          color: 'var(--text)',
-                          fontWeight: 700,
-                        }}
-                      >
-                        {option}
-                      </button>
-                    ))}
+                  <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Próxima batida</div>
+                  <div className="summary" style={{ marginTop: 0, textAlign: 'center' }}>
+                    <div style={{ fontSize: '1.35rem', fontWeight: 800, color: nextType ? 'var(--gold)' : 'var(--success)' }}>
+                      {nextType || 'Jornada encerrada'}
+                    </div>
+                    <div className="small-muted" style={{ marginTop: 6 }}>
+                      O sistema define automaticamente a sequência da jornada.
+                    </div>
                   </div>
+                  {nextType && (
+                    <button type="button" className="primary-btn" style={{ marginTop: 12 }} onClick={handlePhotoSelection}>
+                      Tirar foto para {nextType}
+                    </button>
+                  )}
                 </div>
 
-                <div style={{ marginTop: 16 }}>
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="input"
-                    onChange={handlePhotoChange}
-                    style={{ display: 'none' }}
-                  />
-                </div>
+                {cameraOpen && (
+                  <div style={{ marginTop: 16, textAlign: 'center' }}>
+                    <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Câmera frontal</div>
+                    <div style={{ width: 'min(100%, 320px)', aspectRatio: '1 / 1', margin: '0 auto', overflow: 'hidden', border: '4px solid var(--gold)', borderRadius: 18, background: '#071D13' }}>
+                      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                    </div>
+                    <div className="small-muted" style={{ marginTop: 8 }}>Mantenha o rosto centralizado</div>
+                    <button type="button" className="primary-btn" style={{ marginTop: 12 }} onClick={capturePhoto}>Registrar ponto</button>
+                    <button type="button" className="small-muted" style={{ marginTop: 8, background: 'transparent', border: 'none', padding: 0 }} onClick={closeCamera}>Cancelar câmera</button>
+                  </div>
+                )}
 
-                {photo && (
+                {photo && !cameraOpen && (
                   <>
                     <div style={{ marginTop: 16 }}>
                       <div className="small-muted" style={{ marginBottom: 8, fontWeight: 700 }}>Foto confirmada</div>
@@ -273,19 +294,16 @@ export default function Page() {
 
                     <div className="location-row" style={{ marginTop: 16 }}>
                       <div>
-                        <div className="location-title">{locationState === 'valid' ? '📍 Localização' : locationState === 'getting' ? '📍 Obtendo localização...' : locationState === 'failed' ? '📍 Erro de localização' : '📍 Localização'}</div>
-                        <div className="location-sub">{locationState === 'valid' ? 'Localização validada' : locationState === 'getting' ? 'Aguardando confirmação...' : locationState === 'failed' ? (statusMsg || 'Falha ao validar') : 'Verificação pendente'}</div>
+                      <div className="location-title">📷 Evidência fotográfica</div>
+                      <div className="location-sub">Foto capturada e pronta para validação do registro</div>
                       </div>
                       <div className="location-dot">
-                        {locationState === 'valid' && <span style={{color:'var(--success)'}}>●</span>}
-                        {locationState === 'getting' && <span style={{color:'var(--warn)'}}>●</span>}
-                        {locationState === 'failed' && <span style={{color:'var(--error)'}}>●</span>}
-                        {locationState === 'unknown' && <span style={{color:'var(--muted)'}}>●</span>}
+                        <span style={{color:'var(--success)'}}>●</span>
                       </div>
                     </div>
 
                     <button className="primary-btn" style={{ marginTop: 16 }} onClick={handlePunch} disabled={loading}>
-                      {loading ? 'Processando...' : 'BATER PONTO'}
+                      {loading ? 'Processando...' : 'REGISTRAR PONTO'}
                     </button>
                   </>
                 )}
@@ -297,9 +315,7 @@ export default function Page() {
                 <div style={{ fontWeight: 800, color: 'var(--success)' }}>✓ Ponto registrado</div>
                 <div style={{ marginTop: 8, fontWeight: 700 }}>Tipo: {confirmation.type}</div>
                 <div className="small-muted" style={{ marginTop: 4 }}>{new Date(confirmation.timestamp).toLocaleTimeString()} • {new Date(confirmation.timestamp).toLocaleDateString()}</div>
-                {confirmation.location && (
-                  <div className="small-muted" style={{ marginTop: 6 }}>Geolocalização: {confirmation.location.lat.toFixed(4)}, {confirmation.location.lng.toFixed(4)}</div>
-                )}
+
                 {photo && (
                   <img src={photo} alt="Foto registrada" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 12, marginTop: 12 }} />
                 )}
@@ -317,9 +333,6 @@ export default function Page() {
           <div className="summary" style={{ marginTop: 16 }}>
             <div style={{ fontWeight: 800, color: 'var(--gold)' }}>Último registro</div>
             <div style={{ marginTop: 6 }}>{lastPunch.type} • {new Date(lastPunch.timestamp).toLocaleTimeString()}</div>
-            {lastPunch.location && (
-              <div className="small-muted">{lastPunch.location.lat.toFixed(4)}, {lastPunch.location.lng.toFixed(4)}</div>
-            )}
           </div>
         )}
       </div>

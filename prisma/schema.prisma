@@ -68,6 +68,7 @@ model Punch {
   status          String       @default("VALID")
   origin          String       @default("WEB") // WEB | OFFLINE | ADJUSTED
   clientId        String?      @unique // id gerado no dispositivo
+  photoData       String?      @db.Text // evidência fotográfica em data URL; migrar para storage dedicado em produção
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   audits          PunchAudit[]

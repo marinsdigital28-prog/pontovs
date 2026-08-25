@@ -8,6 +8,43 @@ export const dynamic = 'force-dynamic';
 
 
 
+const profiles: Record<string, { jobTitle: string; workDays: string }> = {
+  '2904': { jobTitle: 'COZINHEIRO', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '0506': { jobTitle: 'VICE DIRETOR', workDays: 'Ter, Qui, Sex' },
+  '0043': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '0026': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg a Sex (Afastado por Cirurgia)' },
+  '2203': { jobTitle: 'ARTESANATO', workDays: 'Sex' },
+  '0042': { jobTitle: 'PSICOPEDAGOGA', workDays: 'Qua, Qui' },
+  '1705': { jobTitle: 'SECRETÁRIO ESCOLAR', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '1701': { jobTitle: 'COZINHEIRA', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '0029': { jobTitle: 'PROFESSORA DE EDUCAÇÃO FÍSICA', workDays: 'Ter, Qua, Qui' },
+  '0050': { jobTitle: 'AUXILIAR DE SERVIÇOS GERAIS', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '3107': { jobTitle: 'CONTADORA DE HISTÓRIAS', workDays: 'Ter' },
+  '0019': { jobTitle: 'INSTRUTOR DE MUSICA', workDays: 'Qui, Sex' },
+  '0304': { jobTitle: 'PROFESSOR JIU JITSU', workDays: 'Ter, Qua, Qui' },
+  '0028': { jobTitle: 'INSTRUTOR DE CAPOEIRA', workDays: 'Seg, Qua, Sex' },
+  '2506': { jobTitle: 'AUXILIAR DE SERVIÇOS GERAIS', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '1811': { jobTitle: 'PSICOLOGA', workDays: 'Seg, Ter, Sex' },
+  '2409': { jobTitle: 'PROFESSORA', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '0803': { jobTitle: 'JOVEM APRENDIZ', workDays: 'Seg, Qua, Qui, Sex' },
+  '5050': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '4041': { jobTitle: 'ADMINISTRATIVO', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '0021': { jobTitle: 'ASSISTENTE SOCIAL', workDays: 'Ter, Qua, Qui' },
+  '0011': { jobTitle: 'ASSISTENTE SOCIAL', workDays: 'Seg, Ter, Qua' },
+  '1508': { jobTitle: 'PSICÓLOGA', workDays: 'Seg, Ter, Qui' },
+  '0909': { jobTitle: 'PSICÓLOGA', workDays: 'Ter, Qua, Qui' },
+  '0701': { jobTitle: 'CONTADORA', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '1910': { jobTitle: 'ASSISTENTE SOCIAL', workDays: 'Seg, Qua' },
+  '0040': { jobTitle: 'PROFESSORA DE TEATRO', workDays: 'Seg, Sex' },
+  '1807': { jobTitle: 'PSICOLOGA', workDays: 'Ter, Qui' },
+  '5500': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '2201': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '5100': { jobTitle: 'FONOAUDIÓLOGA', workDays: 'Seg, Qua' },
+  '2611': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '1404': { jobTitle: 'EDUCADOR SOCIAL', workDays: 'Seg, Ter, Qua, Qui, Sex' },
+  '2020': { jobTitle: 'INSTRUTOR DE DESENHO', workDays: 'Seg, Qua' },
+};
+
 const employees = [
   
   ['ANA MARIA DOS SANTOS CAVALCANTE', '2904'],
@@ -98,11 +135,12 @@ export async function POST(request: Request) {
     
     for (const [name, employeeNumber] of employees) {
       
+      const profile = profiles[employeeNumber];
       await prisma.user.upsert({
         
         where: { employeeNumber },
         
-        update: { name, role: 'EMPLOYEE', active: true },
+        update: { name, role: 'EMPLOYEE', active: true, jobTitle: profile?.jobTitle ?? null, workDays: profile?.workDays ?? null },
         
         create: {
           
@@ -119,6 +157,8 @@ export async function POST(request: Request) {
           role: 'EMPLOYEE',
           
           active: true,
+          jobTitle: profile?.jobTitle ?? null,
+          workDays: profile?.workDays ?? null,
           
         },
         
