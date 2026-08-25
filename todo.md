@@ -5,3 +5,5 @@
 - [ ] Confirmar autenticação e carregamento do painel em produção
 - [ ] Validar que `/ponto` permanece funcionando
 
+- [ ] Alterar o login administrativo para aceitar somente senha global
+- [ ] Validar acesso ao `/admin` sem campo de e-mail no domínio de produção

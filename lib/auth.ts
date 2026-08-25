@@ -3,27 +3,36 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import prisma from './prisma';
 
+const managerRoles = ['ADMIN', 'MANAGER'];
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: 'AdminPassword',
       credentials: {
-        email: { label: 'Email', type: 'text' },
-        password: { label: 'Password', type: 'password' },
+        password: { label: 'Senha administrativa', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-        const user = await prisma.user.findUnique({ where: { email: credentials.email } });
-        if (!user || !user.passwordHash) return null;
-        const ok = await bcrypt.compare(credentials.password, user.passwordHash);
-        if (!ok) return null;
-        return { id: user.id, name: user.name, email: user.email };
+        const password = credentials?.password;
+        if (!password) return null;
+
+        const manager = await prisma.user.findFirst({
+          where: { active: true, role: { in: managerRoles } },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (!manager) return null;
+
+        const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD;
+        const validPassword = configuredPassword
+          ? password === configuredPassword
+          : Boolean(manager.passwordHash && await bcrypt.compare(password, manager.passwordHash));
+
+        if (!validPassword) return null;
+        return { id: manager.id, name: manager.name, email: manager.email };
       },
     }),
   ],
-  session: {
-    strategy: 'jwt',
-  },
+  session: { strategy: 'jwt' },
   callbacks: {
     async jwt({ token, user }) {
       if (user) token.id = (user as any).id;
@@ -34,7 +43,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  pages: {
-    signIn: '/auth/signin',
-  },
+  pages: { signIn: '/auth/signin' },
 };
