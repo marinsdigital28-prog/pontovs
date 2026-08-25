@@ -15,12 +15,15 @@
 - [x] Confirmar a marcação automaticamente ao capturar a foto, sem segundo botão
 - [x] Exibir a foto capturada ocupando quase toda a tela com confirmação destacada
 - [x] Fazer a segunda tela de registro caber inteira na viewport, sem rolagem vertical
-- [ ] Criar dashboard administrativo completo com indicadores e visão operacional
-- [ ] Criar gestão de colaboradores com cadastro, edição, ativação e matrícula
-- [ ] Criar gestão de turnos, jornada e dias trabalhados
-- [ ] Aprimorar gestão de registros de ponto com filtros, detalhes e fotos
-- [ ] Criar área de inconsistências, auditoria e ações administrativas
-- [ ] Validar segurança, responsividade, banco e publicar a área administrativa completa
+- [x] Criar dashboard administrativo completo com indicadores e visão operacional
+- [x] Criar gestão de colaboradores com cadastro, edição, ativação e matrícula
+- [x] Criar gestão de turnos, jornada e dias trabalhados
+- [x] Aprimorar gestão de registros de ponto com filtros, detalhes e fotos
+- [x] Criar área de inconsistências, auditoria e ações administrativas
+- [x] Validar segurança, responsividade, banco e publicar a área administrativa completa
 - [x] Simplificar a segunda etapa para exibir somente câmera e botão único “Marcar + Foto”
 - [x] Mostrar confirmação imediata na mesma tela após captura e envio
 - [x] Remover blocos extras e manter o fluxo rápido sem rolagem
+- [x] Diagnosticar por que o `/ponto` mostra “Sem conexão” e fica sem a etapa da câmera
+- [x] Corrigir o tratamento de erros para diferenciar offline, câmera e falha da API
+- [x] Validar o fluxo de matrícula, câmera, registro e confirmação após a correção

@@ -110,10 +110,15 @@ export default function Page() {
       setStatusMsg('Ponto registrado e sincronizado. Preparando a próxima matrícula...');
       window.setTimeout(() => resetForNextCollaborator(), 2200);
     } catch (err: any) {
-      const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
-      offline.push(payload);
-      localStorage.setItem('offlinePunches', JSON.stringify(offline));
-      setStatusMsg('Sem conexão — salvo localmente e será reenviado quando online');
+      const isNetworkFailure = err instanceof TypeError || !navigator.onLine;
+      if (isNetworkFailure) {
+        const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
+        offline.push(payload);
+        localStorage.setItem('offlinePunches', JSON.stringify(offline));
+        setStatusMsg('Sem conexão — salvo localmente e será reenviado quando online');
+      } else {
+        setStatusMsg(err?.message || 'Não foi possível registrar a marcação. Tente novamente.');
+      }
     } finally {
       setLoading(false);
       if (!confirmation) {
@@ -276,7 +281,19 @@ export default function Page() {
                       {loading ? 'Registrando...' : `Marcar + Foto (${nextType || 'PONTO'})`}
                     </button>
                   </div>
-                ) : null}
+                ) : photo ? (
+                  <div className="camera-stage camera-stage-minimal photo-retry-stage">
+                    <img src={photo} alt="Foto capturada" className="camera-preview-large camera-preview-minimal" />
+                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePunch(photo)} disabled={loading}>
+                      {loading ? 'Registrando...' : 'Tentar registrar novamente'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="camera-stage camera-stage-minimal">
+                    <div className="status-msg">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
+                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePhotoSelection()} disabled={loading}>Abrir câmera</button>
+                  </div>
+                )}
               </>
             ) : (
               <div className="summary confirmation-summary confirmation-minimal">
