@@ -1,7 +1,11 @@
+export const dynamic = 'force-dynamic';
+
 import React from 'react';
 import prisma from '@/lib/prisma';
 
+
 const h = React.createElement;
+
 
 export default async function AdminPage() {
   const employees = await prisma.user.count({ where: { active: true, role: 'EMPLOYEE' } });
@@ -17,3 +21,4 @@ export default async function AdminPage() {
     )
   );
 }
+
