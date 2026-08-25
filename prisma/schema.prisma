@@ -2,10 +2,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 
 model Unit {
   id        String   @id @default(cuid())
@@ -18,10 +20,16 @@ model Unit {
   settings  UnitSettings?
 }
 
+
 model User {
   id            String    @id @default(cuid())
   name          String
   employeeNumber String?  @unique
+  cpf           String?  @unique
+  jobTitle      String?
+  workDays      String?
+  scheduleStart String?
+  scheduleEnd   String?
   email         String    @unique
   passwordHash  String?
   role          String    @default("EMPLOYEE")
@@ -34,6 +42,7 @@ model User {
   audits        PunchAudit[] @relation("AuditAuthor")
   inconsistencies Inconsistency[]
 }
+
 
 model Punch {
   id              String       @id @default(cuid())
@@ -60,6 +69,7 @@ model Punch {
   @@index([status])
 }
 
+
 model PunchAudit {
   id          String   @id @default(cuid())
   punchId     String
@@ -67,39 +77,3 @@ model PunchAudit {
   changedById String
   changedBy   User     @relation("AuditAuthor", fields: [changedById], references: [id])
   field       String   // ex: "timestamp", "type", "status"
-  oldValue    String?
-  newValue    String?
-  reason      String?
-  createdAt   DateTime @default(now())
-  @@index([punchId])
-}
-
-model Inconsistency {
-  id          String              @id @default(cuid())
-  userId      String
-  user        User                @relation(fields: [userId], references: [id])
-  punchId     String?
-  punch       Punch?              @relation(fields: [punchId], references: [id])
-  type        String
-  status      String @default("OPEN")
-  description String?
-  detectedAt  DateTime            @default(now())
-  resolvedAt  DateTime?
-  resolvedBy  String?
-  @@index([status])
-  @@index([userId, status])
-}
-
-model UnitSettings {
-  id                    String  @id @default(cuid())
-  unitId                String  @unique
-  unit                  Unit    @relation(fields: [unitId], references: [id])
-  latitude              Float?
-  longitude             Float?
-  geofenceRadiusMeters  Int     @default(150)
-  requireLocation       Boolean @default(true)
-  allowOffline          Boolean @default(true)
-  maxOfflineHours       Int     @default(24)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-}
