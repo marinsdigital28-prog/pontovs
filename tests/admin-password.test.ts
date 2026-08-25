@@ -16,7 +16,7 @@ describe('admin password authentication', () => {
     const csrfResponse = await fetch(`${baseUrl}/api/auth/csrf`);
     expect(csrfResponse.status).toBe(200);
     const { csrfToken } = await csrfResponse.json() as { csrfToken: string };
-    const cookie = csrfResponse.headers.get('set-cookie') ?? '';
+    const cookie = (csrfResponse.headers.get('set-cookie') ?? '').split(';')[0];
 
     const loginResponse = await fetch(`${baseUrl}/api/auth/callback/credentials`, {
       method: 'POST',
@@ -24,7 +24,7 @@ describe('admin password authentication', () => {
         'content-type': 'application/x-www-form-urlencoded',
         cookie,
       },
-      body: new URLSearchParams({ csrfToken, password: password as string, json: 'true' }),
+      body: new URLSearchParams({ csrfToken, password: password as string, callbackUrl: '/admin', json: 'true' }),
       redirect: 'manual',
     });
 
