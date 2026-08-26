@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
         });
         if (!manager) return null;
 
-        const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD;
+        const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD || process.env.ADMIN_PASSWORD || process.env.SENHA_DE_ADMINISTRADOR || process.env.SENHA_DE_ACESSO_DE_ADMINISTRADOR;
         const validPassword = configuredPassword
           ? password === configuredPassword
           : Boolean(manager.passwordHash && await bcrypt.compare(password, manager.passwordHash));

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +16,12 @@ function localTimestamp(date: string, time: string) {
 
 export async function POST(request: Request) {
   const token = request.headers.get('x-import-token');
-  if (!process.env.ADMIN_PASSWORD || token !== process.env.ADMIN_PASSWORD) {
-    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
-  }
+  const configuredPassword = process.env.ADMIN_PASSWORD || process.env.SENHA_DE_ADMINISTRADOR || process.env.SENHA_DE_ACESSO_DE_ADMINISTRADOR;
+  const tokenAuthorized = Boolean(configuredPassword && token === configuredPassword);
+  const session = tokenAuthorized ? null : ((await getServerSession(authOptions as any)) as any);
+  const sessionUserId = session?.user?.id as string | undefined;
+  const manager = sessionUserId ? await prisma.user.findFirst({ where: { id: sessionUserId, active: true, role: { in: ['ADMIN', 'MANAGER'] } }, select: { id: true } }) : null;
+  if (!tokenAuthorized && !manager) return NextResponse.json({ error: 'Sessão de gestor ou token de importação obrigatório.' }, { status: 401 });
 
   try {
     const body = await request.json();
