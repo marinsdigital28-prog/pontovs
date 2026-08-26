@@ -281,3 +281,4 @@
 - [x] Auditar e preparar o CSV completo de marcações de agosto sem duplicidades
 - [ ] Importar o CSV completo de marcações de agosto no ambiente autorizado
 - [x] Atualizar logo do aplicativo para ícone circular com borda amarelo-dourada
+- [x] Refletir alterações de cargo, dias e horários imediatamente na Folha de Ponto
