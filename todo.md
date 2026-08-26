@@ -50,10 +50,14 @@
 - [x] Integrar totalizadores e registros reais do PostgreSQL
 - [x] Atualizar a folha automaticamente após novas batidas
 - [x] Adicionar visualização para impressão e filtros por competência
-- [ ] Corrigir a publicação da aba Folha de ponto no painel administrativo do domínio
-- [ ] Validar a aba Folha de ponto diretamente em produção
+- [x] Corrigir a publicação da aba Folha de ponto no painel administrativo do domínio
+- [x] Validar a aba Folha de ponto diretamente em produção
 - [x] Tornar a aba Folha de ponto visível no menu móvel sem rolagem horizontal escondida
 - [x] Validar o acesso móvel direto à Folha de ponto sem regressões
 - [x] Configurar verificação automática diária do painel e do deploy da Folha de ponto
-- [ ] Corrigir o aviso “Filtro inválido” exibido ao abrir a Folha de ponto em produção
-- [ ] Validar que a folha carrega os registros reais após a correção
+- [x] Corrigir o aviso “Filtro inválido” exibido ao abrir a Folha de ponto em produção
+- [x] Validar que a folha carrega os registros reais após a correção
+- [ ] Transformar a Folha de ponto em folha individual por colaborador conforme o modelo enviado
+- [ ] Criar calendário diário com horários, horas trabalhadas, horas previstas, saldo, faltas, atrasos e justificativas
+- [ ] Permitir impressão de uma folha por colaborador e impressão em lote
+- [ ] Validar atualização automática e cálculos da folha individual

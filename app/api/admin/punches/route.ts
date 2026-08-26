@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       timestamp: true,
       status: true,
       origin: true,
-      user: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } },
+      user: { select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } },
       photoData: true,
     },
   });
