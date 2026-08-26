@@ -131,19 +131,23 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     if (!selectedEmployee) return [];
     const [year, monthNumber] = month.split('-').map(Number);
     const lastDay = new Date(year, monthNumber, 0).getDate();
-    const workDays = parseWorkDays(selectedEmployee.workDays);
-    const scheduleStart = minutesFromClock(selectedEmployee.scheduleStart) ?? 8 * 60;
-    const scheduleEnd = minutesFromClock(selectedEmployee.scheduleEnd) ?? 17 * 60;
-    const expectedMinutes = Math.max(0, scheduleEnd - scheduleStart);
+    const hasSchedule = Boolean(selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd);
+    const workDays = selectedEmployee.workDays ? parseWorkDays(selectedEmployee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
+    const scheduleStart = minutesFromClock(selectedEmployee.scheduleStart);
+    const scheduleEnd = minutesFromClock(selectedEmployee.scheduleEnd);
+    const expectedMinutes = hasSchedule && scheduleStart !== null && scheduleEnd !== null ? Math.max(0, scheduleEnd - scheduleStart) : null;
     return Array.from({ length: lastDay }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, '0')}`;
       const dayPunches = records.filter((record) => dayKey(record.timestamp) === date);
       const weekday = new Date(`${date}T12:00:00`).getDay();
-      const scheduled = workDays.has(weekdayCodes[weekday]);
+      const scheduled = expectedMinutes !== null && workDays.has(weekdayCodes[weekday]);
       const worked = calculateWorked(dayPunches);
       const firstPunch = dayPunches[0];
-      const late = Boolean(scheduled && firstPunch && minutesFromClock(formatTime(firstPunch.timestamp)) !== null && minutesFromClock(formatTime(firstPunch.timestamp))! > scheduleStart + 5);
-      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected: scheduled ? expectedMinutes : 0, balance: worked === null ? (scheduled ? -expectedMinutes : 0) : worked - (scheduled ? expectedMinutes : 0), absent: scheduled && !dayPunches.length, late };
+      const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
+      const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
+      const expected = scheduled ? expectedMinutes : null;
+      const balance = worked === null || expected === null ? null : worked - expected;
+      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: scheduled && !dayPunches.length, late };
     });
   }, [employeeId, month, records, selectedEmployee]);
 

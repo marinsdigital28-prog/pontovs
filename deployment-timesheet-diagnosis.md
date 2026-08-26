@@ -35,3 +35,33 @@ O deployment `7WeB1tYf4R59qWgmRG8G8Jz4B8MT` terminou como `Ready` em 31 segundos
 ## Validação do domínio principal
 
 Após o deployment `7WeB1tYf4R59qWgmRG8G8Jz4B8MT` ficar `Ready`, o domínio `https://ponto.marinsdistemas.xyz/admin` passou a exibir a aba `Folha de ponto`. Ao clicar nela, a folha é renderizada com competência agosto de 2026, 34 colaboradores e os controles de impressão/atualização. Entretanto, a tela mostrou o aviso `Filtro inválido` e total de 0 registros, exigindo investigação da requisição inicial da API.
+
+## Correção publicada em fila
+
+O commit `8dbf2bf` foi aceito pela Vercel e aparece no projeto `pontovs` como deployment de produção `J68HfmtjSacgTuFe6rmoRZ1xxrEw`, com status inicial `Queued`. A publicação foi aceita após o limite diário ser liberado; a versão anterior `b13ee7e` permanece Ready enquanto o novo build aguarda execução.
+
+## Build da correção em andamento
+
+O deployment `J68HfmtjSacgTuFe6rmoRZ1xxrEw`, referente ao commit `8dbf2bf` que adiciona `ALL` aos tipos de filtro aceitos, foi aceito pela Vercel e avançou de `Queued` para `Building`. A produção continua temporariamente na versão anterior até o build terminar.
+
+## Build ainda em execução
+
+Na última verificação, o deployment `J68HfmtjSacgTuFe6rmoRZ1xxrEw` do commit `8dbf2bf` continuava com status `Building`, após aproximadamente 31 segundos. O deployment anterior `b13ee7e` permanece `Ready`; a produção só será validada novamente quando o novo deployment finalizar.
+
+## Correção em produção validada parcialmente
+
+Após o deployment do commit `8dbf2bf`, o domínio principal exibe a aba `Folha de ponto`. Ao abrir a aba, o aviso `Filtro inválido` não aparece mais; o botão permanece em `Atualizando...` durante a consulta e a folha mostra a estrutura correta com competência agosto de 2026, 34 colaboradores e totalizador inicial de 0 registros. Falta apenas aguardar a conclusão da consulta para confirmar o retorno final da API.
+
+## Folhas individuais em publicação
+
+O commit `01eabc0` foi aceito pela Vercel no deployment `5YCaCkAHdCqDMEa7MzyjdWFEA5JF`, em produção, e está em `Building`. A versão anterior `8dbf2bf` segue Ready enquanto o novo build termina.
+
+## Deployment da folha individual concluído
+
+O deployment `5YCaCkAHdCqDMEa7MzyjdWFEA5JF`, referente ao commit `01eabc0`, passou para `Ready` em produção. A próxima etapa é validar no domínio principal a seleção de um colaborador e a exibição da folha individual.
+
+## Validação da folha individual
+
+A versão `01eabc0` foi publicada como Ready. Em produção, a seleção do colaborador funciona e a folha individual aparece com cabeçalho, dados, calendário diário, colunas H.Trab/H.Prev/Saldo, totais e assinatura.
+
+A validação identificou um ajuste importante: colaboradores sem `workDays` e sem jornada cadastrados estavam sendo tratados como se trabalhassem todos os dias, gerando faltas e saldo negativo indevidos. A regra será corrigida para exibir jornada prevista e falta somente quando a escala estiver cadastrada.
