@@ -176,3 +176,15 @@
 - [x] Adicionar filtro/ordenação rápida por status de presença
 - [x] Testar o painel visual em desktop e mobile
 - [x] Verificar build, GitHub, variáveis e limite da Vercel antes do deploy
+
+- [x] Auditar o CSV de registros enviado em 26/08/2026
+- [ ] Comparar matrículas e marcações do CSV com a base local e produção
+- [ ] Confirmar importação idempotente sem duplicidades e documentar o resultado
+
+- [ ] Importar as marcações do CSV enviado no ambiente de produção
+- [ ] Confirmar inserções, existentes e rejeitadas após a importação
+- [ ] Conferir as marcações importadas na Visão geral e nos registros administrativos
+
+- [x] Renomear “Horários” para “Escala” na Folha de Ponto
+- [x] Manter “Marcações” como horários efetivamente registrados
+- [x] Validar que escala prevista e batidas reais permanecem separadas

@@ -48,6 +48,9 @@ describe('navegação da folha de ponto', () => {
 
   it('renderiza uma folha individual no modelo diário', () => {
     expect(timesheet).toContain('RELATÓRIO DE PONTO DO COLABORADOR');
+    expect(timesheet).toContain('<th>Horários (escala)</th>');
+    expect(timesheet).toContain('<th>Marcações</th>');
+    expect(timesheet).toContain('const schedule = scheduled');
     expect(timesheet).toContain('<th>H.Trab</th>');
     expect(timesheet).toContain('<th>H.Prev</th>');
     expect(timesheet).toContain('<th>Saldo</th>');

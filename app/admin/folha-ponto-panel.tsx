@@ -37,6 +37,7 @@ type DayRow = {
   balance: number | null;
   absent: boolean;
   late: boolean;
+  schedule: string;
 };
 
 const typeLabels: Record<string, string> = { ENTRADA: 'ENTRADA', INTERVALO: 'INTERVALO', RETORNO: 'RETORNO', SAIDA: 'SAÍDA' };
@@ -147,7 +148,8 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
       const expected = scheduled ? expectedMinutes : null;
       const balance = worked === null || expected === null ? null : worked - expected;
-      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: scheduled && !dayPunches.length, late };
+      const schedule = scheduled && selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd}` : 'Folga';
+      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: scheduled && !dayPunches.length, late, schedule };
     });
   }, [employeeId, month, records, selectedEmployee]);
 
@@ -172,7 +174,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         <div className="timesheet-paper">
           <header className="timesheet-titlebar individual-titlebar"><div><strong>EP&nbsp;&nbsp; ESPAÇO PROGREDIR</strong><span>Estrada da Grama, 21 — Miguel Couto · Nova Iguaçu — RJ<br />CNPJ: 05.553.848/0001-61</span></div><div className="timesheet-competence"><b>RELATÓRIO DE PONTO DO COLABORADOR</b><span>Período: 01/{month.slice(5)}/{month.slice(0, 4)} a {monthBounds(month).to.slice(8)}/{month.slice(5)}/{month.slice(0, 4)}<br />{formatMonth(month).toUpperCase()}</span></div></header>
           <section className="employee-meta-grid"><span><b>Nome:</b> {selectedEmployee.name}</span><span><b>CPF:</b> {selectedEmployee.cpf || 'Não informado'}</span><span><b>Matrícula:</b> {selectedEmployee.employeeNumber || 'Não informada'}</span><span><b>Cargo:</b> {selectedEmployee.jobTitle || 'Não informado'}</span><span><b>Departamento:</b> Espaço Progredir</span><span><b>Unidade:</b> Espaço Progredir</span><span><b>Escala:</b> {selectedEmployee.workDays || 'Não informada'}</span><span><b>Jornada:</b> {selectedEmployee.scheduleStart || '08:00'} às {selectedEmployee.scheduleEnd || '17:00'}</span></section>
-          <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{dayRows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.punches.length ? row.punches.map((punch) => formatTime(punch.timestamp)).join(' · ') : 'Folga'}</td><td>{row.punches.length ? row.punches.map((punch) => typeLabels[punch.type] || punch.type).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
+          <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{dayRows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
           <section className="timesheet-totals"><span><b>Total H. Positivo:</b> {formatMinutes(Math.max(summary.balance, 0))}</span><span><b>Total H. Negativo:</b> {formatMinutes(Math.min(summary.balance, 0))}</span><span><b>Total trabalhado:</b> {formatMinutes(summary.worked)}</span><span><b>Saldo de Horas:</b> {formatMinutes(summary.balance)}</span><span><b>Faltas:</b> {summary.absences}</span><span><b>Atrasos:</b> {summary.late}</span></section>
           <div className="signature-line">Assinatura do Colaborador</div>
           <footer className="timesheet-footer">Atualizado em {lastUpdated ? lastUpdated.toLocaleString('pt-BR') : '—'}. Documento gerado pelo Ponto Progredir.</footer>
