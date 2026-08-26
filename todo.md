@@ -230,3 +230,33 @@
 - [x] Fazer a etapa de matrícula e teclado caber na tela móvel sem rolagem
 - [x] Fazer câmera e confirmação caberem na tela móvel sem rolagem
 - [x] Validar alturas pequenas, celulares estreitos e build de produção
+
+- [ ] Diagnosticar o corte persistente no viewport móvel
+- [ ] Remover alturas fixas e conflitos de overflow no fluxo de marcação
+- [ ] Validar matrícula, câmera e confirmação em telas baixas
+
+- [ ] Auditar o PDF atualizado Backup_Ponto_2026-08-26(2)
+- [ ] Comparar o lote atualizado com as marcações já preparadas
+- [ ] Importar todas as marcações válidas sem duplicidades
+- [ ] Confirmar a folha atualizada no painel antes do uso nos dispositivos
+
+- [x] Autorizar importações pela sessão autenticada do gestor
+- [ ] Criar fluxo de importação de PDF dentro do painel
+- [x] Manter token técnico apenas como fallback seguro para automações
+- [x] Testar importação sem solicitar senha no chat
+
+- [ ] Validar build e diff da correção de autenticação por sessão
+- [ ] Publicar a correção no projeto Vercel `pontovs`
+- [ ] Confirmar deployment pronto antes da atualização das marcações
+- [ ] Atualizar o backup idempotentemente após a publicação
+
+- [ ] Publicar a autorização por sessão no projeto Vercel correto
+- [ ] Validar a sessão de gestor no domínio
+- [ ] Importar as 1.414 marcações do PDF atualizado
+- [ ] Conferir a folha e a visão geral após a carga
+
+- [x] Criar botão Importar PDF no painel administrativo
+- [x] Ler todas as páginas do PDF no backend
+- [x] Mostrar prévia completa por colaborador e batida
+- [x] Confirmar importação idempotente pela sessão do gestor
+- [x] Testar PDF completo e build de produção
