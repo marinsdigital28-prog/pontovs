@@ -17,6 +17,7 @@ export default function manifest(): MetadataRoute.Manifest {
     shortcuts: [
       { name: 'Registrar ponto', short_name: 'Ponto', url: '/ponto', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
       { name: 'Painel administrativo', short_name: 'Admin', url: '/admin', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+      { name: 'Portal do colaborador', short_name: 'Colaborador', url: '/colaborador', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
     ],
   };
 }
