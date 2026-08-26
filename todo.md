@@ -63,7 +63,10 @@
 - [x] Validar atualização automática e cálculos da folha individual
 - [x] Auditar as folhas individuais de todos os 34 colaboradores em produção
 - [x] Conferir carregamento de calendário, registros e totais para cada matrícula
-- [ ] Remover o bloco Último registro da tela `/ponto`
-- [ ] Remover os botões inferiores da tela `/ponto`
-- [ ] Ampliar o teclado numérico usando o espaço liberado
-- [ ] Validar o fluxo de marcação após simplificar a tela
+- [x] Remover o bloco Último registro da tela `/ponto`
+- [x] Remover os botões inferiores da tela `/ponto`
+- [x] Ampliar o teclado numérico usando o espaço liberado
+- [x] Validar o fluxo de marcação após simplificar a tela
+- [ ] Aumentar um pouco o relógio na tela `/ponto`
+- [ ] Aumentar os números do teclado e preencher melhor a altura da tela
+- [ ] Validar que a tela continua sem rolagem no celular

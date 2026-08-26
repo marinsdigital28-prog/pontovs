@@ -85,3 +85,15 @@ Após o deployment `fd77122`, o domínio principal abriu a aba `Folha de ponto`,
 ## Simplificação da tela `/ponto`
 
 A validação local confirmou: 12 teclas numéricas/ações presentes, altura mínima das teclas de `72px`, ausência do bloco `Último registro` e ausência do componente `.bottom-nav`. O botão `Continuar` e o fluxo de matrícula permanecem presentes.
+
+## Simplificação do relógio em publicação
+
+O commit `aa75f0c` foi aceito pela Vercel no deployment `9AhjoQ5H8ASrzwEv5933KUzaFzHB`, em ambiente de produção. A versão aparece como `Building`; após a conclusão, deve substituir a versão `fd77122` no domínio principal.
+
+## Status do deployment do relógio
+
+O deployment `9AhjoQ5H8ASrzwEv5933KUzaFzHB` do commit `aa75f0c` foi criado automaticamente e permanece em `Building`. O deployment anterior `fd77122` segue `Ready` enquanto a nova versão termina a compilação.
+
+## Deployment da tela simplificada concluído
+
+O deployment `9AhjoQ5H8ASrzwEv5933KUzaFzHB`, do commit `aa75f0c`, passou para `Ready` em produção. A alteração remove o bloco Último registro e a navegação inferior e amplia as teclas do relógio.
