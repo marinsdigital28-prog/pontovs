@@ -136,7 +136,9 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     const workDays = selectedEmployee.workDays ? parseWorkDays(selectedEmployee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
     const scheduleStart = minutesFromClock(selectedEmployee.scheduleStart);
     const scheduleEnd = minutesFromClock(selectedEmployee.scheduleEnd);
-    const expectedMinutes = hasSchedule && scheduleStart !== null && scheduleEnd !== null ? Math.max(0, scheduleEnd - scheduleStart) : null;
+    const scheduleSpan = hasSchedule && scheduleStart !== null && scheduleEnd !== null ? Math.max(0, scheduleEnd - scheduleStart) : null;
+    const lunchMinutes = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
+    const expectedMinutes = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunchMinutes);
     return Array.from({ length: lastDay }, (_, index) => {
       const date = `${month}-${String(index + 1).padStart(2, '0')}`;
       const dayPunches = records.filter((record) => dayKey(record.timestamp) === date);
@@ -148,7 +150,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
       const expected = scheduled ? expectedMinutes : null;
       const balance = worked === null || expected === null ? null : worked - expected;
-      const schedule = scheduled && selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd}` : 'Folga';
+      const schedule = scheduled && selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Folga';
       return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: scheduled && !dayPunches.length, late, schedule };
     });
   }, [employeeId, month, records, selectedEmployee]);

@@ -51,6 +51,8 @@ describe('navegação da folha de ponto', () => {
     expect(timesheet).toContain('<th>Horários (escala)</th>');
     expect(timesheet).toContain('<th>Marcações</th>');
     expect(timesheet).toContain('const schedule = scheduled');
+    expect(timesheet).toContain('const lunchMinutes = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0');
+    expect(timesheet).toContain("'1h de almoço' : 'meio expediente'");
     expect(timesheet).toContain('<th>H.Trab</th>');
     expect(timesheet).toContain('<th>H.Prev</th>');
     expect(timesheet).toContain('<th>Saldo</th>');

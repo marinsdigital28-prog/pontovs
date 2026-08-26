@@ -188,3 +188,8 @@
 - [x] Renomear “Horários” para “Escala” na Folha de Ponto
 - [x] Manter “Marcações” como horários efetivamente registrados
 - [x] Validar que escala prevista e batidas reais permanecem separadas
+
+- [x] Auditar padrões de entrada, almoço, retorno e saída no CSV enviado
+- [x] Aplicar 1 hora de almoço para jornadas integrais
+- [x] Diferenciar jornadas de meio expediente sem desconto de almoço indevido
+- [x] Validar os cálculos da Folha de Ponto com os padrões importados
