@@ -284,3 +284,4 @@
 - [x] Refletir alterações de cargo, dias e horários imediatamente na Folha de Ponto
 - [x] Criar lançamento manual de marcação esquecida com motivo e auditoria
 - [x] Reorganizar a primeira aba da Administração em uma central operacional clara
+- [x] Adicionar gráficos reais de presença e pontualidade da equipe
