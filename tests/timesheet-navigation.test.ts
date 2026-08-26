@@ -25,6 +25,9 @@ describe('navegação da folha de ponto', () => {
   });
 
   it('mantém a tela de marcação no padrão de totem com identificação, câmera e confirmação', () => {
+    expect(css).toContain('html,body{overflow:hidden}');
+    expect(css).toContain('.ponto-kiosk-card{height:calc(100dvh - 3.95rem)');
+    expect(css).toContain('.ponto-input-panel .camera-preview-minimal{width:min(76vw,330px)');
     expect(punch).toContain('ponto-kiosk-container');
     expect(punch).toContain('ponto-info-panel');
     expect(punch).toContain('ponto-input-panel');

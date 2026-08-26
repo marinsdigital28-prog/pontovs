@@ -217,3 +217,16 @@
 - [ ] Confirmar que o domínio serve o commit com importação CSV/PDF
 - [ ] Validar a credencial administrativa de produção
 - [ ] Importar as marcações somente após a produção estar autorizada
+
+- [x] Confirmar ambiente de teste e próximo tipo da matrícula 4041
+- [x] Executar uma batida de teste com foto identificada como simulação
+- [x] Conferir confirmação, persistência e exibição no painel administrativo
+- [x] Documentar o registro criado e qualquer necessidade de estorno administrativo
+
+- [x] Comparar visualmente a referência e o `/ponto` público
+- [x] Confirmar se o deployment publicado contém o layout do totem
+- [x] Documentar diferenças restantes de marcação e confirmação
+
+- [x] Fazer a etapa de matrícula e teclado caber na tela móvel sem rolagem
+- [x] Fazer câmera e confirmação caberem na tela móvel sem rolagem
+- [x] Validar alturas pequenas, celulares estreitos e build de produção

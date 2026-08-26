@@ -401,3 +401,61 @@ button,input{font:inherit}
 .ponto-input-panel .journey-closed-notice{background:rgba(212,175,55,.12);color:#fff}
 @media(max-width:780px){.ponto-kiosk-container{padding:.55rem}.ponto-kiosk-card{grid-template-columns:1fr;min-height:calc(100dvh - 4.8rem);gap:.65rem;padding:.65rem}.ponto-info-panel{min-height:190px;padding:1rem}.ponto-info-panel .clock .time{font-size:clamp(3.4rem,14vw,5rem)}.ponto-info-divider{margin:.7rem 0}.ponto-info-meta{padding-top:.8rem}.ponto-input-panel{min-height:0;padding:.7rem}.ponto-input-panel .keypad-btn{min-height:62px}}
 @media(max-height:680px) and (min-width:781px){.ponto-info-panel{padding:1rem}.ponto-info-panel .clock .time{font-size:4rem}.ponto-info-divider{margin:1rem 0}.ponto-info-meta{padding-top:1rem}.ponto-input-panel .keypad-btn{min-height:54px}}
+
+/* Ajuste móvel: cada etapa ocupa somente a altura real disponível */
+@media(max-width:780px){
+  html,body{overflow:hidden}
+  .ponto-kiosk-container{height:100dvh;min-height:100dvh;overflow:hidden;padding:.4rem .55rem .55rem}
+  .ponto-kiosk-container .header-row{margin-bottom:.3rem;padding:0 .05rem}
+  .ponto-kiosk-container .header-brand{font-size:.68rem}
+  .ponto-kiosk-container .header-greeting{font-size:.88rem;margin-top:.08rem}
+  .ponto-kiosk-container .avatar{width:34px;height:34px}
+  .ponto-kiosk-card{height:calc(100dvh - 3.95rem);min-height:0;max-height:none;overflow:hidden;grid-template-rows:auto minmax(0,1fr);gap:.45rem;padding:.45rem;border-radius:14px}
+  .ponto-info-panel{min-height:clamp(112px,21dvh,160px);padding:.55rem .7rem;border-radius:11px}
+  .ponto-info-panel .clock .time{font-size:clamp(2.65rem,11vw,4rem);line-height:.95}
+  .ponto-info-panel .clock .date{font-size:.7rem;margin-top:.2rem}
+  .ponto-info-divider{margin:.35rem 0;width:68%}
+  .ponto-reference-hint{font-size:.76rem}
+  .ponto-info-meta{padding-top:.35rem;font-size:.58rem}
+  .ponto-input-panel{overflow:hidden;border-radius:11px;padding:.5rem}
+  .ponto-input-panel .lookup-stage{margin-top:0;overflow:hidden}
+  .ponto-input-panel .matricula-shell{padding:.38rem .65rem;border-radius:8px}
+  .ponto-input-panel .matricula-label{font-size:.62rem}
+  .ponto-input-panel .matricula-display{min-height:1.65rem;margin-top:.15rem;font-size:clamp(1.55rem,7vw,2.35rem)}
+  .ponto-input-panel .keypad-grid{margin-top:.38rem;gap:.3rem}
+  .ponto-input-panel .keypad-btn{min-height:0;border-radius:8px;font-size:clamp(1.35rem,6.5vw,1.95rem)}
+  .ponto-input-panel .lookup-stage>.primary-btn{margin-top:.38rem!important;padding:.56rem .7rem;font-size:.9rem;border-radius:7px}
+  .ponto-input-panel .status-msg{font-size:.72rem;margin-top:.35rem}
+  .ponto-input-panel .register-stage-minimal{min-height:0;flex:1;justify-content:center;overflow:hidden}
+  .ponto-input-panel .camera-stage-minimal{gap:.45rem}
+  .ponto-input-panel .camera-preview-minimal{width:min(76vw,330px);height:min(43dvh,330px);border-width:3px;border-radius:12px}
+  .ponto-input-panel .photo-action-btn{width:min(90vw,390px);padding:.7rem .6rem;font-size:.92rem;border-radius:7px}
+  .ponto-input-panel .confirmation-minimal{padding:.25rem;overflow:hidden}
+  .ponto-input-panel .confirmation-ball{width:clamp(78px,22vw,130px);height:clamp(78px,22vw,130px);border-width:4px}
+  .ponto-input-panel .confirmation-title{font-size:clamp(1.1rem,5vw,1.65rem)}
+  .ponto-input-panel .confirmation-name{font-size:.86rem;margin-top:.2rem}
+  .ponto-input-panel .confirmation-type{font-size:.78rem;margin-top:.15rem}
+  .ponto-input-panel .confirmation-minimal .photo-confirmation-large{height:min(32dvh,225px);min-height:100px;margin-top:.4rem;border-width:3px;border-radius:12px}
+}
+@media(max-width:390px){
+  .ponto-kiosk-container{padding-left:.35rem;padding-right:.35rem}
+  .ponto-kiosk-card{height:calc(100dvh - 3.75rem);padding:.35rem}
+  .ponto-info-panel{min-height:clamp(98px,18dvh,132px);padding:.4rem}
+  .ponto-info-panel .clock .time{font-size:clamp(2.35rem,10vw,3.2rem)}
+  .ponto-info-panel .clock .date{font-size:.62rem}
+  .ponto-reference-hint{font-size:.68rem}
+  .ponto-info-meta{font-size:.52rem}
+  .ponto-input-panel{padding:.38rem}
+  .ponto-input-panel .keypad-grid{gap:.24rem}
+  .ponto-input-panel .keypad-btn{font-size:1.3rem}
+  .ponto-input-panel .lookup-stage>.primary-btn{padding:.48rem;font-size:.82rem}
+}
+@media(max-height:700px){
+  .ponto-kiosk-card{grid-template-rows:auto minmax(0,1fr)}
+  .ponto-info-panel{min-height:100px}
+  .ponto-info-panel .clock .time{font-size:clamp(2.2rem,9vw,3.2rem)}
+  .ponto-info-divider{margin:.2rem 0}
+  .ponto-info-meta{padding-top:.2rem}
+  .ponto-input-panel .camera-preview-minimal{width:min(62vw,250px);height:min(34dvh,250px)}
+  .ponto-input-panel .confirmation-minimal .photo-confirmation-large{height:min(25dvh,170px);min-height:80px}
+}
