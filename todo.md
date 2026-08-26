@@ -199,3 +199,21 @@
 - [x] Conectar confirmação do usuário ao importador idempotente
 - [x] Exibir resultado detalhado com criados, já existentes e ignorados
 - [x] Testar segurança, duplicidade, erros e build de produção
+
+- [ ] Extrair e auditar o PDF Backup_Ponto_2026-08-26(1)
+- [ ] Preparar colaboradores e marcações do PDF para importação idempotente
+- [ ] Executar a importação protegida em produção
+- [ ] Confirmar criados, existentes, ignorados e persistência no painel
+
+- [ ] Substituir a credencial administrativa de produção sem tentar recuperar a senha antiga
+- [ ] Validar a nova credencial no endpoint protegido
+- [ ] Retomar a importação idempotente do PDF após a validação
+
+- [ ] Verificar acesso autenticado ao Vercel nesta sessão
+- [ ] Conferir deployment, domínio e presença da variável administrativa sem revelar valores
+- [ ] Diagnosticar a recusa 401 da importação em produção
+
+- [ ] Corrigir o comando de build do projeto Vercel correto
+- [ ] Confirmar que o domínio serve o commit com importação CSV/PDF
+- [ ] Validar a credencial administrativa de produção
+- [ ] Importar as marcações somente após a produção estar autorizada

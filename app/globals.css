@@ -375,3 +375,29 @@ button,input{font:inherit}
 
 .csv-importer{min-height:0;max-height:none;padding:1.1rem 1.25rem}.csv-importer h3{margin:.3rem 0}.csv-file-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:auto;cursor:pointer}.csv-file-btn input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.csv-preview{border-top:1px solid var(--border);padding-top:1rem;margin-top:.4rem}.csv-preview-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.7rem}.csv-sample{display:grid;gap:.4rem}.csv-sample>div{display:grid;grid-template-columns:90px 1fr 160px 120px;gap:.65rem;align-items:center;padding:.55rem .65rem;border:1px solid var(--border);border-radius:10px;background:rgba(255,255,255,.025);font-size:.78rem}.csv-sample span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.csv-errors{display:grid;gap:.35rem;padding:.75rem;border:1px solid rgba(255,107,107,.35);border-radius:12px;background:rgba(255,107,107,.08);color:#ffb0b0;font-size:.82rem}.csv-preview .row-actions{margin-top:1rem;justify-content:flex-end}.csv-preview .row-actions .primary-btn{width:auto}.csv-importer>.status-msg{margin-bottom:0}
 @media(max-width:760px){.csv-importer{padding:.95rem}.csv-file-btn{width:100%}.csv-sample>div{grid-template-columns:1fr 1fr;font-size:.7rem}.csv-sample>div span:nth-child(2){grid-column:span 2}.csv-preview .row-actions{flex-direction:column}.csv-preview .row-actions button{width:100%}}
+
+/* Totem de marcação inspirado na referência Espaço Progredir */
+.ponto-kiosk-container{max-width:1180px;padding:1rem 1rem 2rem}
+.ponto-kiosk-card{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(390px,.95fr);gap:1rem;min-height:calc(100dvh - 7rem);max-height:none;background:#f6f8f7;border:1px solid rgba(7,88,63,.14);border-radius:18px;padding:1rem;color:#092d20;box-shadow:0 16px 38px rgba(2,8,6,.16)}
+.ponto-info-panel{display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:0;padding:2rem 1.5rem;border-radius:14px;background:#fff;border:1px solid #e0e8e3;color:#082e20}
+.ponto-info-panel .clock{width:100%;padding:0}
+.ponto-info-panel .clock .time{font-size:clamp(4rem,8vw,6.6rem);color:#063c2a;letter-spacing:-.08em}
+.ponto-info-panel .clock .date{color:#1e3e32;font-size:1rem;font-weight:700}
+.ponto-info-divider{width:min(360px,80%);height:1px;background:#dfe7e2;margin:1.7rem 0 1.25rem}
+.ponto-reference-hint{font-size:1rem;color:#122e23;text-align:center}
+.ponto-reference-hint:first-letter{color:#d4af37}
+.ponto-info-meta{margin-top:auto;padding-top:2rem;color:#6c7d74;font-size:.72rem;text-align:center;letter-spacing:.03em}
+.ponto-input-panel{display:flex;flex-direction:column;min-width:0;min-height:0;background:#032e21;border-radius:14px;padding:1rem;color:#f7fbf8}
+.ponto-input-panel .lookup-stage{margin-top:0}
+.ponto-input-panel .small-muted{color:#d2e0d9}
+.ponto-input-panel .matricula-shell{background:#064936;border-color:#d4af37;border-radius:10px;padding:.75rem 1rem}
+.ponto-input-panel .matricula-label{color:#d4af37}
+.ponto-input-panel .matricula-display{font-size:clamp(2rem,5vw,3rem);min-height:2.4rem}
+.ponto-input-panel .keypad-grid{gap:.55rem;margin-top:.7rem}
+.ponto-input-panel .keypad-btn{background:#063c2b;border-color:rgba(212,175,55,.36);border-radius:10px;min-height:76px;color:#fff}
+.ponto-input-panel .keypad-btn:hover{background:#07523c;border-color:#d4af37}
+.ponto-input-panel .primary-btn{background:#d4af37;color:#082e20;border-radius:8px;box-shadow:none;text-transform:uppercase;letter-spacing:.05em}
+.ponto-input-panel .status-msg{color:#d2e0d9}
+.ponto-input-panel .journey-closed-notice{background:rgba(212,175,55,.12);color:#fff}
+@media(max-width:780px){.ponto-kiosk-container{padding:.55rem}.ponto-kiosk-card{grid-template-columns:1fr;min-height:calc(100dvh - 4.8rem);gap:.65rem;padding:.65rem}.ponto-info-panel{min-height:190px;padding:1rem}.ponto-info-panel .clock .time{font-size:clamp(3.4rem,14vw,5rem)}.ponto-info-divider{margin:.7rem 0}.ponto-info-meta{padding-top:.8rem}.ponto-input-panel{min-height:0;padding:.7rem}.ponto-input-panel .keypad-btn{min-height:62px}}
+@media(max-height:680px) and (min-width:781px){.ponto-info-panel{padding:1rem}.ponto-info-panel .clock .time{font-size:4rem}.ponto-info-divider{margin:1rem 0}.ponto-info-meta{padding-top:1rem}.ponto-input-panel .keypad-btn{min-height:54px}}

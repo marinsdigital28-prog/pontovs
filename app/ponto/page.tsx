@@ -263,7 +263,7 @@ export default function Page() {
   }
 
   return (
-    <main className="container">
+    <main className="container ponto-kiosk-container">
       <div className="header-row">
         <div>
           <div className="header-brand">Ponto Progredir</div>
@@ -272,11 +272,17 @@ export default function Page() {
         <div className="avatar" aria-hidden />
       </div>
 
-      <div className="card">
+      <div className="card ponto-kiosk-card">
+        <section className="ponto-info-panel">
         <div className="clock">
           <div className="time">{timeString}</div>
           <div className="date">{dayString}</div>
         </div>
+        <div className="ponto-info-divider" />
+        <div className="ponto-reference-hint">👆 <strong>Digite seu número de matrícula</strong></div>
+        <div className="ponto-info-meta">Ponto Eletrônico Homologado · Portaria 671 MTE</div>
+        </section>
+        <section className="ponto-input-panel">
 
         {step === 'lookup' && (
           <div className="lookup-stage">
@@ -353,6 +359,7 @@ export default function Page() {
           </div>
         )}
 
+        </section>
       </div>
     </main>
   );

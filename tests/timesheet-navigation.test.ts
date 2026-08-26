@@ -24,6 +24,15 @@ describe('navegação da folha de ponto', () => {
     expect(css).toContain('.admin-tabs button:nth-child(5){border:2px solid var(--gold)');
   });
 
+  it('mantém a tela de marcação no padrão de totem com identificação, câmera e confirmação', () => {
+    expect(punch).toContain('ponto-kiosk-container');
+    expect(punch).toContain('ponto-info-panel');
+    expect(punch).toContain('ponto-input-panel');
+    expect(punch).toContain('Digite seu número de matrícula');
+    expect(punch).toContain('Marcar + Foto');
+    expect(punch).toContain('MARCAÇÃO CONFIRMADA');
+  });
+
   it('exibe a confirmação animada e protege a marcação offline', () => {
     expect(punch).toContain('MARCAÇÃO CONFIRMADA');
     expect(punch).toContain('confirmation-ball');
