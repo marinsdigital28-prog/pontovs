@@ -54,3 +54,6 @@
 - [ ] Validar a aba Folha de ponto diretamente em produção
 - [x] Tornar a aba Folha de ponto visível no menu móvel sem rolagem horizontal escondida
 - [x] Validar o acesso móvel direto à Folha de ponto sem regressões
+- [x] Configurar verificação automática diária do painel e do deploy da Folha de ponto
+- [ ] Corrigir o aviso “Filtro inválido” exibido ao abrir a Folha de ponto em produção
+- [ ] Validar que a folha carrega os registros reais após a correção

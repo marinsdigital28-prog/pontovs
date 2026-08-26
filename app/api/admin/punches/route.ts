@@ -5,7 +5,7 @@ import prisma from '../../../../lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-const allowedTypes = new Set(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
+const allowedTypes = new Set(['ALL', 'ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
 const allowedStatuses = new Set(['ALL', 'VALID', 'REJECTED', 'PENDING']);
 
 function parseBoundary(value: string | null, endOfDay: boolean) {
