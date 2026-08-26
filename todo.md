@@ -57,7 +57,13 @@
 - [x] Configurar verificação automática diária do painel e do deploy da Folha de ponto
 - [x] Corrigir o aviso “Filtro inválido” exibido ao abrir a Folha de ponto em produção
 - [x] Validar que a folha carrega os registros reais após a correção
-- [ ] Transformar a Folha de ponto em folha individual por colaborador conforme o modelo enviado
-- [ ] Criar calendário diário com horários, horas trabalhadas, horas previstas, saldo, faltas, atrasos e justificativas
-- [ ] Permitir impressão de uma folha por colaborador e impressão em lote
-- [ ] Validar atualização automática e cálculos da folha individual
+- [x] Transformar a Folha de ponto em folha individual por colaborador conforme o modelo enviado
+- [x] Criar calendário diário com horários, horas trabalhadas, horas previstas, saldo, faltas, atrasos e justificativas
+- [x] Permitir impressão de uma folha por colaborador e impressão em lote
+- [x] Validar atualização automática e cálculos da folha individual
+- [x] Auditar as folhas individuais de todos os 34 colaboradores em produção
+- [x] Conferir carregamento de calendário, registros e totais para cada matrícula
+- [ ] Remover o bloco Último registro da tela `/ponto`
+- [ ] Remover os botões inferiores da tela `/ponto`
+- [ ] Ampliar o teclado numérico usando o espaço liberado
+- [ ] Validar o fluxo de marcação após simplificar a tela

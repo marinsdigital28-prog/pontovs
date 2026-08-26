@@ -65,3 +65,23 @@ O deployment `5YCaCkAHdCqDMEa7MzyjdWFEA5JF`, referente ao commit `01eabc0`, pass
 A versão `01eabc0` foi publicada como Ready. Em produção, a seleção do colaborador funciona e a folha individual aparece com cabeçalho, dados, calendário diário, colunas H.Trab/H.Prev/Saldo, totais e assinatura.
 
 A validação identificou um ajuste importante: colaboradores sem `workDays` e sem jornada cadastrados estavam sendo tratados como se trabalhassem todos os dias, gerando faltas e saldo negativo indevidos. A regra será corrigida para exibir jornada prevista e falta somente quando a escala estiver cadastrada.
+
+## Correção de escala aguardando publicação
+
+O commit `fd77122` foi aceito pela Vercel no deployment `14c7YRYUWDB4i8WvoqEhnm5agbxR`, mas ainda aparece como `Queued`. A produção continua temporariamente no deployment `01eabc0`, que já contém a folha individual, porém ainda usa a regra anterior para colaboradores sem escala.
+
+## Build da correção de escala em execução
+
+O deployment `14c7YRYUWDB4i8WvoqEhnm5agbxR` do commit `fd77122` foi aceito e está com status `Building`. A tela de detalhes mostra a etapa `Linting and checking validity of types` em andamento e nenhum erro reportado até o momento. Os domínios de preview e produção foram atribuídos ao deployment.
+
+## Deployment da correção de escala concluído
+
+A Vercel mostra o deployment `14c7YRYUWDB4i8WvoqEhnm5agbxR` como `Ready`, com duração de 27 segundos, ambiente `Production` e domínio `ponto.marinsdistemas.xyz`. O código publicado é o commit `fd77122` (`fix: do not infer missing employee schedules`). Fonte: https://vercel.com/marinsdigital28-8350s-projects/pontovs/14c7YRYUWDB4i8WvoqEhnm5agbxR
+
+## Validação final em produção
+
+Após o deployment `fd77122`, o domínio principal abriu a aba `Folha de ponto`, permitiu selecionar a matrícula `2904` e exibiu a folha individual no modelo diário. Para a colaboradora sem escala cadastrada, H.Prev e Saldo aparecem como `—` e o total de faltas ficou `0`, eliminando o cálculo indevido anterior.
+
+## Simplificação da tela `/ponto`
+
+A validação local confirmou: 12 teclas numéricas/ações presentes, altura mínima das teclas de `72px`, ausência do bloco `Último registro` e ausência do componente `.bottom-nav`. O botão `Continuar` e o fluxo de matrícula permanecem presentes.

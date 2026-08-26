@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 export default function Page() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [lastPunch, setLastPunch] = useState<any>(null);
   const [now, setNow] = useState<Date | null>(null);
   const [step, setStep] = useState<'lookup' | 'register'>('lookup');
   const [matricula, setMatricula] = useState('');
@@ -38,11 +37,6 @@ export default function Page() {
     setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('lastPunch');
-    if (saved) setLastPunch(JSON.parse(saved));
   }, []);
 
   useEffect(() => {
@@ -117,8 +111,6 @@ export default function Page() {
       });
       const json = await r.json();
       if (!r.ok) throw new Error(json.error || 'Erro ao registrar ponto');
-      localStorage.setItem('lastPunch', JSON.stringify(json));
-      setLastPunch(json);
       setNextType(nextAfter(json.type));
       pendingClientIdRef.current = null;
       setConfirmation({
@@ -349,21 +341,6 @@ export default function Page() {
           </div>
         )}
 
-        {lastPunch && !confirmation && (
-          <div className="summary" style={{ marginTop: 16 }}>
-            <div style={{ fontWeight: 800, color: 'var(--gold)' }}>Último registro</div>
-            <div style={{ marginTop: 6 }}>{lastPunch.type} • {new Date(lastPunch.timestamp).toLocaleTimeString()}</div>
-          </div>
-        )}
-      </div>
-
-      <div className="bottom-nav">
-        <div className="nav-inner">
-          <button className="active">🏠 Início</button>
-          <button>🕐 Registros</button>
-          <button>📄 Folha</button>
-          <button>👤 Perfil</button>
-        </div>
       </div>
     </main>
   );
