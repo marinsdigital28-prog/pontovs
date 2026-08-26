@@ -6,6 +6,8 @@ const root = process.cwd();
 const dashboard = readFileSync(resolve(root, 'app/admin/admin-dashboard.tsx'), 'utf8');
 const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8');
 const timesheet = readFileSync(resolve(root, 'app/admin/folha-ponto-panel.tsx'), 'utf8');
+const punch = readFileSync(resolve(root, 'app/ponto/page.tsx'), 'utf8');
+
 
 describe('navegação da folha de ponto', () => {
   it('declara a Folha de ponto no menu administrativo', () => {
@@ -17,6 +19,13 @@ describe('navegação da folha de ponto', () => {
   it('mantém todas as abas visíveis no menu móvel', () => {
     expect(css).toContain('.admin-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))');
     expect(css).toContain('.admin-tabs button:nth-child(5){border:2px solid var(--gold)');
+  });
+
+  it('exibe a confirmação animada e protege a marcação offline', () => {
+    expect(punch).toContain('MARCAÇÃO CONFIRMADA');
+    expect(punch).toContain('confirmation-ball');
+    expect(punch).toContain('Sem conexão — marcação protegida no aparelho');
+    expect(punch).toContain('response.status !== 409');
   });
 
   it('renderiza uma folha individual no modelo diário', () => {

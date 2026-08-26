@@ -94,15 +94,22 @@ export default function Page() {
 
   async function handlePunch(photoOverride?: string | null) {
     if (!employee) return;
-    setLoading(true);
-    setStatusMsg('Registrando ponto com foto...');
     const payload = {
       employeeNumber: employee.employeeNumber,
       clientTimestamp: new Date().toISOString(),
       clientId: pendingClientIdRef.current ?? (pendingClientIdRef.current = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       photo: photoOverride ?? photo ?? null,
     };
-
+    if (!navigator.onLine) {
+      const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
+      offline.push(payload);
+      localStorage.setItem('offlinePunches', JSON.stringify(offline));
+      setStatusMsg('Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setStatusMsg('Registrando ponto com foto...');
     try {
       const r = await fetch('/api/punch', {
         method: 'POST',
@@ -157,14 +164,18 @@ export default function Page() {
     const sync = async () => {
       const pending = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
       if (!pending || pending.length === 0) return;
+      const remaining: any[] = [];
       for (const p of pending) {
         try {
-          await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
+          const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
+          if (!response.ok && response.status !== 409) remaining.push(p);
         } catch {
-          return;
+          remaining.push(p);
+          break;
         }
       }
-      localStorage.removeItem('offlinePunches');
+      if (remaining.length > 0) localStorage.setItem('offlinePunches', JSON.stringify(remaining));
+      else localStorage.removeItem('offlinePunches');
       setStatusMsg('Pendentes sincronizados');
       setTimeout(() => setStatusMsg(null), 3000);
     };
@@ -330,8 +341,9 @@ export default function Page() {
                 )}
               </>
             ) : (
-              <div className="summary confirmation-summary confirmation-minimal">
-                <div className="confirmation-title">✓ Ponto registrado</div>
+              <div className="summary confirmation-summary confirmation-minimal" role="status" aria-live="polite">
+                <div className="confirmation-animation" aria-hidden="true"><span className="confirmation-ball"><span className="confirmation-check">✓</span></span></div>
+                <div className="confirmation-title">MARCAÇÃO CONFIRMADA</div>
                 <div className="confirmation-name">{employee.name}</div>
                 <div className="confirmation-type">{confirmation.type} · {new Date(confirmation.timestamp).toLocaleTimeString()}</div>
                 {photo && <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />}

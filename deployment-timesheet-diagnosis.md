@@ -125,3 +125,11 @@ O commit `498e67a` terminou como `Ready` no deployment `5qVA1ijdqKTqn7CPqxKm86k8
 ## Quadrado da câmera ampliado
 
 O preview quadrado foi ampliado para até 94% da largura e 64–66% da altura disponível em celulares, com limites responsivos para telas menores. TypeScript, testes e `git diff --check` passaram.
+
+## Câmera ampliada publicada
+
+O deployment `3k6roUUC2Ck6GR1QkU2DSS1bKKLJ`, referente ao commit `2edcf2d`, terminou como `Ready` em produção. O preview quadrado maior está publicado no projeto `pontovs` e associado ao domínio principal.
+
+## Confirmação animada e resiliência do ponto
+
+A confirmação agora exibe bola verde pulsante, check branco e o texto grande `MARCAÇÃO CONFIRMADA`. O fluxo offline foi reforçado para guardar a tentativa no aparelho, reenviar ao voltar a conexão e não remover pendências quando uma sincronização falhar. A API continua protegendo contra duplicidade por `clientId`. TypeScript, quatro testes e `git diff --check` passaram.
