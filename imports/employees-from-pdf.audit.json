@@ -1,0 +1,312 @@
+{
+  "totalHeaders": 34,
+  "uniqueEmployees": 34,
+  "employees": [
+    {
+      "name": "ADMINISTRADOR (GENÉRICO)",
+      "cpf": "—",
+      "employeeNumber": "0000",
+      "jobTitle": "ADMINISTRADOR",
+      "department": "GESTÃO GERAL",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "ANA MARIA DOS SANTOS CAVALCANTE",
+      "cpf": "95558438720",
+      "employeeNumber": "2904",
+      "jobTitle": "COZINHEIRO",
+      "department": "COZINHEIRO",
+      "schedule": "Seg, Ter, Qua, Qui, Sex, 07:30 às 16:30",
+      "jornada": "07:30 – 16:30"
+    },
+    {
+      "name": "CÁSSIO FREIRE DE OLIVEIRA",
+      "cpf": "13158256789",
+      "employeeNumber": "0506",
+      "jobTitle": "VICE DIRETOR",
+      "department": "DIRETORIA",
+      "schedule": "Ter, Qui, Sex",
+      "jornada": "07:30 – 16:30"
+    },
+    {
+      "name": "CRISTIANO DOS SANTOS SILVA",
+      "cpf": "—",
+      "employeeNumber": "0043",
+      "jobTitle": "EDUCADOR SOCIAL",
+      "department": "EDUCADOR SOCIAL",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "DANIELE DE SOUZA TAVARES",
+      "cpf": "13062818735",
+      "employeeNumber": "2203",
+      "jobTitle": "ARTESANATO",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Sex",
+      "jornada": "12:00 – 16:00"
+    },
+    {
+      "name": "DILMA LOPES DOS SANTOS",
+      "cpf": "05490658705",
+      "employeeNumber": "0042",
+      "jobTitle": "PSICOPEDAGOGA",
+      "department": "PSICOPEDAGOGA",
+      "schedule": "Qua, Qui",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "EDILSON TEIXEIRA",
+      "cpf": "08874125896",
+      "employeeNumber": "1705",
+      "jobTitle": "SECRETÁRIO",
+      "department": "SECRETARIA",
+      "schedule": "Seg a Sex, 07:30 às 11:30",
+      "jornada": "07:30 – 11:30"
+    },
+    {
+      "name": "ELISABETE GOMES DA SILVA",
+      "cpf": "12345678901",
+      "employeeNumber": "1701",
+      "jobTitle": "PSICOLOGA",
+      "department": "PSICOLOGIA",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "ELISANGELA DA SILVA CRUZ",
+      "cpf": "08764129854",
+      "employeeNumber": "0029",
+      "jobTitle": "EDUCADOR SOCIAL",
+      "department": "EDUCADOR SOCIAL",
+      "schedule": "Ter, Qua, Qui",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "ELISANGELA REIS COSTA CASTRO",
+      "cpf": "09874561230",
+      "employeeNumber": "0050",
+      "jobTitle": "PEDAGOGA",
+      "department": "PEDAGOGIA",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "GABRIELA PEREIRA DOS SANTOS ARAUJO",
+      "cpf": "15487963210",
+      "employeeNumber": "3107",
+      "jobTitle": "HISTÓRIA",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Ter, 12:00 às 16:00",
+      "jornada": "12:00 – 16:00"
+    },
+    {
+      "name": "GERMANO DA SILVA RIBEIRO",
+      "cpf": "07412589630",
+      "employeeNumber": "0019",
+      "jobTitle": "SERVIÇOS GERAIS",
+      "department": "SERVIÇOS GERAIS",
+      "schedule": "Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "GILVAN RODRIGUES DA SILVA",
+      "cpf": "08521479630",
+      "employeeNumber": "0304",
+      "jobTitle": "HISTÓRIA",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Ter, Qua (08-17), Qui (12-16)",
+      "jornada": "12:00 – 16:00"
+    },
+    {
+      "name": "JORGE EDUARDO MAIA SERAFIM",
+      "cpf": "09632587410",
+      "employeeNumber": "0028",
+      "jobTitle": "CAPOEIRA",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Seg, Qua, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "JOSÉ ULIAN DA SILVA INÁCIO",
+      "cpf": "07894561230",
+      "employeeNumber": "2506",
+      "jobTitle": "SERVIÇOS GERAIS",
+      "department": "SERVIÇOS GERAIS",
+      "schedule": "Seg a Sex, 07:00 às 16:00",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "JOYCE SILVA DE SOUZA",
+      "cpf": "12457896320",
+      "employeeNumber": "1811",
+      "jobTitle": "ASSISTENTE SOCIAL",
+      "department": "SOCIAL",
+      "schedule": "Seg, Ter, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "JULYANNE FELIPPE DE AGUIAR",
+      "cpf": "13579246800",
+      "employeeNumber": "2409",
+      "jobTitle": "PROFESSORA",
+      "department": "PEDAGOGIA",
+      "schedule": "Seg a Sex, 07:30 às 11:30",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "KAIO HENRIQUES DA SILVA VIANNA",
+      "cpf": "14785236900",
+      "employeeNumber": "0803",
+      "jobTitle": "FÚTBOL",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Seg, Qua, Qui, Sex, 08:00 às 15:00",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "LEONARDO DE OLIVEIRA DIAS",
+      "cpf": "15975348620",
+      "employeeNumber": "5050",
+      "jobTitle": "SECRETÁRIO",
+      "department": "SECRETARIA",
+      "schedule": "Seg a Sex, 07:30 às 11:30",
+      "jornada": "07:30 – 11:30"
+    },
+    {
+      "name": "MAICON FERNANDES MARINS",
+      "cpf": "12856489723",
+      "employeeNumber": "4041",
+      "jobTitle": "PRESIDENTE",
+      "department": "DIRETORIA",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "MARIA NIZELBA DUTRA DOS SANTOS",
+      "cpf": "06541239870",
+      "employeeNumber": "0021",
+      "jobTitle": "SERVIÇOS GERAIS",
+      "department": "SERVIÇOS GERAIS",
+      "schedule": "Ter, Qua, Qui",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "MARIA REVIANE DANTAS DA SILVA RESENDE",
+      "cpf": "98471830744",
+      "employeeNumber": "0011",
+      "jobTitle": "ASSISTENTE SOCIAL",
+      "department": "ASSISTENTE SOCIAL",
+      "schedule": "Seg, Ter, Qua",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "MARIÂNGELA SILVA DA CONCEIÇÃO",
+      "cpf": "09189938739",
+      "employeeNumber": "1508",
+      "jobTitle": "PSICÓLOGA",
+      "department": "PSICOLOGO",
+      "schedule": "Seg, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "MARIANNA RODRIGUES COUTO",
+      "cpf": "13424132705",
+      "employeeNumber": "0909",
+      "jobTitle": "PSICOLOGA",
+      "department": "PSICOLOGO",
+      "schedule": "Ter, Qua, Qui",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "MERCIA MARQUES BATISTA",
+      "cpf": "09485369778",
+      "employeeNumber": "0701",
+      "jobTitle": "CONTADORA",
+      "department": "ADMINISTRATIVO",
+      "schedule": "Seg a Sex, 09:30 às 17:00",
+      "jornada": "09:30 – 17:00"
+    },
+    {
+      "name": "NATHALIA DE LIMA LOMBA",
+      "cpf": "11756953783",
+      "employeeNumber": "1910",
+      "jobTitle": "ASSISTENTE SOCIAL",
+      "department": "ASSISTENTE SOCIAL",
+      "schedule": "Seg, Qua",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "OHANA NATUREZA JUNQUEIRA PEREIRA",
+      "cpf": "12712358720",
+      "employeeNumber": "0040",
+      "jobTitle": "PROFESSORA DE TEATRO",
+      "department": "PROFESSORA DE TEATRO",
+      "schedule": "Seg, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "RAYANE PATRICIO DE SOUZA CARVALHÃES",
+      "cpf": "10987654321",
+      "employeeNumber": "1807",
+      "jobTitle": "ASSISTENTE SOCIAL",
+      "department": "SOCIAL",
+      "schedule": "Ter, Qui",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "RENATA DA CONCEIÇÃO FELIPPE DE SÁ",
+      "cpf": "08765432109",
+      "employeeNumber": "5500",
+      "jobTitle": "SERVIÇOS GERAIS",
+      "department": "SERVIÇOS GERAIS",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "ROBSON DE SOUZA SANTOS",
+      "cpf": "10293847561",
+      "employeeNumber": "2201",
+      "jobTitle": "COZINHEIRO",
+      "department": "COZINHA",
+      "schedule": "Seg a Sex, 07:30 às 16:30",
+      "jornada": "07:30 – 16:30"
+    },
+    {
+      "name": "SUELEN JOSE PENHA MACHADO",
+      "cpf": "11223344556",
+      "employeeNumber": "5100",
+      "jobTitle": "OFICINEIRO DE ARTESANATO",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Seg, Qua",
+      "jornada": "12:00 – 16:00"
+    },
+    {
+      "name": "TAIANE RODRIGUES PINTO",
+      "cpf": "12312312345",
+      "employeeNumber": "2611",
+      "jobTitle": "EDUCADORA SOCIAL",
+      "department": "EDUCADOR SOCIAL",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "VIVIANE DE SOUZA GEREMIAS",
+      "cpf": "98765432100",
+      "employeeNumber": "1404",
+      "jobTitle": "DIRETORA",
+      "department": "DIRETORIA",
+      "schedule": "Seg, Ter, Qua, Qui, Sex",
+      "jornada": "08:00 – 17:00"
+    },
+    {
+      "name": "WALLACE COSTA DE CASTRO",
+      "cpf": "11122233344",
+      "employeeNumber": "2020",
+      "jobTitle": "OFICINEIRO DE MÚSICA",
+      "department": "OFICINEIRO(A)",
+      "schedule": "Seg, Qua",
+      "jornada": "08:00 – 17:00"
+    }
+  ]
+}

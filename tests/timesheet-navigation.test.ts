@@ -28,6 +28,12 @@ describe('navegação da folha de ponto', () => {
     expect(punch).toContain('response.status !== 409');
   });
 
+  it('configura a folha individual para preencher a área útil A4 na impressão', () => {
+    expect(css).toContain('min-height:190mm');
+    expect(css).toContain('size:A4 landscape');
+    expect(css).toContain('.individual-table-section .individual-timesheet-table{width:100%;height:100%}');
+  });
+
   it('renderiza uma folha individual no modelo diário', () => {
     expect(timesheet).toContain('RELATÓRIO DE PONTO DO COLABORADOR');
     expect(timesheet).toContain('<th>H.Trab</th>');

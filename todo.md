@@ -75,3 +75,14 @@
 - [ ] Confirmar que teclado, matrícula e botão permanecem visíveis sem rolagem
 - [x] Ampliar o quadrado da foto na etapa de câmera do `/ponto`
 - [x] Confirmar que o botão Marcar + Foto e a confirmação continuam visíveis
+
+- [x] Validar animação de confirmação com bola verde, check e texto “MARCAÇÃO CONFIRMADA”
+- [x] Validar proteção da fila offline e reenvio automático sem perda de pendências
+- [x] Publicar o commit 9d058ee no repositório remoto
+
+- [ ] Extrair e auditar as marcações e dados do PDF Backup_Ponto_2026-08-26
+- [ ] Cruzar as matrículas e nomes do PDF com os 34 colaboradores existentes
+- [ ] Importar as marcações históricas sem duplicidades e com validação
+- [ ] Completar os cargos de todos os colaboradores a partir dos dados confirmados
+- [ ] Ajustar a Folha de Ponto para ocupar a página A4 inteira mantendo o modelo fornecido
+- [ ] Validar dados importados, folha individual e impressão A4
