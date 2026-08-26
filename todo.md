@@ -260,3 +260,17 @@
 - [x] Mostrar prévia completa por colaborador e batida
 - [x] Confirmar importação idempotente pela sessão do gestor
 - [x] Testar PDF completo e build de produção
+
+- [x] Confirmar se o commit 13c5397 está no deployment do projeto `pontovs`
+- [ ] Corrigir a publicação caso o domínio esteja em versão anterior
+- [ ] Confirmar visualmente o cartão Importar PDF no `/admin`
+
+- [ ] Preparar árvore de publicação sem PDFs, backups ou segredos
+- [ ] Fazer deployment manual de produção no projeto `pontovs`
+- [ ] Confirmar estado READY e cartão Importar PDF no domínio
+
+- [x] Auditar o CSV PONTOS_ESP_PROGREDIR_2026_08
+- [x] Identificar incompatibilidades de separador, cabeçalho, codificação ou formato
+- [x] Gerar arquivo compatível ou ajustar o parser sem duplicidades
+- [x] Validar o lote na prévia do importador
+- [x] Aplicar no painel os dias e horários inferidos do CSV mensal
