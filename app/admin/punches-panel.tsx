@@ -32,6 +32,12 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [actionRecord, setActionRecord] = useState<RecordItem | null>(null);
+  const [actionMode, setActionMode] = useState<'edit' | 'cancel' | null>(null);
+  const [actionType, setActionType] = useState('ENTRADA');
+  const [actionTimestamp, setActionTimestamp] = useState('');
+  const [actionReason, setActionReason] = useState('');
+  const [actionSaving, setActionSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +75,23 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
     window.location.assign(`/api/admin/punches?${params.toString()}`);
   }
 
+  async function submitAction(event: React.FormEvent) {
+    event.preventDefault();
+    if (!actionRecord || !actionMode || actionReason.trim().length < 5) return;
+    setActionSaving(true);
+    try {
+      const response = await fetch(`/api/admin/punches/${actionRecord.id}`, { method: actionMode === 'cancel' ? 'DELETE' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actionMode === 'cancel' ? { reason: actionReason } : { type: actionType, timestamp: actionTimestamp, reason: actionReason }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a ação.');
+      setActionRecord(null); setActionMode(null); setActionReason(''); await load();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível concluir a ação.'); }
+    finally { setActionSaving(false); }
+  }
+
+  function openAction(record: RecordItem, mode: 'edit' | 'cancel') {
+    setActionRecord(record); setActionMode(mode); setActionType(record.type); setActionTimestamp(new Date(record.timestamp).toISOString().slice(0, 16)); setActionReason(''); setError('');
+  }
+
   return (
     <section className="card reports-panel">
       <div className="section-heading reports-heading">
@@ -86,10 +109,11 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
 
       <div className="report-summary"><div className="summary"><span className="small-muted">Registros encontrados</span><strong>{counts.total}</strong></div><div className="summary"><span className="small-muted">Entradas</span><strong>{counts.entries}</strong></div><div className="summary"><span className="small-muted">Saídas</span><strong>{counts.exits}</strong></div><div className="summary"><span className="small-muted">Com foto</span><strong>{counts.photos}</strong></div></div>
       {lastUpdated ? <div className="report-updated">Atualizado às {lastUpdated.toLocaleTimeString('pt-BR')}</div> : null}
+      {actionRecord && actionMode ? <form className="punch-action-box" onSubmit={submitAction}><div><span className="eyebrow">TRATAMENTO AUDITADO</span><h3>{actionMode === 'cancel' ? 'Cancelar marcação' : 'Editar marcação'}</h3><p className="small-muted">{actionRecord.user.name} · {new Date(actionRecord.timestamp).toLocaleString('pt-BR')}</p></div>{actionMode === 'edit' ? <div className="punch-action-fields"><label className="small-muted">Tipo<select className="input" value={actionType} onChange={(event) => setActionType(event.target.value)}><option value="ENTRADA">Entrada</option><option value="INTERVALO">Intervalo</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select></label><label className="small-muted">Data e hora<input className="input" type="datetime-local" value={actionTimestamp} onChange={(event) => setActionTimestamp(event.target.value)} /></label></div> : <div className="status-msg">O registro original será preservado e ficará com status “Rejeitado”.</div>}<label className="small-muted">Motivo obrigatório<textarea className="input" rows={3} minLength={5} required value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="Descreva o motivo do tratamento" /></label><div className="row-actions"><button type="button" className="ghost-btn" onClick={() => { setActionRecord(null); setActionMode(null); }}>Voltar</button><button type="submit" className={actionMode === 'cancel' ? 'danger-btn' : 'primary-btn'} disabled={actionSaving || actionReason.trim().length < 5}>{actionSaving ? 'Salvando...' : actionMode === 'cancel' ? 'Confirmar cancelamento' : 'Salvar edição'}</button></div></form> : null}
       {error ? <div className="status-msg" style={{ marginTop: 14 }}>{error}</div> : null}
       {loading ? <p className="small-muted" style={{ marginTop: 16 }}>Buscando registros...</p> : null}
       {!loading && !records.length ? <div className="report-empty"><strong>Nenhum registro encontrado</strong><span>Ajuste o período ou os filtros para consultar outras marcações.</span></div> : null}
-      {records.length ? <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Data e hora</th><th>Colaborador</th><th>Tipo</th><th>Status</th><th>Origem</th><th>Evidência</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td><strong>{new Date(record.timestamp).toLocaleDateString('pt-BR')}</strong><div className="small-muted">{new Date(record.timestamp).toLocaleTimeString('pt-BR')}</div></td><td><strong>{record.user.name}</strong><div className="small-muted">{record.user.employeeNumber || 'Sem matrícula'}{record.user.jobTitle ? ` · ${record.user.jobTitle}` : ''}</div></td><td><span className={`type-badge type-${record.type.toLowerCase()}`}>{typeLabels[record.type] || record.type}</span></td><td><span className={`status-pill ${record.status === 'VALID' ? 'ok' : 'off'}`}>{statusLabels[record.status] || record.status}</span></td><td>{record.origin || 'WEB'}</td><td>{record.hasPhoto ? <a href={`/api/admin/punches/${record.id}/photo`} target="_blank" rel="noreferrer">Ver foto</a> : <span className="small-muted">Sem foto</span>}</td></tr>)}</tbody></table></div> : null}
+      {records.length ? <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Data e hora</th><th>Colaborador</th><th>Tipo</th><th>Status</th><th>Origem</th><th>Evidência</th><th>Ações</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td><strong>{new Date(record.timestamp).toLocaleDateString('pt-BR')}</strong><div className="small-muted">{new Date(record.timestamp).toLocaleTimeString('pt-BR')}</div></td><td><strong>{record.user.name}</strong><div className="small-muted">{record.user.employeeNumber || 'Sem matrícula'}{record.user.jobTitle ? ` · ${record.user.jobTitle}` : ''}</div></td><td><span className={`type-badge type-${record.type.toLowerCase()}`}>{typeLabels[record.type] || record.type}</span></td><td><span className={`status-pill ${record.status === 'VALID' ? 'ok' : 'off'}`}>{statusLabels[record.status] || record.status}</span></td><td>{record.origin || 'WEB'}</td><td>{record.hasPhoto ? <a href={`/api/admin/punches/${record.id}/photo`} target="_blank" rel="noreferrer">Ver foto</a> : <span className="small-muted">Sem foto</span>}</td><td><div className="row-actions"><button type="button" className="ghost-btn compact-btn" onClick={() => openAction(record, 'edit')} disabled={record.status === 'REJECTED'}>Editar</button><button type="button" className="danger-link" onClick={() => openAction(record, 'cancel')} disabled={record.status === 'REJECTED'}>Excluir</button></div></td></tr>)}</tbody></table></div> : null}
     </section>
   );
 }

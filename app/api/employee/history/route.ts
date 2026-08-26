@@ -1,26 +1,40 @@
 import { NextResponse } from 'next/server';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import prisma from '../../../../lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+type BackupEmployee = { name: string; employeeNumber: string; jobTitle: string; schedule: string; jornada: string };
+type BackupRow = { employeeNumber: string; name: string; date: string; time: string; type: string };
+
+function localBackupHistory(employeeNumber: string) {
+  const employees = JSON.parse(readFileSync(join(process.cwd(), 'imports/employees-from-pdf.json'), 'utf8')) as BackupEmployee[];
+  const backup = JSON.parse(readFileSync(join(process.cwd(), 'imports/punches-from-pdf.json'), 'utf8')) as { rows: BackupRow[] };
+  const source = employees.find(employee => employee.employeeNumber === employeeNumber && employee.employeeNumber !== '0000');
+  if (!source) return null;
+  const schedule = source.jornada.match(/(\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})/);
+  const punches = backup.rows.filter(row => row.employeeNumber === employeeNumber).slice(-100).reverse().map((row, index) => ({ id: `backup-${employeeNumber}-${row.date}-${row.time}-${index}`, type: row.type, timestamp: `${row.date}T${row.time}-03:00` }));
+  return { employee: { id: `backup-${employeeNumber}`, name: source.name, employeeNumber: source.employeeNumber, jobTitle: source.jobTitle, workDays: source.schedule.replace(/,\s*\d{2}:\d{2}\s*às\s*\d{2}:\d{2}/i, ''), scheduleStart: schedule?.[1] ?? null, scheduleEnd: schedule?.[2] ?? null }, punches };
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const employeeNumber = url.searchParams.get('employeeNumber')?.trim();
+  const employeeNumber = url.searchParams.get('employeeNumber')?.replace(/\D/g, '').padStart(4, '0');
   if (!employeeNumber) return NextResponse.json({ error: 'Matrícula obrigatória' }, { status: 400 });
 
-  const employee = await prisma.user.findFirst({
-    where: { employeeNumber, active: true, role: 'EMPLOYEE' },
-    select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true },
-  });
-  if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado' }, { status: 404 });
-
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const punches = await prisma.punch.findMany({
-    where: { userId: employee.id, status: 'VALID', timestamp: { gte: since } },
-    select: { id: true, type: true, timestamp: true },
-    orderBy: { timestamp: 'desc' },
-    take: 100,
-  });
-  return NextResponse.json({ employee, punches });
+  try {
+    const employee = await prisma.user.findFirst({ where: { employeeNumber, active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } });
+    if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado' }, { status: 404 });
+    const since = new Date(); since.setDate(since.getDate() - 30);
+    const punches = await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: since } }, select: { id: true, type: true, timestamp: true }, orderBy: { timestamp: 'desc' }, take: 100 });
+    return NextResponse.json({ employee, punches });
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      const localData = localBackupHistory(employeeNumber);
+      if (localData) return NextResponse.json({ ...localData, localDemo: true });
+    }
+    console.error('Falha ao consultar histórico do colaborador', error);
+    return NextResponse.json({ error: 'A consulta está temporariamente indisponível. Tente novamente.' }, { status: 503 });
+  }
 }

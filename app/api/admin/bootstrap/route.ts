@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 
 
-export async function POST() {
+export async function POST(request: Request) {
   
   try {
     
@@ -36,7 +36,11 @@ export async function POST() {
     
 
     
-    await prisma.$executeRawUnsafe('CREATE TABLE IF NOT EXISTS "User" ("id" TEXT PRIMARY KEY, "name" TEXT NOT NULL, "employeeNumber" TEXT UNIQUE, "email" TEXT UNIQUE NOT NULL, "passwordHash" TEXT, "role" TEXT NOT NULL DEFAULT \'EMPLOYEE\', "active" BOOLEAN NOT NULL DEFAULT true, "unitId" TEXT, "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+    const existingManagers = await prisma.user.count({ where: { role: { in: ['ADMIN', 'MANAGER'] }, active: true } });
+    const bootstrapToken = request.headers.get('x-bootstrap-token');
+    if (existingManagers > 0 && bootstrapToken !== password) {
+      return NextResponse.json({ error: 'Bootstrap já inicializado. Token administrativo obrigatório.' }, { status: 401 });
+    }
     
 
     

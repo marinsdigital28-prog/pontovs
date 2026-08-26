@@ -101,3 +101,78 @@
 
 - [ ] Preencher cargo, dias trabalhados e horários de jornada de cada funcionário a partir do backup
 - [ ] Conferir que os dados de jornada foram vinculados à matrícula correta
+
+- [ ] Diagnosticar o bloqueio de deployment da Vercel e identificar se é limite, configuração ou build
+- [ ] Validar o vínculo do projeto `pontovs` com o GitHub e o domínio público
+- [ ] Publicar o commit mais recente por um caminho autorizado e seguro
+- [ ] Confirmar as rotas `/ponto`, `/admin` e `/colaborador` após a publicação
+
+- [x] Implementar localmente o dashboard do colaborador com consulta, histórico e visão mensal
+- [x] Implementar localmente formulários de ausência, troca de dia e atualização de perfil
+- [x] Validar estados de segurança, confirmação e erros da interface do colaborador
+- [x] Executar testes e build local para liberar a URL de teste
+
+- [x] Remover o botão e o link de registrar ponto do portal do colaborador
+- [x] Criar área “Minhas informações” com CPF, cargo, unidade, dias e horários
+- [x] Adicionar e-mail, WhatsApp e data de nascimento ao formulário local
+- [x] Validar campos obrigatórios e impedir alterações indevidas de jornada sem aprovação
+- [x] Testar o portal local sem qualquer atalho para bater ponto pelo telefone
+
+- [ ] Corrigir preview local que abre sem o layout do portal do colaborador
+- [ ] Confirmar carregamento do CSS e dos assets no endereço exposto
+
+- [ ] Destacar visualmente o campo de matrícula no portal do colaborador
+- [ ] Garantir validação da matrícula antes de exibir os dados pessoais
+
+- [x] Implementar validação matemática e normalização de CPF
+- [x] Implementar validação e normalização de e-mail, WhatsApp e data de nascimento
+- [x] Implementar validação de matrícula, unidade, dias e horários
+- [x] Impedir que alterações de cargo e jornada entrem em vigor sem aprovação
+- [ ] Testar as validações no formulário e na API local
+
+- [ ] Diagnosticar por que o layout do portal desaparece novamente no preview
+- [ ] Estabilizar a execução local e o carregamento dos arquivos CSS
+- [ ] Confirmar o layout após recarregar e reiniciar o preview
+
+- [x] Reproduzir as opções do portal que não estão funcionando
+- [x] Corrigir os eventos de clique, identificação e envio dos formulários
+- [x] Testar resumo, ausência, troca de dia e Minhas informações no preview
+
+- [x] Auditar telas, rotas, APIs e banco usados pelo painel administrativo
+- [x] Auditar segurança, permissões, auditoria e confiabilidade operacional
+- [x] Auditar folha de ponto, relatórios, filtros e experiência do gestor
+- [x] Testar o painel local e consolidar lacunas por prioridade
+- [x] Entregar diagnóstico executivo do que falta para o sistema operar em nível profissional
+
+- [ ] Converter a missão master anexada em matriz de requisitos e riscos verificáveis
+- [ ] Auditar OWASP, autenticação, autorização, IDOR/BOLA, integridade e observabilidade
+- [ ] Auditar LGPD, dados sensíveis, uploads, retenção e exposição de informações
+- [ ] Preservar dados e funcionalidades existentes durante todas as correções
+- [ ] Documentar correções aplicadas, testes, riscos residuais e plano de produção
+
+- [x] Implementar rate limiting para login, marcações, consultas, importações e exportações
+- [x] Criar auditoria imutável e encadeada para ações administrativas e eventos críticos
+- [x] Adicionar testes de concorrência, limite, integridade e autorização
+- [x] Atualizar o painel administrativo com status de segurança e atividade auditada
+- [x] Atualizar a área do funcionário com feedback de segurança e histórico de solicitações
+- [x] Gerar e validar preview web das rotas `/admin` e `/colaborador`
+
+- [ ] Adicionar modelo `SecurityAuditEvent` append-only ao Prisma
+- [ ] Criar migration não destrutiva para a tabela de auditoria
+- [ ] Persistir eventos com encadeamento de hashes e verificar a cadeia
+- [ ] Integrar rate limiting distribuído usando Redis com fallback somente local
+- [ ] Adicionar variáveis de ambiente documentadas sem expor segredos
+- [ ] Testar concorrência, indisponibilidade do Redis e integridade da auditoria
+- [ ] Validar build e preparar instruções de configuração em produção
+
+- [x] Adicionar edição controlada de marcação com motivo obrigatório
+- [x] Adicionar ação “Excluir” como cancelamento lógico, sem apagar o original
+- [x] Registrar tratamento em auditoria com autor, motivo e valores anterior/novo
+- [x] Adicionar confirmação visual e proteção contra ações irreversíveis no painel
+- [x] Testar permissões, validação e regressões do painel administrativo
+
+- [x] Criar monitor de presença na Visão geral com círculo, foto, nome e status
+- [x] Exibir rapidamente quem está presente, não marcou e está ausente ou pendente
+- [x] Adicionar filtro/ordenação rápida por status de presença
+- [x] Testar o painel visual em desktop e mobile
+- [x] Verificar build, GitHub, variáveis e limite da Vercel antes do deploy

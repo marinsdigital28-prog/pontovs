@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '../../../../lib/prisma';
+import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../lib/security-controls';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,8 @@ async function requireManager() {
 export async function GET(request: Request) {
   const manager = await requireManager();
   if (!manager) return NextResponse.json({ error: 'Acesso restrito ao gestor' }, { status: 401 });
+  const rate = await consumeRateLimit(getRequestKey(request, 'admin-punches-read', manager.id), 60, 60_000);
+  if (!rate.allowed) return rateLimitResponse(rate.retryAfterSeconds);
 
   const url = new URL(request.url);
   const fromValue = url.searchParams.get('from');
@@ -69,6 +72,7 @@ export async function GET(request: Request) {
 
   const records = punches.map(({ photoData, ...punch }) => ({ ...punch, hasPhoto: Boolean(photoData) }));
   if (format === 'csv') {
+    await appendAuditEvent({ action: 'PUNCHES_EXPORTED', actorId: manager.id, resource: 'Punch', metadata: { from: fromValue, to: toValue, employeeId, type, status, count: records.length } });
     const header = ['Data e hora', 'Colaborador', 'Matrícula', 'Cargo', 'Tipo', 'Status', 'Origem', 'Foto'];
     const rows = records.map((record) => [
       new Date(record.timestamp).toLocaleString('pt-BR'),

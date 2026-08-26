@@ -47,6 +47,7 @@ model User {
   punches       Punch[]
   audits        PunchAudit[] @relation("AuditAuthor")
   inconsistencies Inconsistency[]
+  securityAuditEvents SecurityAuditEvent[]
 }
 
 
@@ -120,4 +121,21 @@ model UnitSettings {
   maxOfflineHours       Int     @default(24)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+
+model SecurityAuditEvent {
+  id           String   @id @default(cuid())
+  action       String
+  actorId      String?
+  actor        User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  resource     String?
+  resourceId   String?
+  metadataJson String?  @db.Text
+  previousHash String
+  hash         String   @unique
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
 }

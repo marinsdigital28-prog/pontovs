@@ -36,10 +36,14 @@ describe('navegação da folha de ponto', () => {
   });
 
   it('declara o portal integrado do colaborador', () => {
-    expect(employeePortal).toContain('Portal do colaborador');
+    expect(employeePortal).toContain('Área do colaborador');
     expect(employeePortal).toContain('/api/employee/history');
-    expect(employeePortal).toContain('Registrar ponto');
-    expect(employeePortal).toContain('Solicitar ausência (em breve)');
+    expect(employeePortal).not.toContain('href="/ponto"');
+    expect(employeePortal).toContain('BATIDA SOMENTE NO RELÓGIO');
+    expect(employeePortal).toContain('Informar ausência');
+    expect(employeePortal).toContain('Trocar dia');
+    expect(employeePortal).toContain('Minhas informações');
+    expect(employeePortal).toContain('modo de teste local');
   });
 
   it('renderiza uma folha individual no modelo diário', () => {
