@@ -71,3 +71,5 @@
 - [ ] Aumentar os números do teclado e preencher melhor a altura da tela
 - [ ] Validar que a tela continua sem rolagem no celular
 - [ ] Aumentar novamente o relógio da tela `/ponto` sem cortar o teclado
+- [ ] Redistribuir o layout vertical para preencher toda a tela do relógio de ponto
+- [ ] Confirmar que teclado, matrícula e botão permanecem visíveis sem rolagem

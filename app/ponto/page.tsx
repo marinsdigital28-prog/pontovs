@@ -268,7 +268,7 @@ export default function Page() {
         </div>
 
         {step === 'lookup' && (
-          <div style={{ marginTop: 18 }}>
+          <div className="lookup-stage">
             {journeyClosed && statusMsg && (
               <div className="journey-closed-notice" role="status">
                 <strong>Jornada encerrada</strong>

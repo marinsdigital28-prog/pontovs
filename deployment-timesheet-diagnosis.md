@@ -109,3 +109,11 @@ A versão local foi validada sem rolagem, com relógio maior e teclas de 80px. O
 ## Relógio ampliado novamente
 
 A tela local `/ponto` foi validada sem pixels abaixo da viewport. O relógio usa `clamp(3.5rem, 10vw, 4.2rem)`, enquanto as 12 teclas e o botão Continuar continuam visíveis.
+
+## Publicação do relógio maior concluída
+
+O deployment `7B7q57VZPnvBgxAyEKFeU2XFLxVA`, referente ao commit `b588208`, terminou como `Ready` em produção. O relógio maior e as teclas de 80px estão publicados no domínio principal.
+
+## Tela preenchida verticalmente
+
+A validação local confirmou que o cartão ocupa a altura disponível, o teclado se expande para preencher o espaço, o relógio permanece destacado e todas as 12 teclas mais o botão Continuar continuam visíveis sem rolagem.

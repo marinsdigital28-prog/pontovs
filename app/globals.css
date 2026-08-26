@@ -48,6 +48,8 @@ button,input{font:inherit}
   min-height:calc(100dvh - 5.8rem);
   max-height:calc(100dvh - 5.8rem);
   overflow:hidden;
+  display:flex;
+  flex-direction:column;
 }
 
 .header-row{
@@ -79,7 +81,7 @@ button,input{font:inherit}
   box-shadow: 0 8px 24px rgba(212, 175, 55, 0.25);
 }
 
-.clock{text-align:center;padding:0.35rem 0 0.7rem}
+.clock{text-align:center;padding:0.35rem 0 0.7rem;flex:0 0 auto}
 .clock .time{font-size:clamp(3.5rem, 10vw, 4.2rem);font-weight:700;line-height:1;color:var(--text);letter-spacing:-0.05em}
 .clock .date{color:var(--muted);font-size:0.9rem;margin-top:0.5rem}
 
@@ -157,11 +159,22 @@ button,input{font:inherit}
   text-align: center;
 }
 
+.lookup-stage {
+  display:flex;
+  flex-direction:column;
+  flex:1 1 auto;
+  min-height:0;
+  margin-top:18px;
+}
+
 .keypad-grid {
   margin-top: 1rem;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
   gap: 0.8rem;
+  flex:1 1 auto;
+  min-height:0;
 }
 
 .keypad-btn {
@@ -171,6 +184,7 @@ button,input{font:inherit}
   background: linear-gradient(180deg, rgba(18, 42, 34, 0.96), rgba(12, 31, 25, 0.96));
   color: var(--text);
   min-height: 80px;
+  height:100%;
   font-size: clamp(1.75rem, 5.5vw, 2.2rem);
   font-weight: 800;
   cursor: pointer;
