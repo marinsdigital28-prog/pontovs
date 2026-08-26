@@ -73,3 +73,5 @@
 - [ ] Aumentar novamente o relógio da tela `/ponto` sem cortar o teclado
 - [ ] Redistribuir o layout vertical para preencher toda a tela do relógio de ponto
 - [ ] Confirmar que teclado, matrícula e botão permanecem visíveis sem rolagem
+- [ ] Ampliar o quadrado da foto na etapa de câmera do `/ponto`
+- [ ] Confirmar que o botão Marcar + Foto e a confirmação continuam visíveis

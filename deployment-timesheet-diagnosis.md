@@ -117,3 +117,11 @@ O deployment `7B7q57VZPnvBgxAyEKFeU2XFLxVA`, referente ao commit `b588208`, term
 ## Tela preenchida verticalmente
 
 A validação local confirmou que o cartão ocupa a altura disponível, o teclado se expande para preencher o espaço, o relógio permanece destacado e todas as 12 teclas mais o botão Continuar continuam visíveis sem rolagem.
+
+## Layout em tela cheia publicado
+
+O commit `498e67a` terminou como `Ready` no deployment `5qVA1ijdqKTqn7CPqxKm86k8jVfi`. O cartão do relógio agora preenche a altura disponível, com o teclado distribuído no espaço restante e sem rolagem no teste local.
+
+## Quadrado da câmera ampliado
+
+O preview quadrado foi ampliado para até 94% da largura e 64–66% da altura disponível em celulares, com limites responsivos para telas menores. TypeScript, testes e `git diff --check` passaram.
