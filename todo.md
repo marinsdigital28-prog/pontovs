@@ -46,3 +46,7 @@
 - [ ] Corrigir divergências e publicar a revisão dos relatórios
 - [x] Exibir mensagem clara quando todas as batidas do dia já estiverem concluídas
 - [x] Impedir abertura da câmera em jornada encerrada e retornar à matrícula após feedback
+- [x] Criar folha de ponto no `/admin` com layout equivalente ao PDF de referência
+- [x] Integrar totalizadores e registros reais do PostgreSQL
+- [x] Atualizar a folha automaticamente após novas batidas
+- [x] Adicionar visualização para impressão e filtros por competência
