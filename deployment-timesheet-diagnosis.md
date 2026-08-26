@@ -97,3 +97,15 @@ O deployment `9AhjoQ5H8ASrzwEv5933KUzaFzHB` do commit `aa75f0c` foi criado autom
 ## Deployment da tela simplificada concluído
 
 O deployment `9AhjoQ5H8ASrzwEv5933KUzaFzHB`, do commit `aa75f0c`, passou para `Ready` em produção. A alteração remove o bloco Último registro e a navegação inferior e amplia as teclas do relógio.
+
+## Ajuste de tamanho aguardando conclusão
+
+O commit `7c9d43a` iniciou o deployment `BLG54snWTSQMBfG4TYUctbdthpR` em produção e aparece como `Queued`. A versão anterior `aa75f0c` permanece Ready até o novo build terminar.
+
+## Status do aumento do relógio e teclado
+
+A versão local foi validada sem rolagem, com relógio maior e teclas de 80px. O commit `7c9d43a` foi enviado ao GitHub; a Vercel criou o deployment `BLG54snWTSQMBfG4TYUctbdthpR` em produção, ainda em `Building` no último acompanhamento.
+
+## Relógio ampliado novamente
+
+A tela local `/ponto` foi validada sem pixels abaixo da viewport. O relógio usa `clamp(3.5rem, 10vw, 4.2rem)`, enquanto as 12 teclas e o botão Continuar continuam visíveis.
