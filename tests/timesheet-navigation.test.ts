@@ -7,6 +7,7 @@ const dashboard = readFileSync(resolve(root, 'app/admin/admin-dashboard.tsx'), '
 const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8');
 const timesheet = readFileSync(resolve(root, 'app/admin/folha-ponto-panel.tsx'), 'utf8');
 const punch = readFileSync(resolve(root, 'app/ponto/page.tsx'), 'utf8');
+const employeePortal = readFileSync(resolve(root, 'app/colaborador/page.tsx'), 'utf8');
 
 
 describe('navegação da folha de ponto', () => {
@@ -32,6 +33,13 @@ describe('navegação da folha de ponto', () => {
     expect(css).toContain('min-height:190mm');
     expect(css).toContain('size:A4 landscape');
     expect(css).toContain('.individual-table-section .individual-timesheet-table{width:100%;height:100%}');
+  });
+
+  it('declara o portal integrado do colaborador', () => {
+    expect(employeePortal).toContain('Portal do colaborador');
+    expect(employeePortal).toContain('/api/employee/history');
+    expect(employeePortal).toContain('Registrar ponto');
+    expect(employeePortal).toContain('Solicitar ausência (em breve)');
   });
 
   it('renderiza uma folha individual no modelo diário', () => {

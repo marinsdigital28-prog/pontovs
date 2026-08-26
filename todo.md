@@ -86,3 +86,15 @@
 - [ ] Completar os cargos de todos os colaboradores a partir dos dados confirmados
 - [ ] Ajustar a Folha de Ponto para ocupar a página A4 inteira mantendo o modelo fornecido
 - [ ] Validar dados importados, folha individual e impressão A4
+
+- [ ] Importar imediatamente todas as marcações comprovadas do backup enviado
+- [ ] Validar no `/admin` a quantidade de colaboradores e marcações após a importação
+
+- [ ] Concluir o deployment do importador no projeto Vercel do domínio público
+- [ ] Importar as marcações comprovadas e validar a persistência sem duplicidades
+- [ ] Definir acesso individual seguro para cada colaborador
+- [ ] Criar portal do colaborador com confirmações de ponto e calendário mensal
+- [ ] Permitir solicitações de ausência e troca de dia com fluxo para aprovação administrativa
+- [ ] Permitir completar e editar dados de perfil com auditoria
+- [ ] Exibir dias trabalhados, faltas, saldo e progresso de fechamento mensal
+- [ ] Testar a integração entre portal do colaborador, `/ponto` e `/admin`
