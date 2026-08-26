@@ -95,3 +95,43 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ records, total: records.length, limit: 1000 });
 }
+
+
+import { manualClientId, manualPunchTypes, parseManualTimestamp } from '../../../../lib/manual-punch';
+
+export async function POST(request: Request) {
+  const manager = await requireManager();
+  if (!manager) return NextResponse.json({ error: 'Acesso restrito ao gestor' }, { status: 401 });
+  const rate = await consumeRateLimit(getRequestKey(request, 'admin-manual-punch', manager.id), 20, 60_000);
+  if (!rate.allowed) return rateLimitResponse(rate.retryAfterSeconds);
+
+  const body = await request.json().catch(() => null);
+  const userId = String(body?.userId ?? '').trim();
+  const type = String(body?.type ?? '').trim().toUpperCase();
+  const date = String(body?.date ?? '').trim();
+  const time = String(body?.time ?? '').trim();
+  const reason = String(body?.reason ?? '').trim();
+  if (!userId || !manualPunchTypes.includes(type as (typeof manualPunchTypes)[number])) return NextResponse.json({ error: 'Selecione um colaborador e um tipo de marcação válido.' }, { status: 400 });
+  if (reason.length < 5) return NextResponse.json({ error: 'Informe o motivo do lançamento com pelo menos 5 caracteres.' }, { status: 400 });
+  const timestamp = parseManualTimestamp(date, time);
+  if (!timestamp) return NextResponse.json({ error: 'Informe uma data e horário válidos.' }, { status: 400 });
+
+  const employee = await prisma.user.findFirst({ where: { id: userId, role: 'EMPLOYEE' }, select: { id: true, unitId: true, name: true, employeeNumber: true } });
+  if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
+  const clientId = manualClientId(employee.id, date, time, type);
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.punch.findUnique({ where: { clientId }, select: { id: true } });
+      if (existing) return { duplicate: true as const, punch: null };
+      const punch = await tx.punch.create({ data: { id: crypto.randomUUID(), userId: employee.id, unitId: employee.unitId, type, timestamp, clientTimestamp: timestamp, status: 'VALID', origin: 'ADJUSTED', locationValid: false, clientId }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });
+      await tx.punchAudit.create({ data: { id: crypto.randomUUID(), punchId: punch.id, changedById: manager.id, field: 'manual_create', oldValue: null, newValue: `${type} ${timestamp.toISOString()}`, reason } });
+      return { duplicate: false as const, punch };
+    });
+    if (result.duplicate) return NextResponse.json({ error: 'Já existe uma marcação manual igual para este colaborador, data, horário e tipo.' }, { status: 409 });
+    await appendAuditEvent({ action: 'PUNCH_CREATED_MANUAL', actorId: manager.id, resource: 'Punch', resourceId: result.punch?.id, metadata: { userId: employee.id, employeeNumber: employee.employeeNumber, type, date, time, reason } });
+    return NextResponse.json({ ok: true, punch: result.punch, employee: { name: employee.name, employeeNumber: employee.employeeNumber } }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: 'Não foi possível lançar a marcação manual.' }, { status: 500 });
+  }
+}
