@@ -283,3 +283,4 @@
 - [x] Atualizar logo do aplicativo para ícone circular com borda amarelo-dourada
 - [x] Refletir alterações de cargo, dias e horários imediatamente na Folha de Ponto
 - [x] Criar lançamento manual de marcação esquecida com motivo e auditoria
+- [x] Reorganizar a primeira aba da Administração em uma central operacional clara
