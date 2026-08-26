@@ -50,3 +50,7 @@
 - [x] Integrar totalizadores e registros reais do PostgreSQL
 - [x] Atualizar a folha automaticamente após novas batidas
 - [x] Adicionar visualização para impressão e filtros por competência
+- [ ] Corrigir a publicação da aba Folha de ponto no painel administrativo do domínio
+- [ ] Validar a aba Folha de ponto diretamente em produção
+- [ ] Tornar a aba Folha de ponto visível no menu móvel sem rolagem horizontal escondida
+- [ ] Validar o acesso móvel direto à Folha de ponto sem regressões
