@@ -278,3 +278,5 @@
 - [x] Adicionar assinatura digital do Espaço Progredir à Folha de Ponto
 - [x] Configurar certificado A1 para assinatura criptográfica das folhas PDF
 - [x] Remover marca d’água e aumentar fonte da Folha de Ponto
+- [x] Auditar e preparar o CSV completo de marcações de agosto sem duplicidades
+- [ ] Importar o CSV completo de marcações de agosto no ambiente autorizado
