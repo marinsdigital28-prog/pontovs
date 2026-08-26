@@ -96,8 +96,8 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
 
   const load = useCallback(async () => {
     const bounds = monthBounds(month);
@@ -110,11 +110,28 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Não foi possível carregar a folha de ponto.');
       setRecords(Array.isArray(data.records) ? data.records.sort((a: RecordItem, b: RecordItem) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) : []);
-      setLastUpdated(new Date());
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível carregar a folha de ponto.');
     } finally { setLoading(false); }
   }, [employeeId, month]);
+
+  const signAndDownload = async () => {
+    if (!selectedEmployee) return;
+    setSigning(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/timesheet-pdf', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ employeeId: selectedEmployee.id, month }) });
+      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'Não foi possível assinar a folha.'); }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `folha-${selectedEmployee.employeeNumber || selectedEmployee.id}-${month}-assinada.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível assinar a folha.'); }
+    finally { setSigning(false); }
+  };
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -166,7 +183,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     <section className="card timesheet-panel">
       <div className="section-heading timesheet-toolbar no-print">
         <div><span className="eyebrow">FOLHA INDIVIDUAL</span><h2>Folha de ponto do colaborador</h2><p className="small-muted">Uma folha por colaborador · atualização automática a cada 10 segundos.</p></div>
-        <div className="report-actions"><button type="button" className="ghost-btn" onClick={() => window.print()} disabled={!selectedEmployee}>Imprimir folha</button><button type="button" className="primary-btn compact-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar agora'}</button></div>
+        <div className="report-actions"><button type="button" className="ghost-btn" onClick={() => window.print()} disabled={!selectedEmployee}>Imprimir folha</button><button type="button" className="primary-btn compact-btn" onClick={() => void signAndDownload()} disabled={!selectedEmployee || signing}>{signing ? 'Assinando PDF...' : 'Assinar e baixar PDF'}</button><button type="button" className="ghost-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar agora'}</button></div>
       </div>
 
       <div className="report-filters no-print">
@@ -182,7 +199,6 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{dayRows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
           <section className="timesheet-totals"><span><b>Total H. Positivo:</b> {formatMinutes(Math.max(summary.balance, 0))}</span><span><b>Total H. Negativo:</b> {formatMinutes(Math.min(summary.balance, 0))}</span><span><b>Total trabalhado:</b> {formatMinutes(summary.worked)}</span><span><b>Saldo de Horas:</b> {formatMinutes(summary.balance)}</span><span><b>Faltas:</b> {summary.absences}</span><span><b>Atrasos:</b> {summary.late}</span></section>
           <div className="signature-area"><div className="signature-block">{signatureData ? <img className="institution-signature" src={signatureData} alt="Assinatura digital do Espaço Progredir" /> : null}<div className="signature-line">Assinatura digital do Espaço Progredir</div><span className="signature-caption">Assinatura institucional</span></div></div>
-          <footer className="timesheet-footer">Atualizado em {lastUpdated ? lastUpdated.toLocaleString('pt-BR') : '—'}. Documento gerado pelo Ponto Progredir.</footer>
         </div>
       )}
     </section>

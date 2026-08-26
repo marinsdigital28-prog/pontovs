@@ -276,3 +276,5 @@
 - [x] Aplicar no painel os dias e horários inferidos do CSV mensal
 - [x] Corrigir Folha de Ponto que exibe dias da escala como folga
 - [x] Adicionar assinatura digital do Espaço Progredir à Folha de Ponto
+- [x] Configurar certificado A1 para assinatura criptográfica das folhas PDF
+- [x] Remover marca d’água e aumentar fonte da Folha de Ponto
