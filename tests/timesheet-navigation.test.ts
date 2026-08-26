@@ -8,6 +8,8 @@ const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8');
 const timesheet = readFileSync(resolve(root, 'app/admin/folha-ponto-panel.tsx'), 'utf8');
 const punch = readFileSync(resolve(root, 'app/ponto/page.tsx'), 'utf8');
 const employeePortal = readFileSync(resolve(root, 'app/colaborador/page.tsx'), 'utf8');
+const csvImporter = readFileSync(resolve(root, 'app/admin/csv-importer.tsx'), 'utf8');
+const csvRoute = readFileSync(resolve(root, 'app/api/admin/import-csv/route.ts'), 'utf8');
 
 
 describe('navegação da folha de ponto', () => {
@@ -33,6 +35,17 @@ describe('navegação da folha de ponto', () => {
     expect(css).toContain('min-height:190mm');
     expect(css).toContain('size:A4 landscape');
     expect(css).toContain('.individual-table-section .individual-timesheet-table{width:100%;height:100%}');
+  });
+
+  it('declara o importador CSV seguro com prévia e confirmação', () => {
+    expect(dashboard).toContain("import CsvImporter from './csv-importer'");
+    expect(dashboard).toContain('<CsvImporter />');
+    expect(csvImporter).toContain('Prévia da importação');
+    expect(csvImporter).toContain('Confirmar importação');
+    expect(csvImporter).toContain("/api/admin/import-csv");
+    expect(csvRoute).toContain("role: { in: ['ADMIN', 'MANAGER'] }");
+    expect(csvRoute).toContain('punchesExisting');
+    expect(csvRoute).toContain("action: 'CSV_IMPORT'");
   });
 
   it('declara o portal integrado do colaborador', () => {

@@ -193,3 +193,9 @@
 - [x] Aplicar 1 hora de almoço para jornadas integrais
 - [x] Diferenciar jornadas de meio expediente sem desconto de almoço indevido
 - [x] Validar os cálculos da Folha de Ponto com os padrões importados
+
+- [x] Criar botão Importar CSV dentro do painel administrativo
+- [x] Exibir prévia e validar colunas, matrículas, datas, horários e tipos
+- [x] Conectar confirmação do usuário ao importador idempotente
+- [x] Exibir resultado detalhado com criados, já existentes e ignorados
+- [x] Testar segurança, duplicidade, erros e build de produção
