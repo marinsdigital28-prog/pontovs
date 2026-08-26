@@ -274,3 +274,4 @@
 - [x] Gerar arquivo compatível ou ajustar o parser sem duplicidades
 - [x] Validar o lote na prévia do importador
 - [x] Aplicar no painel os dias e horários inferidos do CSV mensal
+- [x] Corrigir Folha de Ponto que exibe dias da escala como folga

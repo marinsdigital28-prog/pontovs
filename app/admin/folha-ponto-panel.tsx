@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
 
 type Employee = {
   id: string;
@@ -72,13 +73,6 @@ function formatMinutes(value: number | null) {
   const absolute = Math.abs(Math.round(value));
   return `${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`;
 }
-function parseWorkDays(value: string | null | undefined) {
-  if (!value) return new Set(Object.values(weekdayCodes));
-  try {
-    const parsed = JSON.parse(value);
-    return new Set(Array.isArray(parsed) ? parsed.map(String).map((day) => day.toUpperCase()) : Object.values(weekdayCodes));
-  } catch { return new Set(Object.values(weekdayCodes)); }
-}
 function dayKey(value: string) { return value.slice(0, 10); }
 function minutesBetween(start: string, end: string) { return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000)); }
 function calculateWorked(punches: RecordItem[]) {
@@ -143,15 +137,16 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       const date = `${month}-${String(index + 1).padStart(2, '0')}`;
       const dayPunches = records.filter((record) => dayKey(record.timestamp) === date);
       const weekday = new Date(`${date}T12:00:00`).getDay();
-      const scheduled = expectedMinutes !== null && workDays.has(weekdayCodes[weekday]);
+      const scheduled = isScheduledDay(workDays, weekdayCodes[weekday]);
       const worked = calculateWorked(dayPunches);
       const firstPunch = dayPunches[0];
       const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
       const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
-      const expected = scheduled ? expectedMinutes : null;
+      const configuredWorkday = scheduled && expectedMinutes !== null;
+      const expected = configuredWorkday ? expectedMinutes : null;
       const balance = worked === null || expected === null ? null : worked - expected;
-      const schedule = scheduled && selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Folga';
-      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: scheduled && !dayPunches.length, late, schedule };
+      const schedule = !scheduled ? 'Folga' : selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Escala sem horário';
+      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: configuredWorkday && !dayPunches.length, late: configuredWorkday && late, schedule };
     });
   }, [employeeId, month, records, selectedEmployee]);
 
