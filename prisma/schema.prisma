@@ -119,6 +119,7 @@ model UnitSettings {
   requireLocation       Boolean @default(true)
   allowOffline          Boolean @default(true)
   maxOfflineHours       Int     @default(24)
+  signatureData         String?  @db.Text // assinatura institucional em data URL, acessível apenas ao gestor
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }

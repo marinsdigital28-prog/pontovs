@@ -275,3 +275,4 @@
 - [x] Validar o lote na prévia do importador
 - [x] Aplicar no painel os dias e horários inferidos do CSV mensal
 - [x] Corrigir Folha de Ponto que exibe dias da escala como folga
+- [x] Adicionar assinatura digital do Espaço Progredir à Folha de Ponto

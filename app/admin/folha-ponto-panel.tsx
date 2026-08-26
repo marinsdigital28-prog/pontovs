@@ -97,6 +97,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const bounds = monthBounds(month);
@@ -116,6 +117,13 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   }, [employeeId, month]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/admin/signature', { cache: 'no-store' })
+      .then(async (response) => { const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || ''); if (!cancelled) setSignatureData(data.signatureData || null); })
+      .catch(() => { if (!cancelled) setSignatureData(null); });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     const timer = window.setInterval(() => { void load(); }, 10000);
     return () => window.clearInterval(timer);
@@ -173,7 +181,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           <section className="employee-meta-grid"><span><b>Nome:</b> {selectedEmployee.name}</span><span><b>CPF:</b> {selectedEmployee.cpf || 'Não informado'}</span><span><b>Matrícula:</b> {selectedEmployee.employeeNumber || 'Não informada'}</span><span><b>Cargo:</b> {selectedEmployee.jobTitle || 'Não informado'}</span><span><b>Departamento:</b> Espaço Progredir</span><span><b>Unidade:</b> Espaço Progredir</span><span><b>Escala:</b> {selectedEmployee.workDays || 'Não informada'}</span><span><b>Jornada:</b> {selectedEmployee.scheduleStart || '08:00'} às {selectedEmployee.scheduleEnd || '17:00'}</span></section>
           <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{dayRows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
           <section className="timesheet-totals"><span><b>Total H. Positivo:</b> {formatMinutes(Math.max(summary.balance, 0))}</span><span><b>Total H. Negativo:</b> {formatMinutes(Math.min(summary.balance, 0))}</span><span><b>Total trabalhado:</b> {formatMinutes(summary.worked)}</span><span><b>Saldo de Horas:</b> {formatMinutes(summary.balance)}</span><span><b>Faltas:</b> {summary.absences}</span><span><b>Atrasos:</b> {summary.late}</span></section>
-          <div className="signature-line">Assinatura do Colaborador</div>
+          <div className="signature-area"><div className="signature-block">{signatureData ? <img className="institution-signature" src={signatureData} alt="Assinatura digital do Espaço Progredir" /> : null}<div className="signature-line">Assinatura digital do Espaço Progredir</div><span className="signature-caption">Assinatura institucional</span></div></div>
           <footer className="timesheet-footer">Atualizado em {lastUpdated ? lastUpdated.toLocaleString('pt-BR') : '—'}. Documento gerado pelo Ponto Progredir.</footer>
         </div>
       )}

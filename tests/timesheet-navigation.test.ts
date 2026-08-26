@@ -81,7 +81,7 @@ describe('navegação da folha de ponto', () => {
     expect(timesheet).toContain('<th>H.Trab</th>');
     expect(timesheet).toContain('<th>H.Prev</th>');
     expect(timesheet).toContain('<th>Saldo</th>');
-    expect(timesheet).toContain('Assinatura do Colaborador');
+    expect(timesheet).toContain('Assinatura digital do Espaço Progredir');
     expect(timesheet).toContain('Selecione um colaborador');
   });
 });
