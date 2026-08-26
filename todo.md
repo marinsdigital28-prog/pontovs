@@ -98,3 +98,6 @@
 - [ ] Permitir completar e editar dados de perfil com auditoria
 - [ ] Exibir dias trabalhados, faltas, saldo e progresso de fechamento mensal
 - [ ] Testar a integração entre portal do colaborador, `/ponto` e `/admin`
+
+- [ ] Preencher cargo, dias trabalhados e horários de jornada de cada funcionário a partir do backup
+- [ ] Conferir que os dados de jornada foram vinculados à matrícula correta
