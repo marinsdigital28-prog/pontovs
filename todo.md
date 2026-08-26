@@ -280,3 +280,4 @@
 - [x] Remover marca d’água e aumentar fonte da Folha de Ponto
 - [x] Auditar e preparar o CSV completo de marcações de agosto sem duplicidades
 - [ ] Importar o CSV completo de marcações de agosto no ambiente autorizado
+- [x] Atualizar logo do aplicativo para ícone circular com borda amarelo-dourada
