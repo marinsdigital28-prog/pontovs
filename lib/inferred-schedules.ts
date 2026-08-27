@@ -3,19 +3,20 @@ export type InferredSchedule = {
   scheduleStart: string;
   scheduleEnd: string;
   regime: 'INTEGRAL' | 'MEIO_EXPEDIENTE';
+  scheduleByDay?: string;
 };
 
 export const INFERRED_SCHEDULES: Record<string, InferredSchedule> = {
   '0011': { workDays: 'SEG,TER,QUA', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0019': { workDays: 'QUI,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0021': { workDays: 'TER,QUA,QUI', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
-  '0028': { workDays: 'SEG,QUA,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
+  '0028': { workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL', scheduleByDay: JSON.stringify({ SEG: { start: '08:00', end: '17:00', mode: 'FULL' }, TER: { start: '08:00', end: '17:00', mode: 'FULL' }, QUA: { start: '12:00', end: '16:00', mode: 'HALF' }, QUI: { start: '08:00', end: '17:00', mode: 'FULL' }, SEX: { start: '08:00', end: '17:00', mode: 'FULL' } }) },
   '0029': { workDays: 'TER,QUA,QUI', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0040': { workDays: 'SEG,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0042': { workDays: 'QUA,QUI', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0043': { workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0050': { workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
-  '0304': { workDays: 'TER,QUA,QUI', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
+  '0304': { workDays: 'TER,QUA,QUI', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL', scheduleByDay: JSON.stringify({ TER: { start: '08:00', end: '17:00', mode: 'FULL' }, QUA: { start: '08:00', end: '17:00', mode: 'FULL' }, QUI: { start: '12:00', end: '16:00', mode: 'HALF' } }) },
   '0506': { workDays: 'TER,QUI,SEX', scheduleStart: '07:30', scheduleEnd: '16:30', regime: 'INTEGRAL' },
   '0701': { workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', regime: 'INTEGRAL' },
   '0803': { workDays: 'SEG,QUA,QUI,SEX', scheduleStart: '07:00', scheduleEnd: '16:00', regime: 'INTEGRAL' },

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
+import { resolveDaySchedule } from '@/lib/day-schedule';
 
 type Employee = {
   id: string;
@@ -12,6 +13,7 @@ type Employee = {
   workDays?: string | null;
   scheduleStart?: string | null;
   scheduleEnd?: string | null;
+  scheduleByDay?: string | null;
 };
 
 type RecordItem = {
@@ -108,17 +110,19 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const date = `${month}-${String(index + 1).padStart(2, '0')}`;
     const dayPunches = records.filter((record) => record.user.id === employee.id && dayKey(record.timestamp) === date);
     const weekday = new Date(`${date}T12:00:00`).getDay();
-    const scheduled = isScheduledDay(workDays, weekdayCodes[weekday]);
+    const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday);
+    const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, weekdayCodes[weekday]);
     const worked = calculateWorked(dayPunches);
     const firstPunch = dayPunches[0];
     const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
     const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
-    const configuredWorkday = scheduled && expectedMinutes !== null;
+    const dayExpectedMinutes = daySchedule ? Math.max(0, minutesFromClock(daySchedule.end)! - minutesFromClock(daySchedule.start)! - (daySchedule.mode === 'FULL' ? 60 : 0)) : null;
+    const configuredWorkday = scheduled && dayExpectedMinutes !== null;
     const certificate = certificates.some((item) => item.userId === employee.id && item.status !== 'CANCELADO' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
     const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
-    const expected = configuredWorkday ? expectedMinutes : null;
+    const expected = configuredWorkday ? dayExpectedMinutes : null;
     const balance = worked === null || expected === null ? null : worked - expected;
-    const schedule = !scheduled ? 'Folga' : employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Escala sem horário';
+    const schedule = !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start} às ${daySchedule.end} · ${daySchedule.mode === 'FULL' ? '1h de almoço' : 'meio expediente'}` : 'Escala sem horário';
     const covered = Boolean(certificate || approvedRequest?.type === 'AUSENCIA');
     return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: configuredWorkday && !dayPunches.length && !covered, late: configuredWorkday && late && !covered, certificate: covered, schedule: approvedRequest?.type === 'TROCA_DIA' ? `${schedule} · troca aprovada` : schedule };
   });

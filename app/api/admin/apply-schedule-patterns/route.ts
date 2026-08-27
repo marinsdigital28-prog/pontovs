@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const automatic = body?.mode === 'automatic';
   const result = await prisma.$transaction(async (tx) => {
-    const employees = await tx.user.findMany({ where: { role: 'EMPLOYEE', employeeNumber: { in: Object.keys(INFERRED_SCHEDULES) } }, select: { id: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true } });
+    const employees = await tx.user.findMany({ where: { role: 'EMPLOYEE', employeeNumber: { in: Object.keys(INFERRED_SCHEDULES) } }, select: { id: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true } });
     let updated = 0;
     let skipped = 0;
     for (const employee of employees) {
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
       if (!schedule) continue;
       const merged = mergeInferredSchedule(employee, schedule);
       const currentScheduleIsOfficial = isOfficialSchedule(employee.scheduleStart, employee.scheduleEnd);
-      if (automatic && currentScheduleIsOfficial && employee.workDays) { skipped += 1; continue; }
+      if (automatic && currentScheduleIsOfficial && employee.workDays && (!schedule.scheduleByDay || employee.scheduleByDay === schedule.scheduleByDay)) { skipped += 1; continue; }
       const resolved = currentScheduleIsOfficial && employee.workDays ? merged : { workDays: schedule.workDays, scheduleStart: schedule.scheduleStart, scheduleEnd: schedule.scheduleEnd };
-      await tx.user.update({ where: { id: employee.id }, data: { workDays: resolved.workDays, scheduleStart: resolved.scheduleStart, scheduleEnd: resolved.scheduleEnd } });
+      await tx.user.update({ where: { id: employee.id }, data: { workDays: resolved.workDays, scheduleStart: resolved.scheduleStart, scheduleEnd: resolved.scheduleEnd, ...(schedule.scheduleByDay ? { scheduleByDay: schedule.scheduleByDay } : {}) } });
       updated += 1;
     }
     return { matched: employees.length, updated, skipped };

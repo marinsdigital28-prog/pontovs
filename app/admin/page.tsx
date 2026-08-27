@@ -17,7 +17,7 @@ export default async function AdminPage() {
     prisma.user.count({ where: { active: true, role: 'EMPLOYEE' } }).catch(() => 0),
     prisma.punch.count({ where: { timestamp: { gte: start } } }).catch(() => 0),
     prisma.inconsistency.count({ where: { status: 'OPEN' } }).catch(() => 0),
-    prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, active: true }, orderBy: { name: 'asc' } }).catch(() => []),
+    prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, active: true }, orderBy: { name: 'asc' } }).catch(() => []),
   ]);
   return <main className="admin-container"><header className="admin-header"><div><div className="header-brand">PONTO PROGREDIR</div><h1>Central administrativa</h1><p className="small-muted">Gestão operacional · {manager.name}</p></div><a className="ghost-btn" href="/ponto">Abrir ponto</a></header><AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: item.active }))} stats={{ employeeCount, punchesToday, openInconsistencies }} /><footer className="admin-footer">Desenvolvido por Marins Digital</footer></main>;
 }

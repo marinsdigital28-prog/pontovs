@@ -10,7 +10,7 @@ import AttendanceAnalytics from './attendance-analytics';
 import CertificatesPanel from './certificates-panel';
 import RequestsPanel from './requests-panel';
 
-type Employee = { id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null; workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; active: boolean; _count?: { punches: number } };
+type Employee = { id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null; workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null; active: boolean; _count?: { punches: number } };
 type Issue = { id: string; type: string; status: string; description: string | null; detectedAt: string; user: { name: string; employeeNumber: string | null }; punch: { id: string; type: string; timestamp: string } | null };
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
 type PresenceEmployee = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; status: 'PRESENTE' | 'NAO_MARCOU' | 'PENDENTE' | 'SAIU' | 'FOLGA'; scheduled: boolean; latestPunch: { id: string; type: string; timestamp: string; status: string; hasPhoto: boolean } | null };

@@ -63,6 +63,7 @@ model User {
   passwordHash  String?
   role          Role      @default(EMPLOYEE)
   active        Boolean   @default(true)
+  scheduleByDay String?
   unitId        String?
   unit          Unit?     @relation(fields: [unitId], references: [id])
   createdAt     DateTime  @default(now())
@@ -74,6 +75,8 @@ model User {
   medicalCertificates MedicalCertificate[] @relation("CertificateEmployee")
   certificatesCreated MedicalCertificate[] @relation("CertificateCreator")
   certificatesCanceled MedicalCertificate[] @relation("CertificateCanceler")
+  employeeRequests EmployeeRequest[] @relation("RequestEmployee")
+  requestsReviewed EmployeeRequest[] @relation("RequestReviewer")
 }
 
 model Punch {
@@ -169,6 +172,26 @@ model MedicalCertificate {
 
   @@index([userId, startDate, endDate])
   @@index([status])
+}
+
+model EmployeeRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    User     @relation("RequestEmployee", fields: [employeeId], references: [id])
+  reviewerId  String?
+  reviewer    User?    @relation("RequestReviewer", fields: [reviewerId], references: [id])
+  type        String
+  status      String   @default("PENDENTE")
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  details     String?
+  reviewNote  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([employeeId, status, startDate])
+  @@index([status, createdAt])
 }
 
 model UnitSettings {

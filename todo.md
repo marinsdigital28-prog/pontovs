@@ -344,4 +344,11 @@
 - [x] Adicionar campo de matrícula no login do Portal do Colaborador
 - [x] Autenticar matrícula com senha sem expor dados por URL
 - [x] Testar login por matrícula, sessão e privacidade
-- [ ] Publicar a correção do login do portal
+- [x] Publicar a correção do login do portal
+
+- [x] Deixar o login do portal somente com matrícula e senha
+- [x] Configurar jornadas por dia para Eduardo: seg/sex integral e quarta 12:00–16:00
+- [x] Configurar jornadas por dia para Gilvan: terça/quarta integral e quinta 12:00–16:00
+- [x] Garantir somente entrada e saída no meio expediente
+- [x] Corrigir a visibilidade e o lançamento de atestados no painel
+- [x] Testar folha, login e publicação

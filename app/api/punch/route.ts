@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
+import { resolveDaySchedule } from '../../../lib/day-schedule';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -21,7 +22,8 @@ export async function POST(req: Request) {
     const session = (await getServerSession(authOptions as any)) as any;
     const sessionId = session?.user?.id as string | undefined;
     const result = await prisma.$transaction(async (tx) => {
-      let user = input.employeeNumber ? await tx.user.findUnique({ where: { employeeNumber: input.employeeNumber } }) : null;
+      const normalizedEmployeeNumber = input.employeeNumber ? input.employeeNumber.replace(/\D/g, '').padStart(4, '0') : null;
+      let user = normalizedEmployeeNumber ? await tx.user.findUnique({ where: { employeeNumber: normalizedEmployeeNumber } }) : null;
       if (!user && sessionId) user = await tx.user.findUnique({ where: { id: sessionId } });
       if (!user || !user.active || user.role !== 'EMPLOYEE') throw new HttpError('Colaborador não identificado ou inativo', 401);
       if (input.clientId) {
@@ -31,9 +33,11 @@ export async function POST(req: Request) {
       const now = new Date();
       const { start, end } = brazilDayRange(now);
       const last = await tx.punch.findFirst({ where: { userId: user.id, status: 'VALID', timestamp: { gte: start, lt: end } }, orderBy: { timestamp: 'desc' } });
-      const index = last ? ORDER.indexOf(last.type as (typeof ORDER)[number]) : -1;
-      if (index === ORDER.length - 1) throw new HttpError('A jornada de hoje já foi encerrada', 409);
-      const type = ORDER[index + 1];
+      const schedule = resolveDaySchedule(user.scheduleByDay, user.workDays, user.scheduleStart, user.scheduleEnd, now.getDay());
+      const order = schedule?.mode === 'HALF' ? ['ENTRADA', 'SAIDA'] as const : ORDER;
+      const index = last ? (order as readonly string[]).indexOf(last.type) : -1;
+      if (index === order.length - 1) throw new HttpError('A jornada de hoje já foi encerrada', 409);
+      const type = order[index + 1];
       const punch = await tx.punch.create({ data: { userId: user.id, unitId: user.unitId || null, type, timestamp: now, clientTimestamp: input.clientTimestamp ? new Date(input.clientTimestamp) : null, latitude: input.location?.lat ?? null, longitude: input.location?.lng ?? null, accuracy: input.location?.accuracy ?? null, locationValid: Boolean(input.location), origin: 'WEB', clientId: input.clientId ?? null, photoData: input.photo ?? null } });
       await tx.punchAudit.create({ data: { punchId: punch.id, changedById: user.id, field: 'created', newValue: JSON.stringify({ type: punch.type, timestamp: punch.timestamp.toISOString(), clientId: punch.clientId, origin: punch.origin }), reason: 'Registro inicial via app' } });
       return { punch, user, duplicate: false };
