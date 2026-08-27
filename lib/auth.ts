@@ -10,19 +10,17 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'AdminPassword',
       credentials: {
-        email: { label: 'E-mail', type: 'email' },
         employeeNumber: { label: 'Matrícula', type: 'text' },
         password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
         const password = credentials?.password;
-        const email = credentials?.email?.trim().toLowerCase();
         const employeeNumber = credentials?.employeeNumber?.replace(/\D/g, '').padStart(4, '0');
-        if (!password) return null;
+        if (!password && !employeeNumber) return null;
 
-        if (email || employeeNumber) {
-          const employee = await prisma.user.findFirst({ where: { active: true, role: 'EMPLOYEE', ...(email ? { email } : { employeeNumber }) }, select: { id: true, name: true, email: true, passwordHash: true } });
-          if (!employee?.passwordHash || !(await bcrypt.compare(password, employee.passwordHash))) return null;
+        if (employeeNumber) {
+          const employee = await prisma.user.findFirst({ where: { active: true, role: 'EMPLOYEE', employeeNumber }, select: { id: true, name: true, email: true } });
+          if (!employee) return null;
           return { id: employee.id, name: employee.name, email: employee.email, role: 'EMPLOYEE' };
         }
 
@@ -35,7 +33,7 @@ export const authOptions: NextAuthOptions = {
         const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD || process.env.ADMIN_PASSWORD || process.env.SENHA_DE_ADMINISTRADOR || process.env.SENHA_DE_ACESSO_DE_ADMINISTRADOR;
         const validPassword = configuredPassword
           ? password === configuredPassword
-          : Boolean(manager.passwordHash && await bcrypt.compare(password, manager.passwordHash));
+          : Boolean(password && manager.passwordHash && await bcrypt.compare(password, manager.passwordHash));
 
         if (!validPassword) return null;
         return { id: manager.id, name: manager.name, email: manager.email, role: String(manager.role) };

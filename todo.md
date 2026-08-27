@@ -352,3 +352,9 @@
 - [x] Garantir somente entrada e saída no meio expediente
 - [x] Corrigir a visibilidade e o lançamento de atestados no painel
 - [x] Testar folha, login e publicação
+
+- [x] Remover campo e exigência de senha do Portal do Colaborador
+- [x] Manter acesso do painel administrativo protegido por senha
+- [x] Aprimorar resumo, histórico e solicitações do portal por matrícula
+- [x] Testar acesso por matrícula e regressões do totem/admin
+- [ ] Publicar o novo portal
