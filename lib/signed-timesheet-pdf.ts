@@ -115,9 +115,10 @@ export async function createSignedTimesheetPdf({ employee, punches, month, certi
   page.drawText(`Faltas: ${absences}`, { x: 470, y: totalsY, size: 9, font: bold, color: dark });
 
   // Rodapé institucional: A1 à esquerda e assinatura manuscrita do colaborador à direita.
-  page.drawText('ASSINATURA DIGITAL — ESPAÇO PROGREDIR', { x: 26, y: 43, size: 8.5, font: bold, color: green });
-  page.drawLine({ start: { x: 26, y: 31 }, end: { x: 300, y: 31 }, thickness: 0.8, color: muted });
-  page.drawText('Documento assinado com certificado digital A1', { x: 26, y: 21, size: 7.5, font: regular, color: muted });
+  page.drawRectangle({ x: 26, y: 18, width: 310, height: 34, color: rgb(0.95, 1, 0.96), borderColor: rgb(0.24, 0.61, 0.39), borderWidth: 0.8 });
+  page.drawText('✓ Assinado digitalmente por ESPAÇO PROGREDIR', { x: 32, y: 42, size: 8.2, font: bold, color: green });
+  page.drawText('Certificado digital A1 · CNPJ 05.553.848/0001-61', { x: 32, y: 31, size: 7.1, font: regular, color: green });
+  page.drawText('SHA-256 · PKCS#7 (CMS) · ICP-Brasil A1', { x: 32, y: 22, size: 7.1, font: regular, color: muted });
   page.drawText('ASSINATURA DO COLABORADOR', { x: 560, y: 43, size: 8.5, font: bold, color: green });
   page.drawLine({ start: { x: 560, y: 31 }, end: { x: 816, y: 31 }, thickness: 0.8, color: muted });
   page.drawText(employee.name, { x: 560, y: 21, size: 7.5, font: regular, color: muted, maxWidth: 256 });

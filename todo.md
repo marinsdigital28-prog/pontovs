@@ -318,3 +318,8 @@
 - [x] Melhorar navegação, filtros, estados vazios, feedbacks e ações administrativas
 - [x] Validar lote mensal, paginação A4, assinatura A1 e responsividade
 - [x] Publicar as melhorias após os testes
+
+- [x] Corrigir a exibição de horas previstas por dia e o total mensal de horas previstas
+- [x] Manter o certificado institucional visual igual ao modelo de referência, com bloco verde e identificação A1
+- [x] Validar o cálculo de jornada integral, almoço de 1 hora e meio expediente
+- [x] Testar a folha completa e publicar a correção
