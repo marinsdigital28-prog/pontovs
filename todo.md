@@ -285,3 +285,4 @@
 - [x] Criar lançamento manual de marcação esquecida com motivo e auditoria
 - [x] Reorganizar a primeira aba da Administração em uma central operacional clara
 - [x] Adicionar gráficos reais de presença e pontualidade da equipe
+- [x] Aplicar automaticamente escala, cargo e horas previstas a partir do padrão de marcações

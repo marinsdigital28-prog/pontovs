@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INFERRED_SCHEDULES } from '../lib/inferred-schedules';
+import { mergeInferredSchedule } from '../lib/schedule-application';
 
 describe('padrões de jornada inferidos do CSV mensal', () => {
   it('contém um padrão válido para as 33 matrículas do lote', () => {
@@ -10,6 +11,12 @@ describe('padrões de jornada inferidos do CSV mensal', () => {
       expect(schedule.scheduleEnd).toMatch(/^\d{2}:\d{2}$/);
       expect(schedule.scheduleStart < schedule.scheduleEnd).toBe(true);
     }
+  });
+
+  it('preenche escala ausente e preserva escala personalizada', () => {
+    const suggestion = INFERRED_SCHEDULES['4041'];
+    expect(mergeInferredSchedule({ workDays: null, scheduleStart: null, scheduleEnd: null }, suggestion)).toMatchObject({ workDays: suggestion.workDays, scheduleStart: suggestion.scheduleStart, scheduleEnd: suggestion.scheduleEnd, applied: true });
+    expect(mergeInferredSchedule({ workDays: 'SEG', scheduleStart: '09:00', scheduleEnd: '18:00' }, suggestion)).toMatchObject({ workDays: 'SEG', scheduleStart: '09:00', scheduleEnd: '18:00', applied: false });
   });
 
   it('separa meio expediente de jornada integral', () => {

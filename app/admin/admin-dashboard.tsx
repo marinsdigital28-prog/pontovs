@@ -32,10 +32,12 @@ export default function AdminDashboard({ employees: initialEmployees, stats }: {
   const [presenceUpdatedAt, setPresenceUpdatedAt] = useState<Date | null>(null);
 
   const loadEmployees = useCallback(async () => { const response = await fetch('/api/admin/employees', { cache: 'no-store' }); if (response.ok) setEmployees((await response.json()).employees || []); }, []);
+  const autoApplySchedulePatterns = useCallback(async () => { const response = await fetch('/api/admin/apply-schedule-patterns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'automatic' }) }); if (response.ok) { const data = await response.json().catch(() => ({})); if (data.updated) await loadEmployees(); } }, [loadEmployees]);
   const loadIssues = useCallback(async () => { const response = await fetch('/api/admin/inconsistencies', { cache: 'no-store' }); if (response.ok) setIssues((await response.json()).inconsistencies || []); }, []);
   const loadAudit = useCallback(async () => { const response = await fetch('/api/admin/audit', { cache: 'no-store' }); if (response.ok) setAudit(await response.json()); }, []);
   const loadPresence = useCallback(async () => { const response = await fetch('/api/admin/presence', { cache: 'no-store' }); if (response.ok) { const data = await response.json(); setPresence(Array.isArray(data.employees) ? data.employees : []); setPresenceUpdatedAt(new Date()); } }, []);
   useEffect(() => { void loadIssues(); }, [loadIssues]);
+  useEffect(() => { void autoApplySchedulePatterns(); }, [autoApplySchedulePatterns]);
   useEffect(() => { if (tab === 'security') void loadAudit(); }, [tab, loadAudit]);
   useEffect(() => { if (tab !== 'overview') return; void loadPresence(); const timer = window.setInterval(() => void loadPresence(), 30_000); return () => window.clearInterval(timer); }, [tab, loadPresence]);
 
