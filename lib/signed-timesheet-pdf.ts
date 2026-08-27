@@ -16,6 +16,7 @@ export type TimesheetEmployee = {
 
 export type TimesheetPunch = { type: string; timestamp: Date };
 export type TimesheetCertificate = { startDate: Date; endDate: Date; status: string };
+export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; status: string; reason: string };
 
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
@@ -40,7 +41,7 @@ function workedMinutes(punches: TimesheetPunch[]) {
   return ordered.length ? pairs.reduce((total, [start, end]) => total + minutesBetween(start, end), 0) : null;
 }
 
-export async function createSignedTimesheetPdf({ employee, punches, certificates = [], month, certificate, password }: { employee: TimesheetEmployee; punches: TimesheetPunch[]; certificates?: TimesheetCertificate[]; month: string; certificate: Buffer; password: string }) {
+export async function createSignedTimesheetPdf({ employee, punches, certificates = [], requests = [], month, certificate, password }: { employee: TimesheetEmployee; punches: TimesheetPunch[]; certificates?: TimesheetCertificate[]; requests?: TimesheetRequest[]; month: string; certificate: Buffer; password: string }) {
   const [year, monthNumber] = month.split('-').map(Number);
   const pageWidth = 842;
   const pageHeight = 595;
@@ -97,15 +98,16 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
     if (worked !== null) totalWorked += worked;
     if (expected !== null) totalExpected += expected;
     const coveredByCertificate = certificates.some((item) => item.status !== 'CANCELADO' && item.startDate <= date && item.endDate >= date);
-    const absent = configuredWorkday && !dayPunches.length && !coveredByCertificate;
+    const approvedRequest = requests.find((item) => item.status === 'APROVADO' && ((item.type === 'AUSENCIA' && item.startDate <= date && item.endDate >= date) || (item.type === 'TROCA_DIA' && (item.startDate.getTime() === date.getTime() || item.endDate.getTime() === date.getTime()))));
+    const absent = configuredWorkday && !dayPunches.length && !coveredByCertificate && approvedRequest?.type !== 'AUSENCIA';
     if (absent) absences += 1;
     const y = tableTop - rowHeight * (index + 2);
     if (index % 2 === 1) page.drawRectangle({ x: 26, y: y - 3, width: 790, height: rowHeight, color: rgb(0.975, 0.985, 0.978) });
     const schedule = !scheduled ? 'Folga' : employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd}${lunch ? ' · 1h almoço' : ' · meio expediente'}` : 'Escala sem horário';
     const marks = dayPunches.length ? dayPunches.map((punch) => `${formatTime(punch.timestamp)} ${punch.type}`).join(' · ') : '—';
     const balance = worked === null || expected === null ? null : worked - expected;
-    const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(worked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, coveredByCertificate ? 'ATESTADO' : absent ? 'FALTA' : '', coveredByCertificate && dayPunches.length ? 'ATESTADO + MARCAÇÃO EXISTENTE' : ''];
-    values.forEach((value, valueIndex) => page.drawText(value, { x: columns[valueIndex] + 3, y, size: valueIndex === 2 ? 6.8 : 7.6, font: valueIndex === 6 ? bold : regular, color: valueIndex === 6 && absent ? rgb(0.65, 0.12, 0.12) : valueIndex === 6 && coveredByCertificate ? green : dark, maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 6, lineHeight: 7.6 }));
+    const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(worked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, coveredByCertificate ? 'ATESTADO' : approvedRequest ? (approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA APROVADA' : 'TROCA APROVADA') : absent ? 'FALTA' : '', coveredByCertificate && dayPunches.length ? 'ATESTADO + MARCAÇÃO EXISTENTE' : approvedRequest ? approvedRequest.reason : ''];
+    values.forEach((value, valueIndex) => page.drawText(value, { x: columns[valueIndex] + 3, y, size: valueIndex === 2 ? 6.8 : 7.6, font: valueIndex === 6 ? bold : regular, color: valueIndex === 6 && absent ? rgb(0.65, 0.12, 0.12) : valueIndex === 6 && (coveredByCertificate || Boolean(approvedRequest)) ? green : dark, maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 6, lineHeight: 7.6 }));
     page.drawLine({ start: { x: 26, y: y - 4 }, end: { x: 816, y: y - 4 }, thickness: 0.35, color: rgb(0.76, 0.82, 0.78) });
   }
 

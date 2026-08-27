@@ -31,13 +31,14 @@ export async function POST(request: Request) {
   const to = new Date(year, monthNumber, 1);
   const employee = await prisma.user.findFirst({ where: { id: employeeId, role: 'EMPLOYEE' }, select: { name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } });
   if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
-  const [punches, certificates] = await Promise.all([
+  const [punches, certificates, requests] = await Promise.all([
     prisma.punch.findMany({ where: { userId: employeeId, status: 'VALID', timestamp: { gte: from, lt: to } }, select: { type: true, timestamp: true }, orderBy: { timestamp: 'asc' } }),
     prisma.medicalCertificate.findMany({ where: { userId: employeeId, status: { not: 'CANCELADO' }, startDate: { lt: to }, endDate: { gte: from } }, select: { startDate: true, endDate: true, status: true } }),
+    prisma.employeeRequest.findMany({ where: { employeeId, status: 'APROVADO', startDate: { lt: to }, endDate: { gte: from } }, select: { type: true, startDate: true, endDate: true, status: true, reason: true } }),
   ]);
 
   try {
-    const signedPdf = await createSignedTimesheetPdf({ employee, punches, certificates, month, certificate: Buffer.from(certificateBase64, 'base64'), password: certificatePassword });
+    const signedPdf = await createSignedTimesheetPdf({ employee, punches, certificates, requests, month, certificate: Buffer.from(certificateBase64, 'base64'), password: certificatePassword });
     await appendAuditEvent({ action: 'TIMESHEET_PDF_SIGNED_A1', actorId: manager.id, resource: 'Timesheet', resourceId: employeeId, metadata: { month, employeeNumber: employee.employeeNumber, punchCount: punches.length } });
     return new NextResponse(signedPdf as any, { status: 200, headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="folha-${employee.employeeNumber || employeeId}-${month}-assinada.pdf"`, 'Cache-Control': 'no-store' } });
   } catch (error) {

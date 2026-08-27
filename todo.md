@@ -324,11 +324,19 @@
 - [x] Validar o cálculo de jornada integral, almoço de 1 hora e meio expediente
 - [x] Testar a folha completa e publicar a correção
 
-- [ ] Ler e decompor o Prompt de Atestados anexado
-- [ ] Ler e decompor o Prompt de Redesign do Painel Administrativo anexado
-- [ ] Auditar a arquitetura atual antes de aplicar os prompts
-- [ ] Implementar atestados com período, documento, status, cancelamento lógico e auditoria
-- [ ] Integrar atestados à folha sem criar batidas artificiais
+- [x] Ler e decompor o Prompt de Atestados anexado
+- [x] Ler e decompor o Prompt de Redesign do Painel Administrativo anexado
+- [x] Auditar a arquitetura atual antes de aplicar os prompts
+- [x] Implementar atestados com período, documento, status, cancelamento lógico e auditoria
+- [x] Integrar atestados à folha sem criar batidas artificiais
 - [ ] Aplicar melhorias executáveis do redesign do painel administrativo
-- [ ] Testar permissões, privacidade, não duplicação e regressões
-- [ ] Publicar a execução validada dos dois prompts
+- [x] Testar permissões, privacidade, não duplicação e regressões
+- [x] Publicar a execução validada dos dois prompts
+
+- [x] Criar solicitação persistente de ausência pelo portal do colaborador
+- [x] Criar solicitação persistente de troca de dia pelo portal do colaborador
+- [x] Criar aprovação e rejeição pelo gestor com auditoria
+- [x] Refletir solicitações aprovadas na folha sem apagar marcações originais
+- [x] Garantir uma página A4 horizontal por colaborador na impressão em lote
+- [x] Validar totais mensais de horas previstas e realizadas
+- [ ] Testar permissões, cálculos, impressão e publicar
