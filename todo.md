@@ -311,10 +311,10 @@
 
 > O arquivo PFX não foi commitado nem armazenado no repositório. As credenciais permanecem write-only na Vercel.
 
-- [ ] Criar visão mensal com todas as folhas de ponto dos colaboradores
-- [ ] Criar impressão/exportação em lote, uma folha A4 horizontal por colaborador, em sequência
-- [ ] Usar a assinatura institucional oficial do Espaço Progredir em todas as folhas assinadas
-- [ ] Revisar e melhorar a visão geral do painel administrativo
-- [ ] Melhorar navegação, filtros, estados vazios, feedbacks e ações administrativas
-- [ ] Validar lote mensal, paginação A4, assinatura A1 e responsividade
-- [ ] Publicar as melhorias após os testes
+- [x] Criar visão mensal com todas as folhas de ponto dos colaboradores
+- [x] Criar impressão/exportação em lote, uma folha A4 horizontal por colaborador, em sequência
+- [x] Usar a assinatura institucional oficial do Espaço Progredir em todas as folhas assinadas
+- [x] Revisar e melhorar a visão geral do painel administrativo
+- [x] Melhorar navegação, filtros, estados vazios, feedbacks e ações administrativas
+- [x] Validar lote mensal, paginação A4, assinatura A1 e responsividade
+- [x] Publicar as melhorias após os testes
