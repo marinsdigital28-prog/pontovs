@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
   const [punches, certificates, requests] = await Promise.all([
     prisma.punch.findMany({ where: { userId: employeeId, status: 'VALID', timestamp: { gte: from, lt: to } }, select: { type: true, timestamp: true }, orderBy: { timestamp: 'asc' } }),
-    prisma.medicalCertificate.findMany({ where: { userId: employeeId, status: { not: 'CANCELADO' }, startDate: { lt: to }, endDate: { gte: from } }, select: { startDate: true, endDate: true, status: true } }),
+    prisma.medicalCertificate.findMany({ where: { userId: employeeId, status: { not: 'CANCELADO' }, startDate: { lt: to }, endDate: { gte: from } }, select: { startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, status: true } }),
     prisma.employeeRequest.findMany({ where: { employeeId, status: 'APROVADO', startDate: { lt: to }, endDate: { gte: from } }, select: { type: true, startDate: true, endDate: true, status: true, reason: true } }),
   ]);
 

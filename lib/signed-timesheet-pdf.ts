@@ -15,7 +15,7 @@ export type TimesheetEmployee = {
 };
 
 export type TimesheetPunch = { type: string; timestamp: Date };
-export type TimesheetCertificate = { startDate: Date; endDate: Date; status: string };
+export type TimesheetCertificate = { startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null; hoursPerDayMinutes?: number | null; status: string };
 export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; status: string; reason: string };
 
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
@@ -24,6 +24,7 @@ const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 
 function formatTime(value: Date) { return value.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
 function formatDate(value: Date) { return value.toLocaleDateString('pt-BR'); }
 function minutesFromClock(value: string | null) { const match = value?.match(/^(\d{1,2}):(\d{2})/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }
+function certificateMinutesForDay(item: TimesheetCertificate, date: Date) { if (!item.hoursPerDayMinutes || item.startDate > date || item.endDate < date) return 0; return item.hoursPerDayMinutes; }
 function minutesBetween(start: Date, end: Date) { return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000)); }
 function formatMinutes(value: number | null) { if (value === null) return '—'; return `${String(Math.floor(Math.abs(value) / 60)).padStart(2, '0')}:${String(Math.abs(value) % 60).padStart(2, '0')}`; }
 function formatSignedMinutes(value: number | null) { if (value === null) return '—'; return `${value < 0 ? '-' : ''}${formatMinutes(Math.abs(value))}`; }
@@ -94,10 +95,13 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
     const scheduled = isScheduledDay(workDays, weekdayCodes[date.getDay()]);
     const configuredWorkday = scheduled && expectedMinutes !== null;
     const worked = workedMinutes(dayPunches);
+    const certificate = certificates.find((item) => item.status !== 'CANCELADO' && item.startDate <= date && item.endDate >= date);
+    const certificateMinutes = certificate ? certificateMinutesForDay(certificate, date) : 0;
+    const creditedWorked = worked === null && certificateMinutes > 0 ? certificateMinutes : worked !== null && certificateMinutes > 0 ? worked + certificateMinutes : worked;
     const expected = configuredWorkday ? expectedMinutes : null;
-    if (worked !== null) totalWorked += worked;
+    if (creditedWorked !== null) totalWorked += creditedWorked;
     if (expected !== null) totalExpected += expected;
-    const coveredByCertificate = certificates.some((item) => item.status !== 'CANCELADO' && item.startDate <= date && item.endDate >= date);
+    const coveredByCertificate = Boolean(certificate);
     const approvedRequest = requests.find((item) => item.status === 'APROVADO' && ((item.type === 'AUSENCIA' && item.startDate <= date && item.endDate >= date) || (item.type === 'TROCA_DIA' && (item.startDate.getTime() === date.getTime() || item.endDate.getTime() === date.getTime()))));
     const absent = configuredWorkday && !dayPunches.length && !coveredByCertificate && approvedRequest?.type !== 'AUSENCIA';
     if (absent) absences += 1;
@@ -105,8 +109,9 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
     if (index % 2 === 1) page.drawRectangle({ x: 26, y: y - 3, width: 790, height: rowHeight, color: rgb(0.975, 0.985, 0.978) });
     const schedule = !scheduled ? 'Folga' : employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd}${lunch ? ' · 1h almoço' : ' · meio expediente'}` : 'Escala sem horário';
     const marks = dayPunches.length ? dayPunches.map((punch) => `${formatTime(punch.timestamp)} ${punch.type}`).join(' · ') : '—';
-    const balance = worked === null || expected === null ? null : worked - expected;
-    const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(worked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, coveredByCertificate ? 'ATESTADO' : approvedRequest ? (approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA APROVADA' : 'TROCA APROVADA') : absent ? 'FALTA' : '', coveredByCertificate && dayPunches.length ? 'ATESTADO + MARCAÇÃO EXISTENTE' : approvedRequest ? approvedRequest.reason : ''];
+    const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
+    const certificateLabel = certificateMinutes > 0 ? `ATESTADO ${certificate?.startTime || ''}–${certificate?.endTime || ''}` : 'ATESTADO';
+    const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(creditedWorked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, coveredByCertificate ? certificateLabel : approvedRequest ? (approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA APROVADA' : 'TROCA APROVADA') : absent ? 'FALTA' : '', coveredByCertificate && dayPunches.length ? `${certificateLabel} + MARCAÇÃO EXISTENTE` : approvedRequest ? approvedRequest.reason : ''];
     values.forEach((value, valueIndex) => page.drawText(value, { x: columns[valueIndex] + 3, y, size: valueIndex === 2 ? 6.8 : 7.6, font: valueIndex === 6 ? bold : regular, color: valueIndex === 6 && absent ? rgb(0.65, 0.12, 0.12) : valueIndex === 6 && (coveredByCertificate || Boolean(approvedRequest)) ? green : dark, maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 6, lineHeight: 7.6 }));
     page.drawLine({ start: { x: 26, y: y - 4 }, end: { x: 816, y: y - 4 }, thickness: 0.35, color: rgb(0.76, 0.82, 0.78) });
   }

@@ -365,3 +365,8 @@
 - [x] Redesenhar Informar ausência com calendário, classificação, documento, retorno e observações
 - [x] Persistir anexo e campos adicionais da ausência com segurança
 - [x] Testar atualização cruzada entre as três rotas e publicar
+
+- [x] Adicionar hora inicial e hora final ao lançamento de atestado
+- [x] Validar intervalo de horas e duração no mesmo dia
+- [x] Exibir horas do atestado no painel administrativo e na folha de ponto
+- [x] Testar persistência e cálculo do total abonado

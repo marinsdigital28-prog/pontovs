@@ -13,6 +13,8 @@ const bodySchema = z.object({
   userId: z.string().min(1),
   startDate: z.string().regex(dateOnly),
   endDate: z.string().regex(dateOnly),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().nullable(),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().nullable(),
   observation: z.string().max(2000).optional().nullable(),
   documentName: z.string().max(180).optional().nullable(),
   documentMime: z.string().optional().nullable(),
@@ -21,6 +23,7 @@ const bodySchema = z.object({
 
 function day(date: string) { return new Date(`${date}T12:00:00.000Z`); }
 function inclusiveDays(start: Date, end: Date) { return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1; }
+function minutesBetween(start?: string | null, end?: string | null) { if (!start && !end) return null; if (!start || !end) return -1; const [sh, sm] = start.split(':').map(Number); const [eh, em] = end.split(':').map(Number); return (eh * 60 + em) - (sh * 60 + sm); }
 type ManagerSession = { user: { id: string; role?: string | null } };
 function isManager(session: { user?: { role?: string | null } } | null) { return ['ADMIN', 'MANAGER'].includes(String(session?.user?.role || 'ADMIN')); }
 
@@ -35,7 +38,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Acesso administrativo necessário.' }, { status: 401 });
   const certificates = await prisma.medicalCertificate.findMany({
     orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }], take: 500,
-    select: { id: true, userId: true, startDate: true, endDate: true, daysCount: true, workDaysCount: true, documentName: true, documentMime: true, observation: true, status: true, canceledAt: true, cancelReason: true, createdAt: true, user: { select: { name: true, employeeNumber: true, cpf: true } } },
+    select: { id: true, userId: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, daysCount: true, workDaysCount: true, documentName: true, documentMime: true, observation: true, status: true, canceledAt: true, cancelReason: true, createdAt: true, user: { select: { name: true, employeeNumber: true, cpf: true } } },
   });
   return NextResponse.json({ certificates });
 }
@@ -48,13 +51,16 @@ export async function POST(request: Request) {
   const input = parsed.data;
   const startDate = day(input.startDate); const endDate = day(input.endDate);
   if (endDate < startDate) return NextResponse.json({ error: 'A data final não pode ser anterior à data inicial.' }, { status: 400 });
+  const hoursPerDayMinutes = minutesBetween(input.startTime, input.endTime);
+  if (hoursPerDayMinutes === -1) return NextResponse.json({ error: 'Informe a hora inicial e a hora final do atestado.' }, { status: 400 });
+  if (hoursPerDayMinutes !== null && (hoursPerDayMinutes < 1 || hoursPerDayMinutes > 1_440)) return NextResponse.json({ error: 'O horário final deve ser posterior ao horário inicial.' }, { status: 400 });
   if (input.documentData && (!input.documentMime || !allowedMimes.has(input.documentMime))) return NextResponse.json({ error: 'Documento deve ser PDF, JPG, JPEG ou PNG.' }, { status: 400 });
   const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, name: true, workDays: true } });
   if (!user) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
   const overlap = await prisma.medicalCertificate.findFirst({ where: { userId: input.userId, status: { not: 'CANCELADO' }, startDate: { lte: endDate }, endDate: { gte: startDate } }, select: { id: true } });
   if (overlap) return NextResponse.json({ error: 'Já existe um atestado cadastrado para parte deste período.' }, { status: 409 });
-  const created = await prisma.medicalCertificate.create({ data: { userId: input.userId, createdById: session.user.id, startDate, endDate, daysCount: inclusiveDays(startDate, endDate), documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null, observation: input.observation || null }, select: { id: true, startDate: true, endDate: true, daysCount: true, status: true } });
-  await appendAuditEvent({ action: 'ATESTADO_CRIADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: created.id, metadata: { userId: input.userId, startDate: input.startDate, endDate: input.endDate, daysCount: created.daysCount } });
+  const created = await prisma.medicalCertificate.create({ data: { userId: input.userId, createdById: session.user.id, startDate, endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes: hoursPerDayMinutes === null ? null : hoursPerDayMinutes, daysCount: inclusiveDays(startDate, endDate), documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null, observation: input.observation || null }, select: { id: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, daysCount: true, status: true } });
+  await appendAuditEvent({ action: 'ATESTADO_CRIADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: created.id, metadata: { userId: input.userId, startDate: input.startDate, endDate: input.endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes, daysCount: created.daysCount } });
   return NextResponse.json({ certificate: created }, { status: 201 });
 }
 

@@ -141,6 +141,9 @@ model MedicalCertificate {
   canceledBy     User?    @relation("CertificateCanceler", fields: [canceledById], references: [id])
   startDate      DateTime
   endDate        DateTime
+  startTime      String?
+  endTime        String?
+  hoursPerDayMinutes Int?
   daysCount      Int
   workDaysCount  Int?
   documentName   String?
