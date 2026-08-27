@@ -58,7 +58,7 @@ export async function GET(request: Request) {
   const punches = await prisma.punch.findMany({
     where,
     orderBy: { timestamp: 'desc' },
-    take: 1000,
+    take: 5000,
     select: {
       id: true,
       type: true,
@@ -93,7 +93,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ records, total: records.length, limit: 1000 });
+  return NextResponse.json({ records, total: records.length, limit: 5000 });
 }
 
 

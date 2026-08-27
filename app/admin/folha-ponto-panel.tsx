@@ -90,9 +90,37 @@ function calculateWorked(punches: RecordItem[]) {
   return ordered.length ? total : null;
 }
 
+function buildDayRows(employee: Employee, records: RecordItem[], month: string): DayRow[] {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const lastDay = new Date(year, monthNumber, 0).getDate();
+  const hasSchedule = Boolean(employee.scheduleStart && employee.scheduleEnd);
+  const workDays = employee.workDays ? parseWorkDays(employee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
+  const scheduleStart = minutesFromClock(employee.scheduleStart);
+  const scheduleEnd = minutesFromClock(employee.scheduleEnd);
+  const scheduleSpan = hasSchedule && scheduleStart !== null && scheduleEnd !== null ? Math.max(0, scheduleEnd - scheduleStart) : null;
+  const lunchMinutes = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
+  const expectedMinutes = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunchMinutes);
+  return Array.from({ length: lastDay }, (_, index) => {
+    const date = `${month}-${String(index + 1).padStart(2, '0')}`;
+    const dayPunches = records.filter((record) => record.user.id === employee.id && dayKey(record.timestamp) === date);
+    const weekday = new Date(`${date}T12:00:00`).getDay();
+    const scheduled = isScheduledDay(workDays, weekdayCodes[weekday]);
+    const worked = calculateWorked(dayPunches);
+    const firstPunch = dayPunches[0];
+    const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
+    const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
+    const configuredWorkday = scheduled && expectedMinutes !== null;
+    const expected = configuredWorkday ? expectedMinutes : null;
+    const balance = worked === null || expected === null ? null : worked - expected;
+    const schedule = !scheduled ? 'Folga' : employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Escala sem horário';
+    return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: configuredWorkday && !dayPunches.length, late: configuredWorkday && late, schedule };
+  });
+}
+
 export default function FolhaPontoPanel({ employees }: { employees: Employee[] }) {
   const [month, setMonth] = useState(currentMonth());
   const [employeeId, setEmployeeId] = useState('');
+  const allEmployeesValue = '__ALL__';
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -104,7 +132,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     setLoading(true);
     setError('');
     const params = new URLSearchParams({ ...bounds, status: 'VALID' });
-    if (employeeId) params.set('employeeId', employeeId);
+    if (employeeId && employeeId !== allEmployeesValue) params.set('employeeId', employeeId);
     try {
       const response = await fetch(`/api/admin/punches?${params.toString()}`, { cache: 'no-store' });
       const data = await response.json().catch(() => ({}));
@@ -147,33 +175,9 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   }, [load]);
 
   const selectedEmployee = useMemo(() => employees.find((employee) => employee.id === employeeId), [employeeId, employees]);
-  const dayRows = useMemo<DayRow[]>(() => {
-    if (!selectedEmployee) return [];
-    const [year, monthNumber] = month.split('-').map(Number);
-    const lastDay = new Date(year, monthNumber, 0).getDate();
-    const hasSchedule = Boolean(selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd);
-    const workDays = selectedEmployee.workDays ? parseWorkDays(selectedEmployee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
-    const scheduleStart = minutesFromClock(selectedEmployee.scheduleStart);
-    const scheduleEnd = minutesFromClock(selectedEmployee.scheduleEnd);
-    const scheduleSpan = hasSchedule && scheduleStart !== null && scheduleEnd !== null ? Math.max(0, scheduleEnd - scheduleStart) : null;
-    const lunchMinutes = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
-    const expectedMinutes = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunchMinutes);
-    return Array.from({ length: lastDay }, (_, index) => {
-      const date = `${month}-${String(index + 1).padStart(2, '0')}`;
-      const dayPunches = records.filter((record) => dayKey(record.timestamp) === date);
-      const weekday = new Date(`${date}T12:00:00`).getDay();
-      const scheduled = isScheduledDay(workDays, weekdayCodes[weekday]);
-      const worked = calculateWorked(dayPunches);
-      const firstPunch = dayPunches[0];
-      const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
-      const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
-      const configuredWorkday = scheduled && expectedMinutes !== null;
-      const expected = configuredWorkday ? expectedMinutes : null;
-      const balance = worked === null || expected === null ? null : worked - expected;
-      const schedule = !scheduled ? 'Folga' : selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Escala sem horário';
-      return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: configuredWorkday && !dayPunches.length, late: configuredWorkday && late, schedule };
-    });
-  }, [employeeId, month, records, selectedEmployee]);
+  const visibleEmployees = useMemo(() => employeeId === allEmployeesValue ? employees : selectedEmployee ? [selectedEmployee] : [], [allEmployeesValue, employeeId, employees, selectedEmployee]);
+  const dayRowsByEmployee = useMemo(() => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month)])), [month, records, visibleEmployees]);
+  const dayRows = selectedEmployee ? (dayRowsByEmployee.get(selectedEmployee.id) || []) : [];
 
   const summary = useMemo(() => dayRows.reduce((total, row) => ({
     worked: total.worked + (row.worked ?? 0), expected: total.expected + (row.expected ?? 0), balance: total.balance + (row.balance ?? 0), absences: total.absences + (row.absent ? 1 : 0), late: total.late + (row.late ? 1 : 0),
@@ -182,24 +186,28 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   return (
     <section className="card timesheet-panel">
       <div className="section-heading timesheet-toolbar no-print">
-        <div><span className="eyebrow">FOLHA INDIVIDUAL</span><h2>Folha de ponto do colaborador</h2><p className="small-muted">Uma folha por colaborador · atualização automática a cada 10 segundos.</p></div>
-        <div className="report-actions"><button type="button" className="ghost-btn" onClick={() => window.print()} disabled={!selectedEmployee}>Imprimir folha</button><button type="button" className="primary-btn compact-btn" onClick={() => void signAndDownload()} disabled={!selectedEmployee || signing}>{signing ? 'Assinando PDF...' : 'Assinar e baixar PDF'}</button><button type="button" className="ghost-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar agora'}</button></div>
+        <div><span className="eyebrow">FOLHA INDIVIDUAL</span><h2>Folha de ponto do colaborador</h2><p className="small-muted">Uma folha por colaborador ou todas em sequência · atualização automática a cada 10 segundos.</p></div>
+        <div className="report-actions"><button type="button" className="ghost-btn" onClick={() => window.print()} disabled={!visibleEmployees.length}>Imprimir {employeeId === allEmployeesValue ? 'todas as folhas' : 'folha'}</button><button type="button" className="primary-btn compact-btn" onClick={() => void signAndDownload()} disabled={!selectedEmployee || signing}>{signing ? 'Assinando PDF...' : 'Assinar e baixar PDF individual'}</button><button type="button" className="ghost-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar agora'}</button></div>
       </div>
 
       <div className="report-filters no-print">
         <label className="small-muted">Competência<input className="input" type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label>
-        <label className="small-muted">Colaborador<select className="input" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}><option value="">Selecione um colaborador</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeNumber || 'sem matrícula'} — {employee.name}</option>)}</select></label>
+        <label className="small-muted">Colaborador<select className="input" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}><option value="">Selecione um colaborador</option><option value={allEmployeesValue}>Todos os colaboradores ({employees.length})</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeNumber || 'sem matrícula'} — {employee.name}</option>)}</select></label>
       </div>
 
       {error ? <div className="status-msg no-print">{error}</div> : null}
-      {!selectedEmployee ? <div className="timesheet-empty">Selecione um colaborador para abrir a folha individual no modelo oficial.</div> : (
-        <div className="timesheet-paper">
+      {!visibleEmployees.length ? <div className="timesheet-empty">Selecione um colaborador ou “Todos os colaboradores” para abrir as folhas no modelo oficial.</div> : (
+        <div className={employeeId === allEmployeesValue ? 'timesheet-batch' : ''}>{visibleEmployees.map((employee) => {
+          const rows = dayRowsByEmployee.get(employee.id) || [];
+          const totals = rows.reduce((total, row) => ({ worked: total.worked + (row.worked ?? 0), expected: total.expected + (row.expected ?? 0), balance: total.balance + (row.balance ?? 0), absences: total.absences + (row.absent ? 1 : 0), late: total.late + (row.late ? 1 : 0) }), { worked: 0, expected: 0, balance: 0, absences: 0, late: 0 });
+          return <div className="timesheet-paper" key={employee.id}>
           <header className="timesheet-titlebar individual-titlebar"><div><strong>EP&nbsp;&nbsp; ESPAÇO PROGREDIR</strong><span>Estrada da Grama, 21 — Miguel Couto · Nova Iguaçu — RJ<br />CNPJ: 05.553.848/0001-61</span></div><div className="timesheet-competence"><b>RELATÓRIO DE PONTO DO COLABORADOR</b><span>Período: 01/{month.slice(5)}/{month.slice(0, 4)} a {monthBounds(month).to.slice(8)}/{month.slice(5)}/{month.slice(0, 4)}<br />{formatMonth(month).toUpperCase()}</span></div></header>
-          <section className="employee-meta-grid"><span><b>Nome:</b> {selectedEmployee.name}</span><span><b>CPF:</b> {selectedEmployee.cpf || 'Não informado'}</span><span><b>Matrícula:</b> {selectedEmployee.employeeNumber || 'Não informada'}</span><span><b>Cargo:</b> {selectedEmployee.jobTitle || 'Não informado'}</span><span><b>Departamento:</b> Espaço Progredir</span><span><b>Unidade:</b> Espaço Progredir</span><span><b>Escala:</b> {selectedEmployee.workDays || 'Não informada'}</span><span><b>Jornada:</b> {selectedEmployee.scheduleStart && selectedEmployee.scheduleEnd ? `${selectedEmployee.scheduleStart} às ${selectedEmployee.scheduleEnd}` : 'Não definida'}</span></section>
-          <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{dayRows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
-          <section className="timesheet-totals"><span><b>Total H. Positivo:</b> {formatMinutes(Math.max(summary.balance, 0))}</span><span><b>Total H. Negativo:</b> {formatMinutes(Math.min(summary.balance, 0))}</span><span><b>Total trabalhado:</b> {formatMinutes(summary.worked)}</span><span><b>Saldo de Horas:</b> {formatMinutes(summary.balance)}</span><span><b>Faltas:</b> {summary.absences}</span><span><b>Atrasos:</b> {summary.late}</span></section>
-          <div className="signature-area"><div className="signature-block">{signatureData ? <img className="institution-signature" src={signatureData} alt="Assinatura digital do Espaço Progredir" /> : null}<div className="signature-line">Assinatura digital do Espaço Progredir</div><span className="signature-caption">Assinatura institucional</span></div></div>
-        </div>
+          <section className="employee-meta-grid"><span><b>Nome:</b> {employee.name}</span><span><b>CPF:</b> {employee.cpf || 'Não informado'}</span><span><b>Matrícula:</b> {employee.employeeNumber || 'Não informada'}</span><span><b>Cargo:</b> {employee.jobTitle || 'Não informado'}</span><span><b>Departamento:</b> Espaço Progredir</span><span><b>Unidade:</b> Espaço Progredir</span><span><b>Escala:</b> {employee.workDays || 'Não informada'}</span><span><b>Jornada:</b> {employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd}` : 'Não definida'}</span></section>
+          <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{rows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
+          <section className="timesheet-totals"><span><b>Total H. Positivo:</b> {formatMinutes(Math.max(totals.balance, 0))}</span><span><b>Total H. Negativo:</b> {formatMinutes(Math.min(totals.balance, 0))}</span><span><b>Total trabalhado:</b> {formatMinutes(totals.worked)}</span><span><b>Saldo de Horas:</b> {formatMinutes(totals.balance)}</span><span><b>Faltas:</b> {totals.absences}</span><span><b>Atrasos:</b> {totals.late}</span></section>
+          <div className="signature-area"><div className="signature-block institution-signature-block">{signatureData ? <img className="institution-signature" src={signatureData} alt="Assinatura digital do Espaço Progredir" /> : null}<div className="signature-line">Assinatura digital do Espaço Progredir</div><span className="signature-caption">Assinatura institucional A1</span></div><div className="signature-block employee-signature-block"><div className="signature-spacer" aria-hidden="true" /><div className="signature-line">Assinatura do colaborador</div><span className="signature-caption">{employee.name}</span></div></div>
+          </div>;
+        })}</div>
       )}
     </section>
   );

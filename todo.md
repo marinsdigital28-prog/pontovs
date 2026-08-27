@@ -295,4 +295,26 @@
 - [x] Posicionar assinatura digital A1 no canto inferior esquerdo e assinatura do colaborador no canto inferior direito
 - [x] Garantir que PDF oficial assinado não seja gerado sem certificado A1 válido
 - [x] Testar visualmente e por código a geração, paginação e assinatura digital
-- [ ] Publicar a correção em produção após validação
+- [x] Publicar a correção em produção após validação
+
+- [ ] Configurar o certificado A1 fornecido no ambiente seguro de produção sem expor o conteúdo
+- [ ] Validar senha, validade e leitura do arquivo PFX
+- [ ] Gerar uma folha de ponto assinada e verificar a assinatura criptográfica
+- [ ] Confirmar a exportação assinada no domínio de produção
+
+- [x] Configurar o certificado A1 fornecido no ambiente Production da Vercel
+- [x] Atualizar a senha A1 como variável secreta protegida
+- [x] Redeployar Production com as novas credenciais
+- [x] Gerar PDF de teste A4 com assinatura PKCS#7 e validar todos os bytes assinados
+- [x] Confirmar o emissor do certificado: ESPACO PROGREDIR:05553848000161
+- [x] Confirmar assinatura SHA-256 válida; a confiança da cadeia depende das autoridades certificadoras instaladas no visualizador
+
+> O arquivo PFX não foi commitado nem armazenado no repositório. As credenciais permanecem write-only na Vercel.
+
+- [ ] Criar visão mensal com todas as folhas de ponto dos colaboradores
+- [ ] Criar impressão/exportação em lote, uma folha A4 horizontal por colaborador, em sequência
+- [ ] Usar a assinatura institucional oficial do Espaço Progredir em todas as folhas assinadas
+- [ ] Revisar e melhorar a visão geral do painel administrativo
+- [ ] Melhorar navegação, filtros, estados vazios, feedbacks e ações administrativas
+- [ ] Validar lote mensal, paginação A4, assinatura A1 e responsividade
+- [ ] Publicar as melhorias após os testes
