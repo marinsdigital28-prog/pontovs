@@ -357,4 +357,11 @@
 - [x] Manter acesso do painel administrativo protegido por senha
 - [x] Aprimorar resumo, histórico e solicitações do portal por matrícula
 - [x] Testar acesso por matrícula e regressões do totem/admin
-- [ ] Publicar o novo portal
+- [x] Publicar o novo portal
+
+- [x] Sincronizar dados do totem, painel e portal por uma fonte única
+- [x] Atualizar automaticamente as três interfaces após batidas, cadastros, atestados e aprovações
+- [x] Mostrar status de sincronização e horário da última atualização
+- [x] Redesenhar Informar ausência com calendário, classificação, documento, retorno e observações
+- [x] Persistir anexo e campos adicionais da ausência com segurança
+- [x] Testar atualização cruzada entre as três rotas e publicar

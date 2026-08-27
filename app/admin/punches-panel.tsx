@@ -66,7 +66,7 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
     }
   }, [from, to, employeeId, type, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 10000); const onFocus = () => void load(); window.addEventListener('focus', onFocus); return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); }; }, [load]);
 
   const counts = useMemo(() => records.reduce((summary, record) => {
     summary.total += 1;

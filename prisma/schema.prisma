@@ -167,9 +167,15 @@ model EmployeeRequest {
   status      String   @default("PENDENTE") // PENDENTE | APROVADO | REJEITADO | CANCELADO
   startDate   DateTime
   endDate     DateTime
-  reason      String
-  details     String?
-  reviewNote  String?
+  reason           String
+  details          String?
+  medicalSpecialty String?
+  classification   String?
+  returnExpected   Boolean?
+  documentName     String?
+  documentMime     String?
+  documentData     String?  @db.Text
+  reviewNote       String?
   reviewedAt  DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

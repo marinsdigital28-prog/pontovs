@@ -179,7 +179,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     finally { setSigning(false); }
   };
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 15000); const onFocus = () => void load(); window.addEventListener('focus', onFocus); return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); }; }, [load]);
   useEffect(() => {
     let cancelled = false;
     fetch('/api/admin/signature', { cache: 'no-store' })

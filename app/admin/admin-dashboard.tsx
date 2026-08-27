@@ -41,7 +41,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats }: {
   useEffect(() => { void loadIssues(); }, [loadIssues]);
   useEffect(() => { void autoApplySchedulePatterns(); }, [autoApplySchedulePatterns]);
   useEffect(() => { if (tab === 'security') void loadAudit(); }, [tab, loadAudit]);
-  useEffect(() => { if (tab !== 'overview') return; void loadPresence(); const timer = window.setInterval(() => void loadPresence(), 30_000); return () => window.clearInterval(timer); }, [tab, loadPresence]);
+  useEffect(() => { if (tab !== 'overview') return; void loadPresence(); const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void loadPresence(); }, 10000); return () => window.clearInterval(timer); }, [tab, loadPresence]);
 
   const filteredPresence = useMemo(() => presenceFilter === 'TODOS' ? presence : presence.filter((employee) => employee.status === presenceFilter), [presence, presenceFilter]);
   const presenceCounts = useMemo(() => presence.reduce((acc, employee) => { acc[employee.status] += 1; return acc; }, { PRESENTE: 0, NAO_MARCOU: 0, PENDENTE: 0, SAIU: 0, FOLGA: 0 } as Record<PresenceEmployee['status'], number>), [presence]);

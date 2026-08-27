@@ -272,7 +272,7 @@ export default function Page() {
         <div className="avatar" aria-hidden />
       </div>
 
-      <div className="card ponto-kiosk-card">
+      <div className={`card ponto-kiosk-card ${step === 'register' ? 'ponto-register-card' : 'ponto-lookup-card'}`}>
         <section className="ponto-info-panel">
         <div className="clock">
           <div className="time">{timeString}</div>
