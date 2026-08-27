@@ -15,7 +15,7 @@ function normalizeEmployeeNumber(value: string) { return value.replace(/\D/g, ''
 
 export default function ColaboradorPage() {
   const { data: session, status: sessionStatus } = useSession();
-  const [email, setEmail] = useState('');
+  const [employeeNumber, setEmployeeNumber] = useState('');
   const [password, setPassword] = useState('');
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,8 +44,8 @@ export default function ColaboradorPage() {
 
   async function login(event: FormEvent) {
     event.preventDefault(); setLoading(true); setError('');
-    const result = await signIn('credentials', { email, password, redirect: false });
-    if (result?.error) setError('E-mail ou senha inválidos.');
+    const result = await signIn('credentials', { employeeNumber: employeeNumber.replace(/\D/g, '').padStart(4, '0'), password, redirect: false });
+    if (result?.error) setError('Matrícula ou senha inválidas.');
     else await loadHistory();
     setLoading(false);
   }
@@ -71,7 +71,7 @@ export default function ColaboradorPage() {
   return <main className="employee-portal">
     <header className="employee-portal-header"><div><span className="eyebrow">PONTO PROGREDIR · PORTAL</span><h1>Área do colaborador</h1><p>Consulte sua jornada e suas marcações oficiais. A batida acontece somente no relógio autorizado.</p></div><div className="employee-header-actions">{session ? <><span className="local-badge">CONSULTA INDIVIDUAL</span><button className="ghost-btn" type="button" onClick={() => void signOut({ callbackUrl: '/colaborador' })}>Sair</button></> : null}</div></header>
 
-    {!session && <section className="employee-lookup panel"><div><h2>Entrar no portal</h2><p>Use o e-mail e a senha cadastrados para consultar somente os seus dados.</p></div><form onSubmit={login}><label htmlFor="employee-email">E-mail<input id="employee-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="username" /></label><label htmlFor="employee-password">Senha<input id="employee-password" type="password" required value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" /></label><button className="primary-btn" type="submit" disabled={loading}>{loading ? 'Entrando…' : 'Acessar portal'}</button></form>{error && <p className="form-error" role="alert">{error}</p>}</section>}
+    {!session && <section className="employee-lookup panel"><div><h2>Entrar no portal</h2><p>Informe sua matrícula e sua senha para consultar somente os seus dados.</p></div><form onSubmit={login}><label htmlFor="employee-number">Matrícula<input id="employee-number" inputMode="numeric" maxLength={8} required value={employeeNumber} onChange={event => setEmployeeNumber(event.target.value.replace(/\D/g, ''))} autoComplete="username" placeholder="Ex.: 4041" /></label><label htmlFor="employee-password">Senha<input id="employee-password" type="password" required value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" /></label><button className="primary-btn" type="submit" disabled={loading}>{loading ? 'Entrando…' : 'Acessar portal'}</button></form>{error && <p className="form-error" role="alert">{error}</p>}</section>}
       {sessionStatus === 'authenticated' && !data && loading ? <section className="panel">Carregando seus dados oficiais…</section> : null}
 
     {!data && !loading && session && <section className="employee-feature-grid"><div className="panel"><span className="feature-icon">✓</span><h2>Confirmações de ponto</h2><p>Veja data, hora e tipo de cada registro aceito pelo sistema.</p></div><div className="panel"><span className="feature-icon">▦</span><h2>Fechamento mensal</h2><p>Acompanhe dias trabalhados, faltas, saldo e o que falta para fechar o mês.</p></div><div className="panel"><span className="feature-icon">＋</span><h2>Solicitações</h2><p>Teste ausência, troca de dia e atualização cadastral em um único lugar.</p></div></section>}

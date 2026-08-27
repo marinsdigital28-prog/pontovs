@@ -11,15 +11,17 @@ export const authOptions: NextAuthOptions = {
       name: 'AdminPassword',
       credentials: {
         email: { label: 'E-mail', type: 'email' },
+        employeeNumber: { label: 'Matrícula', type: 'text' },
         password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
         const password = credentials?.password;
         const email = credentials?.email?.trim().toLowerCase();
+        const employeeNumber = credentials?.employeeNumber?.replace(/\D/g, '').padStart(4, '0');
         if (!password) return null;
 
-        if (email) {
-          const employee = await prisma.user.findFirst({ where: { email, active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, email: true, passwordHash: true } });
+        if (email || employeeNumber) {
+          const employee = await prisma.user.findFirst({ where: { active: true, role: 'EMPLOYEE', ...(email ? { email } : { employeeNumber }) }, select: { id: true, name: true, email: true, passwordHash: true } });
           if (!employee?.passwordHash || !(await bcrypt.compare(password, employee.passwordHash))) return null;
           return { id: employee.id, name: employee.name, email: employee.email, role: 'EMPLOYEE' };
         }

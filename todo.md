@@ -339,4 +339,9 @@
 - [x] Refletir solicitações aprovadas na folha sem apagar marcações originais
 - [x] Garantir uma página A4 horizontal por colaborador na impressão em lote
 - [x] Validar totais mensais de horas previstas e realizadas
-- [ ] Testar permissões, cálculos, impressão e publicar
+- [x] Testar permissões, cálculos, impressão e publicar
+
+- [x] Adicionar campo de matrícula no login do Portal do Colaborador
+- [x] Autenticar matrícula com senha sem expor dados por URL
+- [x] Testar login por matrícula, sessão e privacidade
+- [ ] Publicar a correção do login do portal
