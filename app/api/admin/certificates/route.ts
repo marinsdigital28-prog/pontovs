@@ -9,8 +9,10 @@ export const dynamic = 'force-dynamic';
 
 const allowedMimes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
+const certificateTypes = ['DIA_INTEGRAL', 'PERIODO_DIAS', 'HORAS', 'PERIODO_HORAS', 'CONSULTA_MEDICA', 'SAIDA_MEDICA', 'OUTRO'] as const;
 const bodySchema = z.object({
   userId: z.string().min(1),
+  type: z.enum(certificateTypes).default('DIA_INTEGRAL'),
   startDate: z.string().regex(dateOnly),
   endDate: z.string().regex(dateOnly),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().nullable(),
@@ -38,7 +40,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Acesso administrativo necessário.' }, { status: 401 });
   const certificates = await prisma.medicalCertificate.findMany({
     orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }], take: 500,
-    select: { id: true, userId: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, daysCount: true, workDaysCount: true, documentName: true, documentMime: true, observation: true, status: true, canceledAt: true, cancelReason: true, createdAt: true, user: { select: { name: true, employeeNumber: true, cpf: true } } },
+    select: { id: true, userId: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, daysCount: true, workDaysCount: true, documentName: true, documentMime: true, observation: true, status: true, canceledAt: true, cancelReason: true, createdAt: true, user: { select: { name: true, employeeNumber: true, cpf: true } } },
   });
   return NextResponse.json({ certificates });
 }
@@ -59,8 +61,8 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
   const overlap = await prisma.medicalCertificate.findFirst({ where: { userId: input.userId, status: { not: 'CANCELADO' }, startDate: { lte: endDate }, endDate: { gte: startDate } }, select: { id: true } });
   if (overlap) return NextResponse.json({ error: 'Já existe um atestado cadastrado para parte deste período.' }, { status: 409 });
-  const created = await prisma.medicalCertificate.create({ data: { userId: input.userId, createdById: session.user.id, startDate, endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes: hoursPerDayMinutes === null ? null : hoursPerDayMinutes, daysCount: inclusiveDays(startDate, endDate), documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null, observation: input.observation || null }, select: { id: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, daysCount: true, status: true } });
-  await appendAuditEvent({ action: 'ATESTADO_CRIADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: created.id, metadata: { userId: input.userId, startDate: input.startDate, endDate: input.endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes, daysCount: created.daysCount } });
+  const created = await prisma.medicalCertificate.create({ data: { userId: input.userId, createdById: session.user.id, type: input.type, startDate, endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes: hoursPerDayMinutes === null ? null : hoursPerDayMinutes, daysCount: inclusiveDays(startDate, endDate), documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null, observation: input.observation || null, status: 'PENDENTE' }, select: { id: true, type: true, startDate: true, endDate: true, status: true, daysCount: true } });
+  await appendAuditEvent({ action: 'ATESTADO_CRIADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: created.id, metadata: { userId: input.userId, type: input.type, startDate: input.startDate, endDate: input.endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes, daysCount: created.daysCount, status: 'PENDENTE' } });
   return NextResponse.json({ certificate: created }, { status: 201 });
 }
 
@@ -71,6 +73,13 @@ export async function PATCH(request: Request) {
   if (!body?.id) return NextResponse.json({ error: 'Atestado obrigatório.' }, { status: 400 });
   const existing = await prisma.medicalCertificate.findUnique({ where: { id: body.id }, select: { id: true, userId: true, status: true, startDate: true, endDate: true } });
   if (!existing) return NextResponse.json({ error: 'Atestado não encontrado.' }, { status: 404 });
+  if (body.action === 'approve' || body.action === 'reject') {
+    if (!['PENDENTE', 'ATIVO'].includes(existing.status)) return NextResponse.json({ error: 'Somente atestados pendentes podem ser revisados.' }, { status: 409 });
+    const nextStatus = body.action === 'approve' ? 'APROVADO' : 'REJEITADO';
+    const updated = await prisma.medicalCertificate.update({ where: { id: body.id }, data: { status: nextStatus }, select: { id: true, status: true } });
+    await appendAuditEvent({ action: body.action === 'approve' ? 'ATESTADO_APROVADO' : 'ATESTADO_REJEITADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: existing.id, metadata: { userId: existing.userId, reason: body.reason?.trim() || null } });
+    return NextResponse.json({ certificate: updated });
+  }
   if (body.action === 'cancel') {
     if (existing.status === 'CANCELADO') return NextResponse.json({ error: 'Atestado já cancelado.' }, { status: 409 });
     const updated = await prisma.medicalCertificate.update({ where: { id: body.id }, data: { status: 'CANCELADO', canceledAt: new Date(), canceledById: session.user.id, cancelReason: body.reason?.trim() || 'Cancelamento administrativo' }, select: { id: true, status: true, canceledAt: true, cancelReason: true } });

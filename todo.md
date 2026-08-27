@@ -425,3 +425,17 @@
 
 - [ ] Corrigir a exibição dos horários administrativos para America/Sao_Paulo sem deslocar os timestamps corretos do banco
 - [ ] Corrigir a exibição dos horários na folha A4 para America/Sao_Paulo
+
+- [x] Confirmar que os 18 intervalos históricos válidos da Mercia já correspondem a aproximadamente 12:27–12:33 no fuso de São Paulo
+- [x] Corrigir o painel administrativo e a folha A4 para exibir os horários em America/Sao_Paulo sem alterar o banco
+- [ ] Confirmar visualmente a correção no domínio após o deployment terminar
+
+- [ ] Implementar módulo incremental de atestados conforme especificação enviada
+- [ ] Ajustar intervalos históricos válidos da Mercia para horários mesclados entre 12:00 e 13:00, exceto hoje
+- [ ] Testar integração dos atestados com folha, faltas, horas justificadas e conflitos
+
+- [x] Implementar seleção de tipo e fluxo administrativo de atestado pendente/aprovado/rejeitado/cancelado
+- [x] Integrar horas justificadas, faltantes e excedentes à folha diária, descontando 12h–13h em atestados parciais
+- [x] Ajustar 17 intervalos históricos válidos da Mercia entre 12:07 e 12:56 no horário de São Paulo
+- [x] Preservar o intervalo de hoje da Mercia e registrar todas as alterações com auditoria
+- [x] Validar TypeScript sem erros após a implementação

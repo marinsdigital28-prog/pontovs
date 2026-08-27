@@ -133,6 +133,7 @@ model UnitSettings {
 
 model MedicalCertificate {
   id             String   @id @default(cuid())
+  type           String   @default("DIA_INTEGRAL") // DIA_INTEGRAL | PERIODO_DIAS | HORAS | PERIODO_HORAS | CONSULTA_MEDICA | SAIDA_MEDICA | OUTRO
   userId         String
   user           User     @relation("CertificateEmployee", fields: [userId], references: [id])
   createdById    String
