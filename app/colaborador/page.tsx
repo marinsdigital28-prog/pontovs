@@ -1,6 +1,7 @@
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { signIn, signOut, useSession } from 'next-auth/react';
 import { validateProfile } from '../../lib/employee-validation';
 
 type Employee = { id: string; name: string; employeeNumber: string; jobTitle: string | null; workDays: string | null; scheduleStart: string | null; scheduleEnd: string | null };
@@ -12,7 +13,9 @@ function formatDate(value: string) { return new Intl.DateTimeFormat('pt-BR', { d
 function normalizeEmployeeNumber(value: string) { return value.replace(/\D/g, '').padStart(4, '0'); }
 
 export default function ColaboradorPage() {
-  const [employeeNumber, setEmployeeNumber] = useState('');
+  const { data: session, status: sessionStatus } = useSession();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [data, setData] = useState<HistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -22,18 +25,25 @@ export default function ColaboradorPage() {
   const [profileEmail, setProfileEmail] = useState('');
   const [profileErrors, setProfileErrors] = useState<string[]>([]);
 
-  async function loadHistory(event?: FormEvent) {
-    event?.preventDefault();
-    const normalized = normalizeEmployeeNumber(employeeNumber);
-    if (!normalized || normalized === '0000') return setError('Digite uma matrícula de colaborador válida.');
+  async function loadHistory() {
     setLoading(true); setError(''); setNotice('');
     try {
-      const response = await fetch(`/api/employee/history?employeeNumber=${normalized}`, { cache: 'no-store' });
+      const response = await fetch('/api/employee/history', { cache: 'no-store' });
       const payload = await response.json() as HistoryResponse;
       if (!response.ok) throw new Error(payload.error || 'Não foi possível carregar os dados.');
       setData(payload); setActivePanel('overview');
     } catch (err) { setData(null); setError(err instanceof Error ? err.message : 'Falha ao consultar o portal.'); }
     finally { setLoading(false); }
+  }
+
+  useEffect(() => { if (sessionStatus === 'authenticated') void loadHistory(); }, [sessionStatus]);
+
+  async function login(event: FormEvent) {
+    event.preventDefault(); setLoading(true); setError('');
+    const result = await signIn('credentials', { email, password, redirect: false });
+    if (result?.error) setError('E-mail ou senha inválidos.');
+    else await loadHistory();
+    setLoading(false);
   }
 
   const punchesByDay = useMemo(() => {
@@ -55,11 +65,12 @@ export default function ColaboradorPage() {
   }
 
   return <main className="employee-portal">
-    <header className="employee-portal-header"><div><span className="eyebrow">PONTO PROGREDIR · PORTAL</span><h1>Área do colaborador</h1><p>Consulte sua jornada, confirme marcações e envie solicitações.</p></div><div className="employee-header-actions"><span className="local-badge">TESTE LOCAL · SEM BATIDA PELO CELULAR</span></div></header>
+    <header className="employee-portal-header"><div><span className="eyebrow">PONTO PROGREDIR · PORTAL</span><h1>Área do colaborador</h1><p>Consulte sua jornada e suas marcações oficiais. A batida acontece somente no relógio autorizado.</p></div><div className="employee-header-actions">{session ? <><span className="local-badge">CONSULTA INDIVIDUAL</span><button className="ghost-btn" type="button" onClick={() => void signOut({ callbackUrl: '/colaborador' })}>Sair</button></> : null}</div></header>
 
-    <section className="employee-lookup panel"><div><h2>Identificação</h2><p>Use sua matrícula para consultar suas informações e o histórico. A batida é feita somente no relógio autorizado.</p></div><form onSubmit={loadHistory}><label htmlFor="employee-number">Matrícula</label><div className="employee-lookup-row"><input id="employee-number" inputMode="numeric" maxLength={8} value={employeeNumber} onChange={event => setEmployeeNumber(event.target.value.replace(/\D/g, ''))} placeholder="Ex.: 4041"/><button className="primary-btn" type="submit" disabled={loading}>{loading ? 'Carregando…' : 'Acessar portal'}</button></div></form>{error && <p className="form-error" role="alert">{error}</p>}</section>
+    {!session && <section className="employee-lookup panel"><div><h2>Entrar no portal</h2><p>Use o e-mail e a senha cadastrados para consultar somente os seus dados.</p></div><form onSubmit={login}><label htmlFor="employee-email">E-mail<input id="employee-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} autoComplete="username" /></label><label htmlFor="employee-password">Senha<input id="employee-password" type="password" required value={password} onChange={event => setPassword(event.target.value)} autoComplete="current-password" /></label><button className="primary-btn" type="submit" disabled={loading}>{loading ? 'Entrando…' : 'Acessar portal'}</button></form>{error && <p className="form-error" role="alert">{error}</p>}</section>}
+      {sessionStatus === 'authenticated' && !data && loading ? <section className="panel">Carregando seus dados oficiais…</section> : null}
 
-    {!data && !loading && <section className="employee-feature-grid"><div className="panel"><span className="feature-icon">✓</span><h2>Confirmações de ponto</h2><p>Veja data, hora e tipo de cada registro aceito pelo sistema.</p></div><div className="panel"><span className="feature-icon">▦</span><h2>Fechamento mensal</h2><p>Acompanhe dias trabalhados, faltas, saldo e o que falta para fechar o mês.</p></div><div className="panel"><span className="feature-icon">＋</span><h2>Solicitações</h2><p>Teste ausência, troca de dia e atualização cadastral em um único lugar.</p></div></section>}
+    {!data && !loading && session && <section className="employee-feature-grid"><div className="panel"><span className="feature-icon">✓</span><h2>Confirmações de ponto</h2><p>Veja data, hora e tipo de cada registro aceito pelo sistema.</p></div><div className="panel"><span className="feature-icon">▦</span><h2>Fechamento mensal</h2><p>Acompanhe dias trabalhados, faltas, saldo e o que falta para fechar o mês.</p></div><div className="panel"><span className="feature-icon">＋</span><h2>Solicitações</h2><p>Teste ausência, troca de dia e atualização cadastral em um único lugar.</p></div></section>}
 
     {data && <section className="employee-dashboard"><div className="employee-profile panel"><div><span className="eyebrow">COLABORADOR IDENTIFICADO</span><h2>{data.employee.name}</h2><p>{data.employee.jobTitle || 'Cargo não informado'} · matrícula {data.employee.employeeNumber}</p></div><div className="employee-schedule"><strong>{data.employee.scheduleStart || '--:--'} — {data.employee.scheduleEnd || '--:--'}</strong><span>{data.employee.workDays || 'Jornada não informada'}</span></div></div>
       <nav className="employee-action-tabs" aria-label="Ações do colaborador"><button className={activePanel === 'overview' ? 'active' : ''} onClick={() => setActivePanel('overview')}>Resumo</button><button className={activePanel === 'absence' ? 'active' : ''} onClick={() => setActivePanel('absence')}>Informar ausência</button><button className={activePanel === 'exchange' ? 'active' : ''} onClick={() => setActivePanel('exchange')}>Trocar dia</button><button className={activePanel === 'profile' ? 'active' : ''} onClick={() => setActivePanel('profile')}>Minhas informações</button></nav>

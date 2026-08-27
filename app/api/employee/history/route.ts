@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '../../../../lib/auth';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import prisma from '../../../../lib/prisma';
@@ -18,21 +20,21 @@ function localBackupHistory(employeeNumber: string) {
   return { employee: { id: `backup-${employeeNumber}`, name: source.name, employeeNumber: source.employeeNumber, jobTitle: source.jobTitle, workDays: source.schedule.replace(/,\s*\d{2}:\d{2}\s*às\s*\d{2}:\d{2}/i, ''), scheduleStart: schedule?.[1] ?? null, scheduleEnd: schedule?.[2] ?? null }, punches };
 }
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const employeeNumber = url.searchParams.get('employeeNumber')?.replace(/\D/g, '').padStart(4, '0');
-  if (!employeeNumber) return NextResponse.json({ error: 'Matrícula obrigatória' }, { status: 400 });
+export async function GET() {
+  const session = await getServerSession(authOptions as any) as any;
+  const employeeId = session?.user?.id as string | undefined;
+  const role = String(session?.user?.role || '');
+  if (!employeeId || role !== 'EMPLOYEE') return NextResponse.json({ error: 'Faça login como colaborador para consultar o portal.' }, { status: 401 });
 
   try {
-    const employee = await prisma.user.findFirst({ where: { employeeNumber, active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } });
+    const employee = await prisma.user.findFirst({ where: { id: employeeId, active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } });
     if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado' }, { status: 404 });
     const since = new Date(); since.setDate(since.getDate() - 30);
-    const punches = await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: since } }, select: { id: true, type: true, timestamp: true }, orderBy: { timestamp: 'desc' }, take: 100 });
+      const punches = await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: since } }, select: { id: true, type: true, timestamp: true }, orderBy: { timestamp: 'desc' }, take: 100 });
     return NextResponse.json({ employee, punches });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
-      const localData = localBackupHistory(employeeNumber);
-      if (localData) return NextResponse.json({ ...localData, localDemo: true });
+      return NextResponse.json({ error: 'A consulta está temporariamente indisponível. Tente novamente.' }, { status: 503 });
     }
     console.error('Falha ao consultar histórico do colaborador', error);
     return NextResponse.json({ error: 'A consulta está temporariamente indisponível. Tente novamente.' }, { status: 503 });

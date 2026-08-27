@@ -71,6 +71,9 @@ model User {
   punches       Punch[]
   audits        PunchAudit[] @relation("AuditAuthor")
   inconsistencies Inconsistency[]
+  medicalCertificates MedicalCertificate[] @relation("CertificateEmployee")
+  certificatesCreated MedicalCertificate[] @relation("CertificateCreator")
+  certificatesCanceled MedicalCertificate[] @relation("CertificateCanceler")
 }
 
 model Punch {
@@ -140,6 +143,32 @@ model Inconsistency {
 
   @@index([status])
   @@index([userId, status])
+}
+
+model MedicalCertificate {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation("CertificateEmployee", fields: [userId], references: [id])
+  createdById    String
+  createdBy      User     @relation("CertificateCreator", fields: [createdById], references: [id])
+  canceledById   String?
+  canceledBy     User?    @relation("CertificateCanceler", fields: [canceledById], references: [id])
+  startDate      DateTime
+  endDate        DateTime
+  daysCount      Int
+  workDaysCount  Int?
+  documentName   String?
+  documentMime   String?
+  documentData   String?  @db.Text
+  observation    String?
+  status         String   @default("ATIVO")
+  canceledAt     DateTime?
+  cancelReason   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, startDate, endDate])
+  @@index([status])
 }
 
 model UnitSettings {

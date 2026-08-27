@@ -38,6 +38,7 @@ type DayRow = {
   balance: number | null;
   absent: boolean;
   late: boolean;
+  certificate: boolean;
   schedule: string;
 };
 
@@ -90,7 +91,9 @@ function calculateWorked(punches: RecordItem[]) {
   return ordered.length ? total : null;
 }
 
-function buildDayRows(employee: Employee, records: RecordItem[], month: string): DayRow[] {
+type CertificateItem = { userId: string; startDate: string; endDate: string; status: string };
+
+function buildDayRows(employee: Employee, records: RecordItem[], month: string, certificates: CertificateItem[]): DayRow[] {
   const [year, monthNumber] = month.split('-').map(Number);
   const lastDay = new Date(year, monthNumber, 0).getDate();
   const hasSchedule = Boolean(employee.scheduleStart && employee.scheduleEnd);
@@ -110,10 +113,11 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string):
     const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
     const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
     const configuredWorkday = scheduled && expectedMinutes !== null;
+    const certificate = certificates.some((item) => item.userId === employee.id && item.status !== 'CANCELADO' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
     const expected = configuredWorkday ? expectedMinutes : null;
     const balance = worked === null || expected === null ? null : worked - expected;
     const schedule = !scheduled ? 'Folga' : employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd} · ${lunchMinutes ? '1h de almoço' : 'meio expediente'}` : 'Escala sem horário';
-    return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: configuredWorkday && !dayPunches.length, late: configuredWorkday && late, schedule };
+    return { date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, balance, absent: configuredWorkday && !dayPunches.length && !certificate, late: configuredWorkday && late && !certificate, certificate, schedule };
   });
 }
 
@@ -122,6 +126,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [employeeId, setEmployeeId] = useState('');
   const allEmployeesValue = '__ALL__';
   const [records, setRecords] = useState<RecordItem[]>([]);
+  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -138,6 +143,9 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Não foi possível carregar a folha de ponto.');
       setRecords(Array.isArray(data.records) ? data.records.sort((a: RecordItem, b: RecordItem) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) : []);
+      const certificateResponse = await fetch('/api/admin/certificates', { cache: 'no-store' });
+      const certificateData = await certificateResponse.json().catch(() => ({}));
+      setCertificates(Array.isArray(certificateData.certificates) ? certificateData.certificates : []);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Não foi possível carregar a folha de ponto.');
     } finally { setLoading(false); }
@@ -176,7 +184,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
 
   const selectedEmployee = useMemo(() => employees.find((employee) => employee.id === employeeId), [employeeId, employees]);
   const visibleEmployees = useMemo(() => employeeId === allEmployeesValue ? employees : selectedEmployee ? [selectedEmployee] : [], [allEmployeesValue, employeeId, employees, selectedEmployee]);
-  const dayRowsByEmployee = useMemo(() => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month)])), [month, records, visibleEmployees]);
+  const dayRowsByEmployee = useMemo(() => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month, certificates)])), [month, records, certificates, visibleEmployees]);
   const dayRows = selectedEmployee ? (dayRowsByEmployee.get(selectedEmployee.id) || []) : [];
 
   const summary = useMemo(() => dayRows.reduce((total, row) => ({
@@ -203,7 +211,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           return <div className="timesheet-paper" key={employee.id}>
           <header className="timesheet-titlebar individual-titlebar"><div><strong>EP&nbsp;&nbsp; ESPAÇO PROGREDIR</strong><span>Estrada da Grama, 21 — Miguel Couto · Nova Iguaçu — RJ<br />CNPJ: 05.553.848/0001-61</span></div><div className="timesheet-competence"><b>RELATÓRIO DE PONTO DO COLABORADOR</b><span>Período: 01/{month.slice(5)}/{month.slice(0, 4)} a {monthBounds(month).to.slice(8)}/{month.slice(5)}/{month.slice(0, 4)}<br />{formatMonth(month).toUpperCase()}</span></div></header>
           <section className="employee-meta-grid"><span><b>Nome:</b> {employee.name}</span><span><b>CPF:</b> {employee.cpf || 'Não informado'}</span><span><b>Matrícula:</b> {employee.employeeNumber || 'Não informada'}</span><span><b>Cargo:</b> {employee.jobTitle || 'Não informado'}</span><span><b>Departamento:</b> Espaço Progredir</span><span><b>Unidade:</b> Espaço Progredir</span><span><b>Escala:</b> {employee.workDays || 'Não informada'}</span><span><b>Jornada:</b> {employee.scheduleStart && employee.scheduleEnd ? `${employee.scheduleStart} às ${employee.scheduleEnd}` : 'Não definida'}</span></section>
-          <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{rows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td></td></tr>)}</tbody></table></section>
+          <section className="timesheet-section individual-table-section"><table className="timesheet-table individual-timesheet-table"><thead><tr><th>Data</th><th>Horários (escala)</th><th>Marcações</th><th>H.Trab</th><th>H.Prev</th><th>Saldo</th><th>Desc.</th><th>Justificativa</th></tr></thead><tbody>{rows.map((row) => <tr key={row.date}><td>{String(Number(row.date.slice(8))).padStart(2, '0')} {row.weekday}</td><td>{row.schedule}</td><td>{row.punches.length ? row.punches.map((punch) => `${formatTime(punch.timestamp)} (${typeLabels[punch.type] || punch.type})`).join(' · ') : '—'}</td><td>{formatMinutes(row.worked)}</td><td>{formatMinutes(row.expected)}</td><td className={row.balance !== null && row.balance < 0 ? 'negative-balance' : ''}>{formatMinutes(row.balance)}</td><td>{row.certificate ? 'ATESTADO' : row.absent ? 'FALTA' : row.late ? 'ATRASO' : ''}</td><td>{row.certificate && row.punches.length ? 'ATESTADO + MARCAÇÃO EXISTENTE' : ''}</td></tr>)}</tbody></table></section>
           <section className="timesheet-totals"><span><b>Total H. Positivo:</b> {formatMinutes(Math.max(totals.balance, 0))}</span><span><b>Total H. Negativo:</b> {formatMinutes(Math.min(totals.balance, 0))}</span><span><b>Total trabalhado:</b> {formatMinutes(totals.worked)}</span><span><b>Total previsto:</b> {formatMinutes(totals.expected)}</span><span><b>Saldo de Horas:</b> {formatMinutes(totals.balance)}</span><span><b>Faltas:</b> {totals.absences}</span><span><b>Atrasos:</b> {totals.late}</span></section>
           <div className="signature-area"><div className="signature-block institution-signature-block">{signatureData ? <img className="institution-signature" src={signatureData} alt="Assinatura digital do Espaço Progredir" /> : null}<div className="signature-certificate-block"><strong>✓ Assinado digitalmente por ESPAÇO PROGREDIR</strong><span>Certificado digital A1 · CNPJ 05.553.848/0001-61</span><span>SHA-256 · PKCS#7 (CMS) · ICP-Brasil A1</span></div><div className="signature-line">Assinatura digital do Espaço Progredir</div><span className="signature-caption">Assinatura institucional A1</span></div><div className="signature-block employee-signature-block"><div className="signature-spacer" aria-hidden="true" /><div className="signature-line">Assinatura do colaborador</div><span className="signature-caption">{employee.name}</span></div></div>
           </div>;

@@ -10,11 +10,19 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'AdminPassword',
       credentials: {
-        password: { label: 'Senha administrativa', type: 'password' },
+        email: { label: 'E-mail', type: 'email' },
+        password: { label: 'Senha', type: 'password' },
       },
       async authorize(credentials) {
         const password = credentials?.password;
+        const email = credentials?.email?.trim().toLowerCase();
         if (!password) return null;
+
+        if (email) {
+          const employee = await prisma.user.findFirst({ where: { email, active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, email: true, passwordHash: true } });
+          if (!employee?.passwordHash || !(await bcrypt.compare(password, employee.passwordHash))) return null;
+          return { id: employee.id, name: employee.name, email: employee.email, role: 'EMPLOYEE' };
+        }
 
         const manager = await prisma.user.findFirst({
           where: { active: true, role: { in: managerRoles } },
@@ -28,18 +36,18 @@ export const authOptions: NextAuthOptions = {
           : Boolean(manager.passwordHash && await bcrypt.compare(password, manager.passwordHash));
 
         if (!validPassword) return null;
-        return { id: manager.id, name: manager.name, email: manager.email };
+        return { id: manager.id, name: manager.name, email: manager.email, role: String(manager.role) };
       },
     }),
   ],
   session: { strategy: 'jwt' },
   callbacks: {
     async jwt({ token, user }) {
-      if (user) token.id = (user as any).id;
+      if (user) { token.id = (user as any).id; token.role = (user as any).role; }
       return token;
     },
     async session({ session, token }) {
-      if (token && session.user) (session.user as any).id = (token as any).id;
+      if (token && session.user) { (session.user as any).id = (token as any).id; (session.user as any).role = (token as any).role; }
       return session;
     },
   },

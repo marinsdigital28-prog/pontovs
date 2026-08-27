@@ -323,3 +323,12 @@
 - [x] Manter o certificado institucional visual igual ao modelo de referência, com bloco verde e identificação A1
 - [x] Validar o cálculo de jornada integral, almoço de 1 hora e meio expediente
 - [x] Testar a folha completa e publicar a correção
+
+- [ ] Ler e decompor o Prompt de Atestados anexado
+- [ ] Ler e decompor o Prompt de Redesign do Painel Administrativo anexado
+- [ ] Auditar a arquitetura atual antes de aplicar os prompts
+- [ ] Implementar atestados com período, documento, status, cancelamento lógico e auditoria
+- [ ] Integrar atestados à folha sem criar batidas artificiais
+- [ ] Aplicar melhorias executáveis do redesign do painel administrativo
+- [ ] Testar permissões, privacidade, não duplicação e regressões
+- [ ] Publicar a execução validada dos dois prompts
