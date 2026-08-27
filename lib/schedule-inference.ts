@@ -1,4 +1,5 @@
 import { dayCodeForDate, localDateKey, localMinutes } from './attendance-analytics';
+import { normalizeToOfficialSchedule } from './official-schedules';
 
 const DAY_ORDER = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
 
@@ -45,7 +46,15 @@ export function inferSchedulesFromPunches(punches: Punch[]) {
     const days = [...new Set(observed.map((pattern) => pattern.day))].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
     const starts = observed.flatMap((pattern) => pattern.entry === null ? [] : [pattern.entry]);
     const ends = observed.flatMap((pattern) => pattern.exit === null ? [] : [pattern.exit]);
-    result.set(userId, { workDays: days.join(','), scheduleStart: clock(median(starts)), scheduleEnd: clock(median(ends)), observedDays: observed.length });
+    const inferredStart = clock(median(starts));
+    const inferredEnd = clock(median(ends));
+    const official = inferredStart && inferredEnd ? normalizeToOfficialSchedule(inferredStart, inferredEnd) : null;
+    result.set(userId, {
+      workDays: days.join(','),
+      scheduleStart: official?.scheduleStart ?? inferredStart,
+      scheduleEnd: official?.scheduleEnd ?? inferredEnd,
+      observedDays: observed.length,
+    });
   }
   return result;
 }

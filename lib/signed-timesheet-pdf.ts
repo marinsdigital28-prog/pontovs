@@ -24,6 +24,7 @@ function formatDate(value: Date) { return value.toLocaleDateString('pt-BR'); }
 function minutesFromClock(value: string | null) { const match = value?.match(/^(\d{1,2}):(\d{2})/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }
 function minutesBetween(start: Date, end: Date) { return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000)); }
 function formatMinutes(value: number | null) { if (value === null) return '—'; return `${String(Math.floor(Math.abs(value) / 60)).padStart(2, '0')}:${String(Math.abs(value) % 60).padStart(2, '0')}`; }
+function formatSignedMinutes(value: number | null) { if (value === null) return '—'; return `${value < 0 ? '-' : ''}${formatMinutes(Math.abs(value))}`; }
 function rowDayKey(value: Date) { return value.toISOString().slice(0, 10); }
 function workedMinutes(punches: TimesheetPunch[]) {
   const ordered = [...punches].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
@@ -73,7 +74,9 @@ export async function createSignedTimesheetPdf({ employee, punches, month, certi
   page.drawText(`Jornada: ${employee.scheduleStart || '—'} às ${employee.scheduleEnd || '—'}`, { x: 490, y: metaY - 15, size: 9, font: regular, color: dark });
 
   const tableTop = metaY - 35;
-  const rowHeight = 13.2;
+  // A4 horizontal: 842 x 595 pt. A linha de totais e as assinaturas ficam
+  // dentro da mesma página, sem criar uma segunda página no visualizador.
+  const rowHeight = 11.5;
   const columns = [26, 76, 190, 495, 555, 615, 675, 735, 816];
   page.drawRectangle({ x: 26, y: tableTop - rowHeight + 2, width: 790, height: rowHeight, color: rgb(0.91, 0.95, 0.92) });
   ['Data', 'Horários (escala)', 'Marcações', 'H.Trab', 'H.Prev', 'Saldo', 'Desc.', 'Justificativa'].forEach((label, index) => page.drawText(label, { x: columns[index] + 3, y: tableTop - 8, size: 7.2, font: bold, color: green }));
@@ -100,21 +103,26 @@ export async function createSignedTimesheetPdf({ employee, punches, month, certi
     const marks = dayPunches.length ? dayPunches.map((punch) => `${formatTime(punch.timestamp)} ${punch.type}`).join(' · ') : '—';
     const balance = worked === null || expected === null ? null : worked - expected;
     const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(worked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, absent ? 'FALTA' : '', ''];
-    values.forEach((value, valueIndex) => page.drawText(value, { x: columns[valueIndex] + 3, y, size: valueIndex === 2 ? 6.2 : 7, font: valueIndex === 6 ? bold : regular, color: valueIndex === 6 && absent ? rgb(0.65, 0.12, 0.12) : dark, maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 6, lineHeight: 7 }));
+    values.forEach((value, valueIndex) => page.drawText(value, { x: columns[valueIndex] + 3, y, size: valueIndex === 2 ? 6.8 : 7.6, font: valueIndex === 6 ? bold : regular, color: valueIndex === 6 && absent ? rgb(0.65, 0.12, 0.12) : dark, maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 6, lineHeight: 7.6 }));
     page.drawLine({ start: { x: 26, y: y - 4 }, end: { x: 816, y: y - 4 }, thickness: 0.35, color: rgb(0.76, 0.82, 0.78) });
   }
 
-  const totalsY = 102;
+  const totalsY = 68;
   page.drawLine({ start: { x: 26, y: totalsY + 11 }, end: { x: 816, y: totalsY + 11 }, thickness: 1.2, color: green });
-  page.drawText(`Total trabalhado: ${formatMinutes(totalWorked)}`, { x: 26, y: totalsY, size: 8, font: bold, color: dark });
-  page.drawText(`Total previsto: ${formatMinutes(totalExpected)}`, { x: 190, y: totalsY, size: 8, font: bold, color: dark });
-  page.drawText(`Saldo: ${formatMinutes(totalWorked - totalExpected)}`, { x: 345, y: totalsY, size: 8, font: bold, color: dark });
-  page.drawText(`Faltas: ${absences}`, { x: 470, y: totalsY, size: 8, font: bold, color: dark });
-  page.drawText('Assinatura digital do Espaço Progredir', { x: 585, y: totalsY + 15, size: 7.5, font: bold, color: muted });
-  page.drawLine({ start: { x: 585, y: totalsY + 10 }, end: { x: 816, y: totalsY + 10 }, thickness: 0.7, color: muted });
-  page.drawText('Documento assinado com certificado A1', { x: 585, y: totalsY, size: 6.5, font: regular, color: muted });
+  page.drawText(`Total trabalhado: ${formatMinutes(totalWorked)}`, { x: 26, y: totalsY, size: 9, font: bold, color: dark });
+  page.drawText(`Total previsto: ${formatMinutes(totalExpected)}`, { x: 190, y: totalsY, size: 9, font: bold, color: dark });
+  page.drawText(`Saldo: ${formatSignedMinutes(totalWorked - totalExpected)}`, { x: 345, y: totalsY, size: 9, font: bold, color: dark });
+  page.drawText(`Faltas: ${absences}`, { x: 470, y: totalsY, size: 9, font: bold, color: dark });
 
-  pdflibAddPlaceholder({ pdfDoc, pdfPage: page, reason: 'Assinatura institucional da Folha de Ponto', contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ', signatureLength: 20000, widgetRect: [585, totalsY - 2, 816, totalsY + 12] });
+  // Rodapé institucional: A1 à esquerda e assinatura manuscrita do colaborador à direita.
+  page.drawText('ASSINATURA DIGITAL — ESPAÇO PROGREDIR', { x: 26, y: 43, size: 8.5, font: bold, color: green });
+  page.drawLine({ start: { x: 26, y: 31 }, end: { x: 300, y: 31 }, thickness: 0.8, color: muted });
+  page.drawText('Documento assinado com certificado digital A1', { x: 26, y: 21, size: 7.5, font: regular, color: muted });
+  page.drawText('ASSINATURA DO COLABORADOR', { x: 560, y: 43, size: 8.5, font: bold, color: green });
+  page.drawLine({ start: { x: 560, y: 31 }, end: { x: 816, y: 31 }, thickness: 0.8, color: muted });
+  page.drawText(employee.name, { x: 560, y: 21, size: 7.5, font: regular, color: muted, maxWidth: 256 });
+
+  pdflibAddPlaceholder({ pdfDoc, pdfPage: page, reason: 'Assinatura institucional da Folha de Ponto', contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ', signatureLength: 20000, widgetRect: [26, 23, 300, 38] });
   const pdfWithPlaceholder = Buffer.from(await pdfDoc.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
   return Buffer.from(signedPdf);

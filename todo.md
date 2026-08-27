@@ -287,3 +287,12 @@
 - [x] Adicionar gráficos reais de presença e pontualidade da equipe
 - [x] Aplicar automaticamente escala, cargo e horas previstas a partir do padrão de marcações
 - [x] Permitir a próxima marcação válida sem bloquear com mensagem de marcação existente
+
+- [x] Fixar as quatro escalas oficiais: 07:00–16:00, 07:30–16:30, 08:00–17:00 e 12:00–16:00
+- [x] Corrigir a inferência para não gerar horários quebrados e refletir escala/horas previstas na folha
+- [x] Ajustar folha A4 horizontal para uma única página com tipografia legível
+- [x] Exibir totais no rodapé da folha de ponto
+- [x] Posicionar assinatura digital A1 no canto inferior esquerdo e assinatura do colaborador no canto inferior direito
+- [x] Garantir que PDF oficial assinado não seja gerado sem certificado A1 válido
+- [x] Testar visualmente e por código a geração, paginação e assinatura digital
+- [ ] Publicar a correção em produção após validação

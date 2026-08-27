@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { INFERRED_SCHEDULES } from '../../../../lib/inferred-schedules';
 import { mergeInferredSchedule } from '../../../../lib/schedule-application';
+import { isOfficialSchedule } from '../../../../lib/official-schedules';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
 
 export const dynamic = 'force-dynamic';
@@ -32,8 +33,10 @@ export async function POST(request: Request) {
       const schedule = INFERRED_SCHEDULES[number];
       if (!schedule) continue;
       const merged = mergeInferredSchedule(employee, schedule);
-      if (automatic && !merged.applied) { skipped += 1; continue; }
-      await tx.user.update({ where: { id: employee.id }, data: { workDays: merged.workDays, scheduleStart: merged.scheduleStart, scheduleEnd: merged.scheduleEnd } });
+      const currentScheduleIsOfficial = isOfficialSchedule(employee.scheduleStart, employee.scheduleEnd);
+      if (automatic && currentScheduleIsOfficial && employee.workDays) { skipped += 1; continue; }
+      const resolved = currentScheduleIsOfficial && employee.workDays ? merged : { workDays: schedule.workDays, scheduleStart: schedule.scheduleStart, scheduleEnd: schedule.scheduleEnd };
+      await tx.user.update({ where: { id: employee.id }, data: { workDays: resolved.workDays, scheduleStart: resolved.scheduleStart, scheduleEnd: resolved.scheduleEnd } });
       updated += 1;
     }
     return { matched: employees.length, updated, skipped };
