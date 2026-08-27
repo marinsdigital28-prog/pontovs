@@ -286,3 +286,4 @@
 - [x] Reorganizar a primeira aba da Administração em uma central operacional clara
 - [x] Adicionar gráficos reais de presença e pontualidade da equipe
 - [x] Aplicar automaticamente escala, cargo e horas previstas a partir do padrão de marcações
+- [x] Permitir a próxima marcação válida sem bloquear com mensagem de marcação existente

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
+import { brazilDayRange } from '../../../lib/brazil-time';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -28,9 +29,8 @@ export async function POST(req: Request) {
         if (old) return { punch: old, user, duplicate: true };
       }
       const now = new Date();
-      const start = new Date(now); start.setHours(0, 0, 0, 0);
-      const end = new Date(start); end.setDate(end.getDate() + 1);
-      const last = await tx.punch.findFirst({ where: { userId: user.id, timestamp: { gte: start, lt: end } }, orderBy: { timestamp: 'desc' } });
+      const { start, end } = brazilDayRange(now);
+      const last = await tx.punch.findFirst({ where: { userId: user.id, status: 'VALID', timestamp: { gte: start, lt: end } }, orderBy: { timestamp: 'desc' } });
       const index = last ? ORDER.indexOf(last.type as (typeof ORDER)[number]) : -1;
       if (index === ORDER.length - 1) throw new HttpError('A jornada de hoje já foi encerrada', 409);
       const type = ORDER[index + 1];
