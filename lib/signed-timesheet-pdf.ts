@@ -21,8 +21,9 @@ export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; s
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-function formatTime(value: Date) { return value.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
-function formatDate(value: Date) { return value.toLocaleDateString('pt-BR'); }
+const APP_TIME_ZONE = 'America/Sao_Paulo';
+function formatTime(value: Date) { return value.toLocaleTimeString('pt-BR', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' }); }
+function formatDate(value: Date) { return value.toLocaleDateString('pt-BR', { timeZone: APP_TIME_ZONE }); }
 function minutesFromClock(value: string | null) { const match = value?.match(/^(\d{1,2}):(\d{2})/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }
 function certificateMinutesForDay(item: TimesheetCertificate, date: Date) { if (!item.hoursPerDayMinutes || item.startDate > date || item.endDate < date) return 0; return item.hoursPerDayMinutes; }
 function minutesBetween(start: Date, end: Date) { return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000)); }

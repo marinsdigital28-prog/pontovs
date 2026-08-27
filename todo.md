@@ -370,3 +370,58 @@
 - [x] Validar intervalo de horas e duração no mesmo dia
 - [x] Exibir horas do atestado no painel administrativo e na folha de ponto
 - [x] Testar persistência e cálculo do total abonado
+
+- [ ] Avaliar APK dedicado para o portal do colaborador em telefone pessoal
+- [ ] Redesenhar o portal para uso mobile com navegação simples e sem cortes
+- [ ] Integrar o APK ao mesmo backend e à mesma sessão do portal web
+- [ ] Validar atualização automática entre APK, totem e painel
+
+- [ ] Reorganizar o APK em pastas de telas, componentes, serviços, tipos e tema
+- [ ] Criar documento de arquitetura e mapa de navegação do colaborador
+- [ ] Definir ordem de implementação sem misturar APK do colaborador com totem e painel
+
+- [ ] Corrigir mensagem indevida “Acesso restrito ao gestor” ao editar funcionário
+- [ ] Validar sessão e permissão da API de cadastro administrativo
+- [ ] Testar edição cadastral mantendo bloqueio para colaboradores
+
+- [ ] Corrigir o horário cadastrado de Elizabete após comparar com as marcações reais
+- [ ] Auditar escalas e horários dos demais colaboradores
+- [ ] Registrar alterações de jornada com auditoria e validar reflexo na folha
+
+- [x] Corrigir Elizabete, matrícula 1701, para 07:00–16:00 de segunda a sexta
+- [x] Preservar marcações, atestados e totais históricos sem mesclar ou zerar
+- [x] Validar a nova escala na folha de ponto e registrar auditoria
+
+- [ ] Ajustar entradas 08:xx para 07:xx da matrícula 1701, preservando minutos
+- [ ] Ajustar saídas 17:xx para 16:xx da matrícula 1701, preservando minutos
+- [ ] Manter intervalo, retorno e demais colaboradores inalterados
+- [ ] Validar e auditar as alterações históricas da matrícula 1701
+
+- [ ] Reativar Elizabete, matrícula 1701, no backend
+- [ ] Confirmar identificação da matrícula 1701 no totem
+- [ ] Verificar que horários e marcações permanecem intactos
+
+- [x] Reativar Elizabete, matrícula 1701, no backend após bloqueio indevido
+- [x] Confirmar identificação da matrícula 1701 no totem com resposta HTTP 200
+- [x] Verificar que a escala permanece 07:00–16:00 e não alterar marcações históricas
+
+- [x] Corrigir todas as entradas históricas 08:xx para 07:xx da matrícula 1701, preservando minutos
+- [x] Corrigir todas as saídas históricas 17:xx para 16:xx da matrícula 1701, preservando minutos
+- [x] Excluir integralmente o dia 27/08/2026 da correção
+- [x] Validar 20 edições auditadas, 70 registros históricos e 4 registros de hoje sem duplicidades
+
+- [ ] Reverter as 20 correções históricas atuais da matrícula 1701 aos horários originais
+- [ ] Reaplicar menos 1 hora nas entradas e saídas históricas, exceto no dia atual
+- [ ] Validar que intervalos, retornos, minutos e registros de hoje permaneceram preservados
+
+- [x] Reverter as 20 correções históricas atuais da matrícula 1701 aos horários originais
+- [x] Reaplicar menos 1 hora nas entradas e saídas históricas válidas, exceto no dia atual
+- [x] Validar que intervalos, retornos, minutos e registros de hoje permaneceram preservados
+- [x] Registrar o único registro cancelado que não pôde ser editado pela proteção do sistema
+
+- [ ] Revisar os intervalos de almoço históricos da Mercia, matrícula 0701
+- [ ] Corrigir intervalos fora do padrão 12:00–13:00 sem alterar hoje
+- [ ] Validar que entrada, retorno, saída e demais colaboradores permaneceram intactos
+
+- [ ] Corrigir a exibição dos horários administrativos para America/Sao_Paulo sem deslocar os timestamps corretos do banco
+- [ ] Corrigir a exibição dos horários na folha A4 para America/Sao_Paulo
