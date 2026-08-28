@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '../../../../lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../lib/security-controls';
+import { isDatabaseQuotaExceeded } from '../../../../lib/database-errors';
+import recoveryData from '../../../../punches-recovery-2026-08-01-to-28.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +26,15 @@ async function requireManager() {
   const session = (await getServerSession(authOptions as any)) as any;
   const id = session?.user?.id as string | undefined;
   if (!id) return null;
-  return prisma.user.findFirst({
-    where: { id, active: true, role: { in: ['ADMIN', 'MANAGER'] } },
-    select: { id: true },
-  });
+  try {
+    return await prisma.user.findFirst({
+      where: { id, active: true, role: { in: ['ADMIN', 'MANAGER'] } },
+      select: { id: true, role: true },
+    });
+  } catch (error) {
+    if (isDatabaseQuotaExceeded(error) && ['ADMIN', 'MANAGER'].includes(String(session?.user?.role))) return { id, role: String(session?.user?.role), degraded: true };
+    return null;
+  }
 }
 
 export async function GET(request: Request) {
@@ -55,22 +63,42 @@ export async function GET(request: Request) {
   if (employeeId) where.userId = employeeId;
   if (from || to) where.timestamp = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
 
-  const punches = await prisma.punch.findMany({
-    where,
-    orderBy: { timestamp: 'desc' },
-    take: 5000,
-    select: {
-      id: true,
-      type: true,
-      timestamp: true,
-      status: true,
-      origin: true,
-      user: { select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } },
-      photoData: true,
-    },
-  });
+  let punches;
+  let degraded = Boolean((manager as any).degraded);
+  try {
+    punches = await prisma.punch.findMany({
+      where,
+      orderBy: { timestamp: 'desc' },
+      take: 5000,
+      select: {
+        id: true,
+        type: true,
+        timestamp: true,
+        status: true,
+        origin: true,
+        user: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } },
+      },
+    });
+  } catch (error) {
+    if (!isDatabaseQuotaExceeded(error)) throw error;
+    degraded = true;
+    const rows = recoveryData.rows.filter((row) => {
+      const timestamp = new Date(`${row.date}T${row.time}-03:00`);
+      return (!employeeId || employeeId === `offline-${row.employeeNumber}`) && (type === 'ALL' || row.type === type) && (status === 'ALL' || status === 'VALID') && (!from || timestamp >= from) && (!to || timestamp <= to);
+    }).slice(0, 5000);
+    punches = rows.map((row) => ({ id: `recovery-${row.sourceId}`, type: row.type, timestamp: new Date(`${row.date}T${row.time}-03:00`), status: 'VALID', origin: 'RECOVERY', user: { id: `offline-${row.employeeNumber}`, name: row.name, employeeNumber: row.employeeNumber, jobTitle: null } }));
+  }
 
-  const records = punches.map(({ photoData, ...punch }) => ({ ...punch, hasPhoto: Boolean(photoData) }));
+  const photoFlags = new Map<string, boolean>();
+  if (punches.length) {
+    try {
+      const flags = await prisma.$queryRaw<Array<{ id: string; hasPhoto: boolean }>>(Prisma.sql`SELECT "id", ("photoData" IS NOT NULL) AS "hasPhoto" FROM "Punch" WHERE "id" IN (${Prisma.join(punches.map((punch) => punch.id))})`);
+      flags.forEach((flag) => photoFlags.set(flag.id, Boolean(flag.hasPhoto)));
+    } catch {
+      // A failed metadata lookup must not transfer or expose photo contents.
+    }
+  }
+  const records = punches.map((punch) => ({ ...punch, hasPhoto: photoFlags.get(punch.id) ?? false }));
   if (format === 'csv') {
     await appendAuditEvent({ action: 'PUNCHES_EXPORTED', actorId: manager.id, resource: 'Punch', metadata: { from: fromValue, to: toValue, employeeId, type, status, count: records.length } });
     const header = ['Data e hora', 'Colaborador', 'Matrícula', 'Cargo', 'Tipo', 'Status', 'Origem', 'Foto'];
@@ -93,7 +121,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ records, total: records.length, limit: 5000 });
+  return NextResponse.json({ records, total: records.length, limit: 5000, degraded });
 }
 
 

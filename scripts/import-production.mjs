@@ -8,7 +8,7 @@ const punches = punchBackup.rows ?? [];
 const response = await fetch(`${baseUrl}/api/admin/import-pdf`, {
   method: 'POST',
   headers: { 'content-type': 'application/json', 'x-import-token': token },
-  body: JSON.stringify({ employees, punches }),
+  body: JSON.stringify({ employees, punches, pagesDetected: 0 }),
 });
 const text = await response.text();
 if (!response.ok) throw new Error(`Importação não executada (${response.status}): ${text.slice(0, 300)}`);
