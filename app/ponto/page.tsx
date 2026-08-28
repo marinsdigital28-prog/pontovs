@@ -57,6 +57,7 @@ export default function Page() {
     setLoading(true);
     setStatusMsg(null);
     setJourneyClosed(false);
+    const normalizedEmployeeNumber = matricula.replace(/\D/g, '').padStart(4, '0');
     try {
       const r = await fetch('/api/identify', {
         method: 'POST',
@@ -64,7 +65,17 @@ export default function Page() {
         body: JSON.stringify({ employeeNumber: matricula.trim() }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Matrícula não encontrada');
+      if (!r.ok) {
+        if (r.status === 503 && data.code === 'DATABASE_QUOTA_EXCEEDED') {
+          closeCamera();
+          setEmployee({ employeeNumber: normalizedEmployeeNumber, name: 'Colaborador', offline: true });
+          setNextType('ENTRADA');
+          setStep('register');
+          setStatusMsg('Banco indisponível. Toque em “Abrir câmera” para salvar a marcação no aparelho e sincronizar depois.');
+          return;
+        }
+        throw new Error(data.error || 'Matrícula não encontrada');
+      }
       const recognizedNextType = data.nextType as 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null;
       if (!recognizedNextType) {
         closeCamera();
@@ -83,13 +94,25 @@ export default function Page() {
       setEmployee(data);
       setNextType(recognizedNextType);
       setStep('register');
-      setStatusMsg(data.offlineFallback ? `Funcionário reconhecido em contingência. A saída será salva neste aparelho e sincronizada quando o banco voltar.` : `Funcionário reconhecido. Abrindo a câmera para ${recognizedNextType}...`);
-      window.setTimeout(() => { void handlePhotoSelection(); }, 120);
+      setStatusMsg(data.offlineFallback
+        ? 'Funcionário reconhecido em contingência. Toque em “Abrir câmera” para salvar a saída neste aparelho e sincronizar quando o banco voltar.'
+        : `Funcionário reconhecido. Toque em “Abrir câmera” para ${recognizedNextType}.`);
     } catch (err: any) {
       setStatusMsg(err?.message || 'Matrícula inválida');
     } finally {
       setLoading(false);
     }
+  }
+
+  function queueOfflinePunch(payload: { employeeNumber: string; clientTimestamp: string; clientId: string; photo: string | null }, reason: string) {
+    const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
+    offline.push(payload);
+    localStorage.setItem('offlinePunches', JSON.stringify(offline));
+    pendingClientIdRef.current = null;
+    setConfirmation({ type: 'PENDENTE', timestamp: payload.clientTimestamp });
+    setStatusMsg(reason);
+    setLoading(false);
+    window.setTimeout(() => resetForNextCollaborator(), 2200);
   }
 
   async function handlePunch(photoOverride?: string | null) {
@@ -100,12 +123,10 @@ export default function Page() {
       clientId: pendingClientIdRef.current ?? (pendingClientIdRef.current = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       photo: photoOverride ?? photo ?? null,
     };
-    if (!navigator.onLine) {
-      const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
-      offline.push(payload);
-      localStorage.setItem('offlinePunches', JSON.stringify(offline));
-      setStatusMsg('Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente');
-      setLoading(false);
+    if (employee.offline || employee.offlineFallback || !navigator.onLine) {
+      queueOfflinePunch(payload, employee.offline || employee.offlineFallback
+        ? 'Marcação salva no aparelho — será sincronizada assim que o banco voltar.'
+        : 'Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente');
       return;
     }
     setLoading(true);
@@ -156,10 +177,7 @@ export default function Page() {
       }
       const isNetworkFailure = err instanceof TypeError || !navigator.onLine;
       if (isNetworkFailure) {
-        const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
-        offline.push(payload);
-        localStorage.setItem('offlinePunches', JSON.stringify(offline));
-        setStatusMsg('Sem conexão — salvo localmente e será reenviado quando online');
+        queueOfflinePunch(payload, 'Sem conexão — salvo localmente e será reenviado quando online');
       } else {
         setStatusMsg(errorMessage);
       }
@@ -172,28 +190,37 @@ export default function Page() {
   }
 
   useEffect(() => {
+    let syncing = false;
     const sync = async () => {
+      if (syncing || !navigator.onLine) return;
       const pending = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
       if (!pending || pending.length === 0) return;
+      syncing = true;
       const remaining: any[] = [];
-      for (const p of pending) {
-        try {
+      try {
+        for (const p of pending) {
           const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
           if (!response.ok && response.status !== 409) remaining.push(p);
-        } catch {
-          remaining.push(p);
-          break;
         }
+        if (remaining.length > 0) localStorage.setItem('offlinePunches', JSON.stringify(remaining));
+        else localStorage.removeItem('offlinePunches');
+        if (remaining.length < pending.length) {
+          setStatusMsg(remaining.length > 0 ? 'Algumas marcações continuam pendentes.' : 'Marcações pendentes sincronizadas');
+          setTimeout(() => setStatusMsg(null), 3000);
+        }
+      } catch {
+        localStorage.setItem('offlinePunches', JSON.stringify(pending));
+      } finally {
+        syncing = false;
       }
-      if (remaining.length > 0) localStorage.setItem('offlinePunches', JSON.stringify(remaining));
-      else localStorage.removeItem('offlinePunches');
-      setStatusMsg('Pendentes sincronizados');
-      setTimeout(() => setStatusMsg(null), 3000);
     };
     void sync();
-    const timer = window.setInterval(() => { if (navigator.onLine) void sync(); }, 60000);
+    const retryTimer = window.setInterval(() => { if (navigator.onLine) void sync(); }, 60000);
     window.addEventListener('online', sync);
-    return () => { window.clearInterval(timer); window.removeEventListener('online', sync); };
+    return () => {
+      window.clearInterval(retryTimer);
+      window.removeEventListener('online', sync);
+    };
   }, []);
 
   const dayString = now ? now.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
@@ -362,9 +389,9 @@ export default function Page() {
             ) : (
               <div className="summary confirmation-summary confirmation-minimal" role="status" aria-live="polite">
                 <div className="confirmation-animation" aria-hidden="true"><span className="confirmation-ball"><span className="confirmation-check">✓</span></span></div>
-                <div className="confirmation-title">MARCAÇÃO CONFIRMADA</div>
+                <div className="confirmation-title">{confirmation.type === 'PENDENTE' ? 'MARCAÇÃO SALVA OFFLINE' : 'MARCAÇÃO CONFIRMADA'}</div>
                 <div className="confirmation-name">{employee.name}</div>
-                <div className="confirmation-type">{confirmation.type} · {new Date(confirmation.timestamp).toLocaleTimeString()}</div>
+                <div className="confirmation-type">{confirmation.type === 'PENDENTE' ? 'Aguardando sincronização' : `${confirmation.type} · ${new Date(confirmation.timestamp).toLocaleTimeString()}`}</div>
                 {photo && <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />}
               </div>
             )}

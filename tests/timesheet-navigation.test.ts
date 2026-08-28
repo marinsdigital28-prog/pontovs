@@ -38,9 +38,16 @@ describe('navegação da folha de ponto', () => {
 
   it('exibe a confirmação animada e protege a marcação offline', () => {
     expect(punch).toContain('MARCAÇÃO CONFIRMADA');
+    expect(punch).toContain('MARCAÇÃO SALVA OFFLINE');
     expect(punch).toContain('confirmation-ball');
     expect(punch).toContain('Sem conexão — marcação protegida no aparelho');
+    expect(punch).toContain('DATABASE_QUOTA_EXCEEDED');
     expect(punch).toContain('response.status !== 409');
+  });
+
+  it('não abre a câmera automaticamente fora de um gesto do usuário', () => {
+    expect(punch).toContain('Toque em “Abrir câmera”');
+    expect(punch).not.toContain('window.setTimeout(() => { void handlePhotoSelection(); }, 120)');
   });
 
   it('configura a folha individual para preencher a área útil A4 na impressão', () => {
