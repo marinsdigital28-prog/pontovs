@@ -6,6 +6,7 @@ import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
 import { resolveDaySchedule } from '../../../lib/day-schedule';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
+import { isExitOverrideActive } from '../../../lib/exit-override';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       const order = schedule?.mode === 'HALF' ? ['ENTRADA', 'SAIDA'] as const : ORDER;
       const index = last ? (order as readonly string[]).indexOf(last.type) : -1;
       if (index === order.length - 1) throw new HttpError('A jornada de hoje já foi encerrada', 409);
-      const type = order[index + 1];
+      const type = isExitOverrideActive(now) ? 'SAIDA' : order[index + 1];
       const punch = await tx.punch.create({ data: { userId: user.id, unitId: user.unitId || null, type, timestamp: now, clientTimestamp: input.clientTimestamp ? new Date(input.clientTimestamp) : null, latitude: input.location?.lat ?? null, longitude: input.location?.lng ?? null, accuracy: input.location?.accuracy ?? null, locationValid: Boolean(input.location), origin: 'WEB', clientId: input.clientId ?? null, photoData: input.photo ?? null } });
       await tx.punchAudit.create({ data: { punchId: punch.id, changedById: user.id, field: 'created', newValue: JSON.stringify({ type: punch.type, timestamp: punch.timestamp.toISOString(), clientId: punch.clientId, origin: punch.origin }), reason: 'Registro inicial via app' } });
       return { punch, user, duplicate: false };

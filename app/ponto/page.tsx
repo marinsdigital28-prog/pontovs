@@ -83,7 +83,7 @@ export default function Page() {
       setEmployee(data);
       setNextType(recognizedNextType);
       setStep('register');
-      setStatusMsg(`Funcionário reconhecido. Abrindo a câmera para ${recognizedNextType}...`);
+      setStatusMsg(data.offlineFallback ? `Funcionário reconhecido em contingência. A saída será salva neste aparelho e sincronizada quando o banco voltar.` : `Funcionário reconhecido. Abrindo a câmera para ${recognizedNextType}...`);
       window.setTimeout(() => { void handlePhotoSelection(); }, 120);
     } catch (err: any) {
       setStatusMsg(err?.message || 'Matrícula inválida');
@@ -117,7 +117,11 @@ export default function Page() {
         body: JSON.stringify(payload),
       });
       const json = await r.json();
-      if (!r.ok) throw new Error(json.error || 'Erro ao registrar ponto');
+      if (!r.ok) {
+        const apiError = new Error(json.error || 'Erro ao registrar ponto');
+        (apiError as any).code = json.code;
+        throw apiError;
+      }
       setNextType(nextAfter(json.type));
       pendingClientIdRef.current = null;
       setConfirmation({
@@ -128,6 +132,13 @@ export default function Page() {
       window.setTimeout(() => resetForNextCollaborator(), 2200);
     } catch (err: any) {
       const errorMessage = err?.message || 'Não foi possível registrar a marcação. Tente novamente.';
+      if (err?.code === 'DATABASE_QUOTA_EXCEEDED') {
+        const pending = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
+        pending.push(payload);
+        localStorage.setItem('offlinePunches', JSON.stringify(pending));
+        setStatusMsg('Saída salva neste aparelho e aguardando sincronização quando o banco for liberado.');
+        return;
+      }
       if (/jornada.*encerrad|todas.*marcaç|todas.*batida/i.test(errorMessage)) {
         closeCamera();
         setPhoto(null);
@@ -179,8 +190,10 @@ export default function Page() {
       setStatusMsg('Pendentes sincronizados');
       setTimeout(() => setStatusMsg(null), 3000);
     };
+    void sync();
+    const timer = window.setInterval(() => { if (navigator.onLine) void sync(); }, 60000);
     window.addEventListener('online', sync);
-    return () => window.removeEventListener('online', sync);
+    return () => { window.clearInterval(timer); window.removeEventListener('online', sync); };
   }, []);
 
   const dayString = now ? now.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';

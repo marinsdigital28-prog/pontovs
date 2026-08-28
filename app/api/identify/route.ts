@@ -3,13 +3,16 @@ import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
 import { resolveDaySchedule } from '../../../lib/day-schedule';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
+import { isExitOverrideActive } from '../../../lib/exit-override';
+import { findEmployeeFallback } from '../../../lib/employee-fallback';
 
 const ORDER = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'] as const;
 
 export async function POST(req: Request) {
+  let employeeNumber = '';
   try {
     const body = await req.json();
-    const employeeNumber = String(body?.employeeNumber ?? '').replace(/\D/g, '').padStart(4, '0');
+    employeeNumber = String(body?.employeeNumber ?? '').replace(/\D/g, '').padStart(4, '0');
     if (!employeeNumber) return NextResponse.json({ error: 'Matrícula obrigatória' }, { status: 400 });
 
     const { start, end } = brazilDayRange();
@@ -31,6 +34,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ...user, punches: undefined, lastPunch: last ?? null, nextType }, { status: 200 });
   } catch (error) {
     if (isDatabaseQuotaExceeded(error)) {
+      const fallback = isExitOverrideActive() ? findEmployeeFallback(employeeNumber) : null;
+      if (fallback) {
+        return NextResponse.json({ ...fallback, lastPunch: null, nextType: 'SAIDA', offlineFallback: true }, { status: 200 });
+      }
       return NextResponse.json(databaseUnavailableResponse(), { status: 503 });
     }
     return NextResponse.json({ error: 'Não foi possível consultar o colaborador agora. Tente novamente.' }, { status: 500 });
