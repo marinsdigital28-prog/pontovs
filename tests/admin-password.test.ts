@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 const baseUrl = process.env.ADMIN_TEST_BASE_URL ?? 'https://ponto.marinsdistemas.xyz';
 const password = process.env.ADMIN_ACCESS_PASSWORD;
 
-describe('admin password authentication', () => {
+describe.skipIf(!process.env.RUN_ADMIN_PASSWORD_TEST)('admin password authentication', () => {
   it('exposes only the password credential and accepts the configured password', async () => {
     expect(password).toBeTruthy();
 

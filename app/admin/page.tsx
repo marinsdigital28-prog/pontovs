@@ -11,7 +11,7 @@ export default async function AdminPage() {
   const sessionUserId = session?.user?.id;
   if (!sessionUserId) redirect('/auth/signin?callbackUrl=/admin');
   const manager = await prisma.user.findFirst({ where: { id: sessionUserId, active: true, role: { in: ['ADMIN', 'MANAGER'] } }, select: { name: true } });
-  if (!manager) redirect('/ponto');
+  if (!manager) redirect('/auth/signin?callbackUrl=%2Fadmin');
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const [employeeCount, punchesToday, openInconsistencies, employeeOptions] = await Promise.all([
     prisma.user.count({ where: { active: true, role: 'EMPLOYEE' } }).catch(() => 0),
