@@ -6,18 +6,16 @@ type ImportedEmployee = {
   jobTitle?: string;
 };
 
-export function findEmployeeFallback(employeeNumber: string) {
-  const normalized = employeeNumber.replace(/\D/g, '').padStart(4, '0');
-  const employee = (employees as ImportedEmployee[]).find((item) => item.employeeNumber === normalized && normalized !== '0000');
-  if (!employee?.name || !employee.employeeNumber) return null;
-
+function toFallbackEmployee(employee: ImportedEmployee) {
+  if (!employee.name || !employee.employeeNumber || employee.employeeNumber === '0000') return null;
   return {
-    id: `offline-${normalized}`,
+    id: `offline-${employee.employeeNumber}`,
     name: employee.name,
-    employeeNumber: normalized,
+    employeeNumber: employee.employeeNumber,
     email: '',
     role: 'EMPLOYEE',
     jobTitle: employee.jobTitle ?? null,
+    cpf: null,
     workDays: null,
     scheduleStart: null,
     scheduleEnd: null,
@@ -25,4 +23,16 @@ export function findEmployeeFallback(employeeNumber: string) {
     active: true,
     punches: [],
   };
+}
+
+export function findEmployeeFallback(employeeNumber: string) {
+  const normalized = employeeNumber.replace(/\D/g, '').padStart(4, '0');
+  const employee = (employees as ImportedEmployee[]).find((item) => item.employeeNumber === normalized);
+  return employee ? toFallbackEmployee(employee) : null;
+}
+
+export function listEmployeeFallbacks() {
+  return (employees as ImportedEmployee[])
+    .map(toFallbackEmployee)
+    .filter((employee): employee is NonNullable<ReturnType<typeof toFallbackEmployee>> => Boolean(employee));
 }

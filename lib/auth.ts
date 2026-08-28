@@ -24,17 +24,27 @@ export const authOptions: NextAuthOptions = {
           return { id: employee.id, name: employee.name, email: employee.email, role: 'EMPLOYEE' };
         }
 
+        const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD || process.env.ADMIN_PASSWORD || process.env.SENHA_DE_ADMINISTRADOR || process.env.SENHA_DE_ACESSO_DE_ADMINISTRADOR;
+        if (configuredPassword) {
+          if (password !== configuredPassword) return null;
+          try {
+            const manager = await prisma.user.findFirst({
+              where: { active: true, role: { in: managerRoles } },
+              orderBy: { createdAt: 'asc' },
+            });
+            if (manager) return { id: manager.id, name: manager.name, email: manager.email, role: String(manager.role) };
+          } catch {
+            // O painel poderá abrir em modo de contingência com a senha administrativa válida.
+          }
+          return { id: 'offline-admin', name: 'Gestor (modo contingência)', email: '', role: 'ADMIN' };
+        }
+
         const manager = await prisma.user.findFirst({
           where: { active: true, role: { in: managerRoles } },
           orderBy: { createdAt: 'asc' },
         });
-        if (!manager) return null;
-
-        const configuredPassword = process.env.ADMIN_ACCESS_PASSWORD || process.env.ADMIN_PASSWORD || process.env.SENHA_DE_ADMINISTRADOR || process.env.SENHA_DE_ACESSO_DE_ADMINISTRADOR;
-        const validPassword = configuredPassword
-          ? password === configuredPassword
-          : Boolean(password && manager.passwordHash && await bcrypt.compare(password, manager.passwordHash));
-
+        if (!manager || !password || !manager.passwordHash) return null;
+        const validPassword = await bcrypt.compare(password, manager.passwordHash);
         if (!validPassword) return null;
         return { id: manager.id, name: manager.name, email: manager.email, role: String(manager.role) };
       },
