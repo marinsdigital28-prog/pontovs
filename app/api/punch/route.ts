@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
 import { resolveDaySchedule } from '../../../lib/day-schedule';
+import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (isConflict(error)) return NextResponse.json({ error: 'Esta batida já foi registrada ou houve concorrência. Atualize e tente novamente.' }, { status: 409 });
+    if (isDatabaseQuotaExceeded(error)) return NextResponse.json(databaseUnavailableResponse(), { status: 503 });
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível registrar a batida' }, { status: 400 });
   }
 }

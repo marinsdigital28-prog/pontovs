@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
 import { resolveDaySchedule } from '../../../lib/day-schedule';
+import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 
 const ORDER = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'] as const;
 
@@ -28,7 +29,10 @@ export async function POST(req: Request) {
     const index = last ? (order as readonly string[]).indexOf(last.type) : -1;
     const nextType = index >= 0 && index < order.length - 1 ? order[index + 1] : index === order.length - 1 ? null : 'ENTRADA';
     return NextResponse.json({ ...user, punches: undefined, lastPunch: last ?? null, nextType }, { status: 200 });
-  } catch {
-    return NextResponse.json({ error: 'Erro ao localizar usuário' }, { status: 500 });
+  } catch (error) {
+    if (isDatabaseQuotaExceeded(error)) {
+      return NextResponse.json(databaseUnavailableResponse(), { status: 503 });
+    }
+    return NextResponse.json({ error: 'Não foi possível consultar o colaborador agora. Tente novamente.' }, { status: 500 });
   }
 }
