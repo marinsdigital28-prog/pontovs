@@ -45,9 +45,10 @@ describe('navegação da folha de ponto', () => {
     expect(punch).toContain('if (!response.ok) remaining.push(p);');
   });
 
-  it('não abre a câmera automaticamente fora de um gesto do usuário', () => {
-    expect(punch).toContain('Toque em “Abrir câmera”');
-    expect(punch).not.toContain('window.setTimeout(() => { void handlePhotoSelection(); }, 120)');
+  it('tenta abrir a câmera automaticamente ao entrar na etapa de marcação', () => {
+    expect(punch).toContain("if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading) return;");
+    expect(punch).toContain('void handlePhotoSelection();');
+    expect(punch).toContain('a tela mantém o botão manual como fallback');
   });
 
   it('configura a folha individual para preencher a área útil A4 na impressão', () => {

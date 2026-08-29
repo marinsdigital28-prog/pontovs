@@ -40,6 +40,13 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading) return;
+    // A câmera tenta abrir assim que a identificação termina. Se o navegador exigir
+    // gesto explícito ou negar a permissão, a tela mantém o botão manual como fallback.
+    void handlePhotoSelection();
+  }, [step, employee, cameraOpen, photo, confirmation, loading]);
+
+  useEffect(() => {
     const value = matricula.replace(/\D/g, '').trim();
     if (step !== 'lookup' || value.length < 4) {
       autoLookupRef.current = '';
@@ -71,7 +78,7 @@ export default function Page() {
           setEmployee({ employeeNumber: normalizedEmployeeNumber, name: 'Colaborador', offline: true });
           setNextType('ENTRADA');
           setStep('register');
-          setStatusMsg('Banco indisponível. Toque em “Abrir câmera” para salvar a marcação no aparelho e sincronizar depois.');
+          setStatusMsg('Banco indisponível. A câmera será aberta para salvar a marcação no aparelho e sincronizar depois.');
           return;
         }
         throw new Error(data.error || 'Matrícula não encontrada');
@@ -95,8 +102,8 @@ export default function Page() {
       setNextType(recognizedNextType);
       setStep('register');
       setStatusMsg(data.offlineFallback
-        ? 'Funcionário reconhecido em contingência. Toque em “Abrir câmera” para salvar a saída neste aparelho e sincronizar quando o banco voltar.'
-        : `Funcionário reconhecido. Toque em “Abrir câmera” para ${recognizedNextType}.`);
+        ? 'Funcionário reconhecido em contingência. Preparando a câmera para salvar a saída neste aparelho.'
+        : `Funcionário reconhecido. Preparando a câmera para ${recognizedNextType}.`);
     } catch (err: any) {
       setStatusMsg(err?.message || 'Matrícula inválida');
     } finally {
@@ -270,7 +277,7 @@ export default function Page() {
     }
     try {
       streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' } }, audio: false });
+      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' }, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
       setCameraOpen(true);
       setStatusMsg('Câmera pronta. Posicione o rosto no quadrado e toque em Registrar ponto.');
     } catch {
@@ -294,10 +301,10 @@ export default function Page() {
     const sourceX = (video.videoWidth - size) / 2;
     const sourceY = (video.videoHeight - size) / 2;
     const canvas = document.createElement('canvas');
-    canvas.width = 480;
-    canvas.height = 480;
-    canvas.getContext('2d')?.drawImage(video, sourceX, sourceY, size, size, 0, 0, 480, 480);
-    const capturedPhoto = canvas.toDataURL('image/jpeg', 0.78);
+    canvas.width = 720;
+    canvas.height = 720;
+    canvas.getContext('2d')?.drawImage(video, sourceX, sourceY, size, size, 0, 0, 720, 720);
+    const capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
     setPhoto(capturedPhoto);
     closeCamera();
     setStatusMsg('Foto capturada. Confirmando marcação...');
