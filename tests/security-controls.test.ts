@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { appendAuditEvent, consumeRateLimit, resetSecurityStateForTests, verifyAuditChain } from '../lib/security-controls';
 
 afterEach(() => resetSecurityStateForTests());
+const identifyRoute = readFileSync(resolve(process.cwd(), 'app/api/identify/route.ts'), 'utf8');
+const punchRoute = readFileSync(resolve(process.cwd(), 'app/api/punch/route.ts'), 'utf8');
 
 describe('security controls', () => {
   it('allows the configured number of requests and blocks the next one', async () => {
@@ -11,6 +15,13 @@ describe('security controls', () => {
     const blocked = await consumeRateLimit(key, 2, 60_000);
     expect(blocked.allowed).toBe(false);
     expect(blocked.remaining).toBe(0);
+  });
+
+  it('protects public identification and punch endpoints with rate limiting', () => {
+    expect(identifyRoute).toContain("getRequestKey(req, 'employee-identify')");
+    expect(identifyRoute).toContain('if (!rate.allowed) return rateLimitResponse');
+    expect(punchRoute).toContain("getRequestKey(req, 'punch-write')");
+    expect(punchRoute).toContain('if (!rate.allowed) return rateLimitResponse');
   });
 
   it('creates and verifies an ordered audit hash chain', async () => {

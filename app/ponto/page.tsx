@@ -200,7 +200,9 @@ export default function Page() {
       try {
         for (const p of pending) {
           const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
-          if (!response.ok && response.status !== 409) remaining.push(p);
+          // Um 409 pode representar concorrência ou jornada encerrada; não confirma que esta
+          // marcação foi persistida. Mantemos o item para não perder a evidência local.
+          if (!response.ok) remaining.push(p);
         }
         if (remaining.length > 0) localStorage.setItem('offlinePunches', JSON.stringify(remaining));
         else localStorage.removeItem('offlinePunches');

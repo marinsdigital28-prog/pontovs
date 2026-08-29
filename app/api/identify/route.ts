@@ -5,10 +5,13 @@ import { resolveDaySchedule } from '../../../lib/day-schedule';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 import { isExitOverrideActive } from '../../../lib/exit-override';
 import { findEmployeeFallback } from '../../../lib/employee-fallback';
+import { consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../lib/security-controls';
 
 const ORDER = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'] as const;
 
 export async function POST(req: Request) {
+  const rate = await consumeRateLimit(getRequestKey(req, 'employee-identify'), 120, 60_000);
+  if (!rate.allowed) return rateLimitResponse(rate.retryAfterSeconds);
   let employeeNumber = '';
   try {
     const body = await req.json();

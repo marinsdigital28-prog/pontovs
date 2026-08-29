@@ -42,7 +42,7 @@ describe('navegação da folha de ponto', () => {
     expect(punch).toContain('confirmation-ball');
     expect(punch).toContain('Sem conexão — marcação protegida no aparelho');
     expect(punch).toContain('DATABASE_QUOTA_EXCEEDED');
-    expect(punch).toContain('response.status !== 409');
+    expect(punch).toContain('if (!response.ok) remaining.push(p);');
   });
 
   it('não abre a câmera automaticamente fora de um gesto do usuário', () => {

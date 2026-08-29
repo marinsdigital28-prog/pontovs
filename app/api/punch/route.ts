@@ -7,6 +7,7 @@ import { brazilDayRange } from '../../../lib/brazil-time';
 import { resolveDaySchedule } from '../../../lib/day-schedule';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 import { isExitOverrideActive } from '../../../lib/exit-override';
+import { consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../lib/security-controls';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -19,6 +20,8 @@ const Input = z.object({
 const ORDER = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'] as const;
 
 export async function POST(req: Request) {
+  const rate = await consumeRateLimit(getRequestKey(req, 'punch-write'), 120, 60_000);
+  if (!rate.allowed) return rateLimitResponse(rate.retryAfterSeconds);
   try {
     const input = Input.parse(await req.json());
     const session = (await getServerSession(authOptions as any)) as any;
