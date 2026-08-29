@@ -653,9 +653,9 @@ button,input{font:inherit}
 
 
 /* Ajuste solicitado: relógio e área de captura com mais presença */
-.ponto-info-panel .clock .time{font-size:clamp(4.15rem,8.7vw,7.25rem)}
+.ponto-info-panel .clock .time{font-size:clamp(4.15rem,8.7vw,7.25rem);color:#f2f7f4;text-shadow:0 6px 24px rgba(2,8,6,.38)}
 .ponto-register-card .camera-preview-minimal{width:min(96%,620px);height:min(70dvh,620px)}
 @media (max-width:760px){
-  .ponto-info-panel .clock .time{font-size:clamp(3rem,13vw,4.35rem)}
+  .ponto-info-panel .clock .time{font-size:clamp(3rem,13vw,4.35rem);color:#f2f7f4}
   .ponto-register-card .camera-preview-minimal{width:min(94vw,520px);height:min(68dvh,520px)}
 }
