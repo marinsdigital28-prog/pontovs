@@ -156,7 +156,14 @@ export default function Page() {
         type: json.type,
         timestamp: json.timestamp,
       });
-      setStatusMsg('Ponto registrado e sincronizado. Preparando a próxima matrícula...');
+      const receiptStatus = json.receiptEmail?.status;
+      setStatusMsg(receiptStatus === 'sent'
+        ? 'Ponto registrado. Comprovante enviado para seu email.'
+        : receiptStatus === 'not_configured'
+          ? 'Ponto registrado. Comprovante pendente de configuração do email.'
+          : receiptStatus === 'failed'
+            ? 'Ponto registrado. Não foi possível enviar o comprovante por email.'
+            : 'Ponto registrado e sincronizado. Preparando a próxima matrícula...');
       window.setTimeout(() => resetForNextCollaborator(), 2200);
     } catch (err: any) {
       const errorMessage = err?.message || 'Não foi possível registrar a marcação. Tente novamente.';

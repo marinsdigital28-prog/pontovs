@@ -8,6 +8,7 @@ import { resolveDaySchedule } from '../../../lib/day-schedule';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 import { isExitOverrideActive } from '../../../lib/exit-override';
 import { consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../lib/security-controls';
+import { sendPunchReceiptEmail } from '../../../lib/punch-receipt';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -47,8 +48,24 @@ export async function POST(req: Request) {
       await tx.punchAudit.create({ data: { punchId: punch.id, changedById: user.id, field: 'created', newValue: JSON.stringify({ type: punch.type, timestamp: punch.timestamp.toISOString(), clientId: punch.clientId, origin: punch.origin }), reason: 'Registro inicial via app' } });
       return { punch, user, duplicate: false };
     }, { isolationLevel: 'Serializable' });
+    let receiptEmail: { status: string; id?: string } = { status: 'not_available' };
+    if (!result.duplicate && result.user.email) {
+      try {
+        const sent = await sendPunchReceiptEmail({
+          to: result.user.email,
+          employeeName: result.user.name,
+          employeeNumber: result.user.employeeNumber,
+          type: result.punch.type,
+          timestamp: result.punch.timestamp,
+          photoData: result.punch.photoData,
+        });
+        receiptEmail = sent.status === 'sent' ? { status: sent.status, id: sent.id } : { status: sent.status };
+      } catch {
+        receiptEmail = { status: 'failed' };
+      }
+    }
     const { photoData: _photoData, ...safePunch } = result.punch;
-    return NextResponse.json({ ...safePunch, userName: result.user.name, employeeNumber: result.user.employeeNumber, hasPhoto: Boolean(result.punch.photoData) }, { status: result.duplicate ? 200 : 201 });
+    return NextResponse.json({ ...safePunch, userName: result.user.name, employeeNumber: result.user.employeeNumber, hasPhoto: Boolean(result.punch.photoData), receiptEmail }, { status: result.duplicate ? 200 : 201 });
   } catch (error) {
     if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });
     if (isConflict(error)) return NextResponse.json({ error: 'Esta batida já foi registrada ou houve concorrência. Atualize e tente novamente.' }, { status: 409 });
