@@ -11,6 +11,7 @@ import CertificatesPanel from './certificates-panel';
 import RequestsPanel from './requests-panel';
 import NotificationsPanel from './notifications-panel';
 import HealthCard from './health-card';
+import './overview-layout.css';
 
 type Employee = { id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null; workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null; active: boolean; _count?: { punches: number } };
 type Issue = { id: string; type: string; status: string; description: string | null; detectedAt: string; user: { name: string; employeeNumber: string | null }; punch: { id: string; type: string; timestamp: string } | null };
@@ -68,7 +69,6 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
     {tab === 'overview' ? <section className="overview-layout">
-      {/* 1. Cabeçalho operacional + KPIs */}
       <div className="overview-top">
         <div className="card admin-hero overview-hero">
           <div>
@@ -90,7 +90,6 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         </div>
       </div>
 
-      {/* 2. Zona principal: presença + lateral de alertas/saúde */}
       <div className="overview-main">
         <div className="card presence-card overview-presence">
           <div className="section-heading">
@@ -161,7 +160,6 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         </aside>
       </div>
 
-      {/* 3. Análise mensal — bloco secundário */}
       <div className="overview-analytics">
         <AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} />
       </div>
