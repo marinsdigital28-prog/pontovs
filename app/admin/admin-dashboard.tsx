@@ -13,12 +13,55 @@ import NotificationsPanel from './notifications-panel';
 import HealthCard from './health-card';
 import './overview-layout.css';
 
-type Employee = { id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null; workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null; active: boolean; _count?: { punches: number } };
+type EmployeeProfile = {
+  phone?: string;
+  personalEmail?: string;
+  address?: string;
+  city?: string;
+  uf?: string;
+  cep?: string;
+  pis?: string;
+  rg?: string;
+  birthDate?: string;
+  admissionDate?: string;
+  department?: string;
+  ctps?: string;
+  motherName?: string;
+  fatherName?: string;
+  [key: string]: string | undefined;
+};
+
+type Employee = {
+  id: string;
+  name: string;
+  employeeNumber: string | null;
+  cpf?: string | null;
+  jobTitle?: string | null;
+  workDays?: string | null;
+  scheduleStart?: string | null;
+  scheduleEnd?: string | null;
+  scheduleByDay?: string | null;
+  profile?: EmployeeProfile | null;
+  active: boolean;
+  _count?: { punches: number };
+};
 type Issue = { id: string; type: string; status: string; description: string | null; detectedAt: string; user: { name: string; employeeNumber: string | null }; punch: { id: string; type: string; timestamp: string } | null };
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
 type PresenceEmployee = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; status: 'PRESENTE' | 'NAO_MARCOU' | 'PENDENTE' | 'SAIU' | 'FOLGA'; scheduled: boolean; latestPunch: { id: string; type: string; timestamp: string; status: string; hasPhoto: boolean } | null };
 
 const emptyForm = { name: '', employeeNumber: '', cpf: '', jobTitle: '', workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '18:00' };
+
+function formatProfileLine(employee: Employee) {
+  const parts = [
+    employee.employeeNumber || 'Sem matrícula',
+    employee.jobTitle || 'Cargo não informado',
+  ];
+  if (employee.cpf) parts.push(`CPF ${employee.cpf}`);
+  if (employee.profile?.phone) parts.push(`Tel ${employee.profile.phone}`);
+  if (employee.profile?.personalEmail) parts.push(employee.profile.personalEmail);
+  if (employee.profile?.city) parts.push(`${employee.profile.city}/${employee.profile.uf || ''}`.trim());
+  return parts.join(' · ');
+}
 
 export default function AdminDashboard({ employees: initialEmployees, stats, degraded = false }: { employees: Employee[]; stats: { employeeCount: number; punchesToday: number; openInconsistencies: number }; degraded?: boolean }) {
   const [tab, setTab] = useState('overview');
@@ -29,6 +72,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const [issues, setIssues] = useState<Issue[]>([]);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const [scheduleApplying, setScheduleApplying] = useState(false);
   const [audit, setAudit] = useState<{ chainValid: boolean; events: AuditEvent[]; mode: string } | null>(null);
   const [presence, setPresence] = useState<PresenceEmployee[]>([]);
@@ -47,11 +91,27 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
 
   const filteredPresence = useMemo(() => presenceFilter === 'TODOS' ? presence : presence.filter((employee) => employee.status === presenceFilter), [presence, presenceFilter]);
   const presenceCounts = useMemo(() => presence.reduce((acc, employee) => { acc[employee.status] += 1; return acc; }, { PRESENTE: 0, NAO_MARCOU: 0, PENDENTE: 0, SAIU: 0, FOLGA: 0 } as Record<PresenceEmployee['status'], number>), [presence]);
-  const filteredEmployees = useMemo(() => employees.filter((item) => `${item.name} ${item.employeeNumber || ''} ${item.jobTitle || ''}`.toLowerCase().includes(employeeSearch.toLowerCase())), [employees, employeeSearch]);
+  const filteredEmployees = useMemo(() => employees.filter((item) => `${item.name} ${item.employeeNumber || ''} ${item.jobTitle || ''} ${item.cpf || ''} ${item.profile?.phone || ''}`.toLowerCase().includes(employeeSearch.toLowerCase())), [employees, employeeSearch]);
   const startEdit = (employee: Employee) => { setEditing(employee); setForm({ name: employee.name, employeeNumber: employee.employeeNumber || '', cpf: employee.cpf || '', jobTitle: employee.jobTitle || '', workDays: employee.workDays || '', scheduleStart: employee.scheduleStart || '', scheduleEnd: employee.scheduleEnd || '' }); setTab('employees'); };
   const resetForm = () => { setEditing(null); setForm(emptyForm); };
   const saveEmployee = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setMessage(''); const response = await fetch('/api/admin/employees', { method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing ? { ...form, id: editing.id } : form) }); const data = await response.json().catch(() => ({})); if (!response.ok) setMessage(data.error || 'Não foi possível salvar.'); else { setMessage(editing ? 'Colaborador atualizado.' : 'Colaborador cadastrado.'); resetForm(); await loadEmployees(); } setSaving(false); };
   const toggleEmployee = async (employee: Employee) => { const response = await fetch('/api/admin/employees', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: employee.id, active: !employee.active }) }); if (response.ok) { setMessage(employee.active ? 'Colaborador desativado.' : 'Colaborador ativado.'); await loadEmployees(); } };
+  const enrichFromPdf = async () => {
+    setEnriching(true);
+    setMessage('');
+    const response = await fetch('/api/admin/enrich-employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fromBuiltin: true }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) setMessage(data.error || 'Não foi possível importar os dados cadastrais.');
+    else {
+      setMessage(`Dados cadastrais aplicados: ${data.updated || 0} atualizados (matrícula e jornada preservadas).${data.skipped ? ` ${data.skipped} ignorados.` : ''}`);
+      await loadEmployees();
+    }
+    setEnriching(false);
+  };
   const applySchedulePatterns = async () => { setScheduleApplying(true); setMessage(''); const response = await fetch('/api/admin/apply-schedule-patterns', { method: 'POST' }); const data = await response.json().catch(() => ({})); if (!response.ok) setMessage(data.error || 'Não foi possível aplicar os padrões.'); else { setMessage(`${data.updated || 0} jornadas atualizadas a partir das marcações de agosto.`); await loadEmployees(); } setScheduleApplying(false); };
   const resolveIssue = async (id: string) => { const response = await fetch('/api/admin/inconsistencies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'RESOLVED' }) }); if (response.ok) { setMessage('Inconsistência resolvida.'); await loadIssues(); } };
 
@@ -166,7 +226,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     </section> : null}
 
     {tab === 'settings' ? <section className="admin-two-col"><CsvImporter /><PdfImporter /><SignatureSettings /></section> : null}
-    {tab === 'employees' ? <section className="admin-two-col"><div className="card"><div className="section-heading"><div><h2>{editing ? 'Editar colaborador' : 'Novo colaborador'}</h2><p className="small-muted">Cadastre matrícula, função e dados de jornada.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div><form onSubmit={saveEmployee} className="admin-form">{[['name', 'Nome completo'], ['employeeNumber', 'Matrícula'], ['cpf', 'CPF'], ['jobTitle', 'Cargo'], ['workDays', 'Dias trabalhados'], ['scheduleStart', 'Início da jornada'], ['scheduleEnd', 'Fim da jornada']].map(([key, label]) => <label key={key} className="small-muted">{label}<input className="input" required={key === 'name' || key === 'employeeNumber'} value={form[key as keyof typeof form]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}<button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar colaborador'}</button></form></div><div className="card"><div className="section-heading"><div><h2>Equipe</h2><p className="small-muted">{employees.length} colaboradores cadastrados.</p></div></div><input className="input" placeholder="Buscar por nome, matrícula ou cargo" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} /><div className="employee-list">{filteredEmployees.map((employee) => <div className="employee-row" key={employee.id}><div><strong>{employee.name}</strong><div className="small-muted">{employee.employeeNumber || 'Sem matrícula'} · {employee.jobTitle || 'Cargo não informado'}</div></div><div className="row-actions"><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button><button className="ghost-btn" onClick={() => void toggleEmployee(employee)}>{employee.active ? 'Desativar' : 'Ativar'}</button></div></div>)}</div></div></section> : null}
+    {tab === 'employees' ? <section className="admin-two-col"><div className="card"><div className="section-heading"><div><h2>{editing ? 'Editar colaborador' : 'Novo colaborador'}</h2><p className="small-muted">Cadastre matrícula, função e dados de jornada.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div><form onSubmit={saveEmployee} className="admin-form">{[['name', 'Nome completo'], ['employeeNumber', 'Matrícula'], ['cpf', 'CPF'], ['jobTitle', 'Cargo'], ['workDays', 'Dias trabalhados'], ['scheduleStart', 'Início da jornada'], ['scheduleEnd', 'Fim da jornada']].map(([key, label]) => <label key={key} className="small-muted">{label}<input className="input" required={key === 'name' || key === 'employeeNumber'} value={form[key as keyof typeof form]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}{editing?.profile ? <div className="small-muted" style={{ marginTop: 8, lineHeight: 1.5 }}><strong>Dados cadastrais salvos</strong><br />{[editing.profile.phone && `Tel: ${editing.profile.phone}`, editing.profile.personalEmail && `E-mail: ${editing.profile.personalEmail}`, editing.profile.rg && `RG: ${editing.profile.rg}`, editing.profile.pis && `PIS: ${editing.profile.pis}`, editing.profile.address && `End.: ${editing.profile.address}`, editing.profile.city && `${editing.profile.city}/${editing.profile.uf || ''}`, editing.profile.cep && `CEP ${editing.profile.cep}`, editing.profile.admissionDate && `Admissão ${editing.profile.admissionDate}`].filter(Boolean).join(' · ')}</div> : null}<button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar colaborador'}</button></form></div><div className="card"><div className="section-heading"><div><h2>Equipe</h2><p className="small-muted">{employees.length} colaboradores cadastrados. Matrícula e jornada não são alteradas na importação cadastral.</p></div><button type="button" className="ghost-btn" disabled={enriching} onClick={() => void enrichFromPdf()}>{enriching ? 'Importando...' : 'Importar documentos e contatos (PDF)'}</button></div><input className="input" placeholder="Buscar por nome, matrícula, cargo, CPF ou telefone" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} /><div className="employee-list">{filteredEmployees.map((employee) => <div className="employee-row" key={employee.id}><div><strong>{employee.name}</strong><div className="small-muted">{formatProfileLine(employee)}</div></div><div className="row-actions"><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button><button className="ghost-btn" onClick={() => void toggleEmployee(employee)}>{employee.active ? 'Desativar' : 'Ativar'}</button></div></div>)}</div></div></section> : null}
     {tab === 'shifts' ? <section className="card"><div className="section-heading"><div><h2>Turnos e jornada</h2><p className="small-muted">A jornada é configurada por colaborador e alimenta a conferência operacional.</p></div><div className="row-actions"><button className="ghost-btn" onClick={() => void applySchedulePatterns()} disabled={scheduleApplying}>{scheduleApplying ? 'Aplicando...' : 'Aplicar padrões de agosto'}</button><button className="ghost-btn" onClick={() => setTab('employees')}>Gerenciar colaboradores</button></div></div><div className="shift-table"><div className="shift-header"><span>Colaborador</span><span>Dias</span><span>Jornada</span><span>Status</span><span>Ação</span></div>{employees.map((employee) => <div className="shift-row" key={employee.id}><span><b>{employee.name}</b><small>{employee.employeeNumber || '—'}</small></span><span>{employee.workDays || 'Não definido'}</span><span>{employee.scheduleStart || '—'} às {employee.scheduleEnd || '—'}</span><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button></div>)}</div></section> : null}
     {tab === 'punches' ? <PunchesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /> : null}
     {tab === 'timesheet' ? <FolhaPontoPanel employees={employees.filter((item) => item.active)} /> : null}
