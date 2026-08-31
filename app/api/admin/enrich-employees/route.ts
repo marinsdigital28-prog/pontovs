@@ -4,14 +4,10 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { normalizeCpf } from '@/lib/employee-validation';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
+import { EMPLOYEE_ENRICH_ITEMS } from '@/lib/employee-enrich-data';
 
 export const dynamic = 'force-dynamic';
 
-/**
- * Enriquece colaboradores existentes com dados cadastrais (documentos, contatos, endereço).
- * NÃO altera: employeeNumber (matrícula), workDays, scheduleStart, scheduleEnd, scheduleByDay.
- * Corpo: { items: [{ employeeNumber, cpf?, profile? }] }
- */
 async function requireManager() {
   const session = (await getServerSession(authOptions as any)) as any;
   const id = session?.user?.id as string | undefined;
@@ -30,7 +26,10 @@ export async function POST(request: Request) {
   if (!rate.allowed) return rateLimitResponse(rate.retryAfterSeconds);
 
   const body = await request.json().catch(() => null);
-  const items = Array.isArray(body?.items) ? body.items : null;
+  let items: any[] | null = Array.isArray(body?.items) ? body.items : null;
+  if ((!items || !items.length) && body?.fromBuiltin) {
+    items = EMPLOYEE_ENRICH_ITEMS as any[];
+  }
   if (!items?.length) return NextResponse.json({ error: 'Lista de enriquecimento vazia.' }, { status: 400 });
 
   let updated = 0;
