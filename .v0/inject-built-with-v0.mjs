@@ -1,2 +1,3 @@
-// no-op stub — Vercel project build command still references this path from v0
-console.log('[v0] inject-built-with-v0: noop');
+// noop — mantido só porque o projeto Vercel referencia este arquivo no build
+console.log('[v0] inject noop ok');
+process.exitCode = 0;
