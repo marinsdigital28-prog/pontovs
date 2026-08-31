@@ -1,4 +1,4 @@
-/* Folha de ponto — legível, competência nítida */
+/* Folha de ponto — tela legível + impressão 1x A4 paisagem */
 
 .folha-ponto-root { overflow: visible; }
 
@@ -157,6 +157,162 @@
 .folha-neg { color: #b42318 !important; font-weight: 800; }
 .folha-pos { color: #087443 !important; font-weight: 800; }
 .folha-hint { margin-top: 1rem; font-size: 1rem; color: var(--muted, #8a9a90); }
+
+/* ========== IMPRESSÃO: 1 página A4 paisagem ========== */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 6mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .folha-ponto-root,
+  .folha-ponto-root * {
+    visibility: visible;
+  }
+
+  .folha-ponto-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .section-heading .row-actions,
+  .folha-toolbar,
+  .ghost-btn,
+  .primary-btn,
+  .eyebrow,
+  nav,
+  .admin-tabs,
+  button {
+    display: none !important;
+  }
+
+  .folha-competence-banner {
+    margin: 0 0 4mm;
+    padding: 2mm 3mm;
+    border-radius: 0;
+    background: #0b5c42 !important;
+    color: #fff !important;
+    box-shadow: none;
+    page-break-after: avoid;
+  }
+
+  .folha-competence-banner strong {
+    font-size: 11pt;
+  }
+
+  .folha-competence-banner span,
+  .folha-competence-banner b {
+    font-size: 9pt;
+    color: #fff !important;
+  }
+
+  .folha-block {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .folha-employee-header h3 {
+    font-size: 12pt;
+    color: #000 !important;
+  }
+
+  .folha-employee-meta {
+    font-size: 9pt;
+    color: #333 !important;
+  }
+
+  .folha-table-scroll {
+    overflow: visible;
+    border: 1px solid #333;
+    border-radius: 0;
+    background: #fff;
+  }
+
+  .folha-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    font-size: 7.5pt !important;
+    line-height: 1.15 !important;
+  }
+
+  .folha-table thead th {
+    position: static;
+    background: #0b5c42 !important;
+    color: #fff !important;
+    font-size: 7pt !important;
+    padding: 1.5mm 1mm !important;
+    border-bottom: 1px solid #000;
+  }
+
+  .folha-table tbody td {
+    padding: 0.9mm 1mm !important;
+    font-size: 7pt !important;
+    border-bottom: 0.3pt solid #bbb;
+    color: #000 !important;
+  }
+
+  .folha-table tfoot td {
+    padding: 1.5mm 1mm !important;
+    font-size: 8pt !important;
+    background: #123d30 !important;
+    color: #fff !important;
+  }
+
+  .folha-col-date b {
+    font-size: 8pt;
+    color: #000 !important;
+  }
+
+  .folha-col-date span {
+    font-size: 6.5pt;
+    color: #333 !important;
+  }
+
+  .folha-mark {
+    padding: 0 1mm;
+    margin: 0 0.5mm 0 0;
+    font-size: 6.5pt;
+    background: #e8eee9 !important;
+    border-radius: 1px;
+  }
+
+  .signature-area {
+    margin-top: 3mm;
+    page-break-inside: avoid;
+  }
+
+  .signature-block {
+    color: #000 !important;
+  }
+
+  /* Força conteúdo em uma única página */
+  .folha-block {
+    page-break-after: avoid;
+    page-break-before: avoid;
+  }
+}
 
 @media (max-width: 900px) {
   .folha-table { font-size: 13px; min-width: 860px; }
