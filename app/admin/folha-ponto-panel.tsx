@@ -32,6 +32,7 @@ type ApprovedRequest = {
 const typeLabels: Record<string, string> = { ENTRADA: 'E', INTERVALO: 'I', RETORNO: 'R', SAIDA: 'S' };
 const weekdayNames = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
+const allEmployeesValue = '__ALL__';
 
 function currentMonth() {
   return brazilDateKey(new Date()).slice(0, 7);
@@ -64,7 +65,6 @@ function formatMinutes(value: number | null) {
   const absolute = Math.abs(Math.round(value));
   return `${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`;
 }
-/** Dia civil em SP — evita vazamento UTC para o mês seguinte. */
 function dayKey(value: string) { return brazilDateKey(new Date(value)); }
 function minutesBetween(start: string, end: string) {
   return Math.max(0, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000));
@@ -167,8 +167,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
 
 export default function FolhaPontoPanel({ employees }: { employees: Employee[] }) {
   const [month, setMonth] = useState(currentMonth());
-  const [employeeId, setEmployeeId] = useState('');
-  const allEmployeesValue = '__ALL__';
+  const [employeeId, setEmployeeId] = useState(allEmployeesValue);
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [requests, setRequests] = useState<ApprovedRequest[]>([]);
@@ -176,6 +175,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [error, setError] = useState('');
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
+  const [batchProgress, setBatchProgress] = useState('');
 
   const load = useCallback(async () => {
     const bounds = monthBounds(month);
@@ -221,8 +221,19 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     [month, records, certificates, requests, visibleEmployees],
   );
 
+  async function downloadPdfBlob(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function signPdf(emp: Employee) {
     setSigning(true);
+    setBatchProgress('');
+    setError('');
     try {
       const response = await fetch('/api/admin/timesheet-pdf', {
         method: 'POST',
@@ -236,16 +247,43 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         return;
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `folha-${emp.employeeNumber || emp.id}-${month}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadPdfBlob(blob, `folha-${emp.employeeNumber || emp.id}-${month}.pdf`);
     } catch {
       setError('Falha ao assinar a folha.');
     }
     setSigning(false);
+  }
+
+  async function signAllPdfs() {
+    setSigning(true);
+    setError('');
+    setBatchProgress(`Gerando PDF de ${employees.length} colaboradores...`);
+    try {
+      const response = await fetch('/api/admin/timesheet-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true, month }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data.error || 'Não foi possível gerar o PDF em lote.');
+        setSigning(false);
+        setBatchProgress('');
+        return;
+      }
+      const blob = await response.blob();
+      await downloadPdfBlob(blob, `folhas-todos-${month}-assinadas.pdf`);
+      setBatchProgress(`Pronto: ${employees.length} folhas em 1 PDF.`);
+    } catch {
+      setError('Falha ao gerar PDF de todos.');
+      setBatchProgress('');
+    }
+    setSigning(false);
+  }
+
+  function handlePrintAll() {
+    setEmployeeId(allEmployeesValue);
+    setTimeout(() => window.print(), 300);
   }
 
   const bounds = monthBounds(month);
@@ -256,27 +294,36 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         <div>
           <span className="eyebrow">CONFERÊNCIA MENSAL</span>
           <h2>Folha de ponto</h2>
-          <p className="small-muted">Competência fechada no mês (fuso Brasília). Não inclui dias do mês seguinte.</p>
+          <p className="small-muted">A4 horizontal · 1 página por colaborador · padrão Espaço Progredir</p>
         </div>
-        <div className="row-actions">
+        <div className="row-actions folha-print-actions">
           <input className="input folha-month-input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
           <select className="input folha-employee-select" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-            <option value="">Selecione o colaborador</option>
-            <option value={allEmployeesValue}>Todos</option>
+            <option value={allEmployeesValue}>Todos os colaboradores</option>
             {employees.map((e) => (
               <option key={e.id} value={e.id}>{e.employeeNumber || '—'} · {e.name}</option>
             ))}
           </select>
-          <button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>{loading ? 'Carregando...' : 'Atualizar'}</button>
+          <button className="ghost-btn" type="button" onClick={() => void load()} disabled={loading}>
+            {loading ? 'Carregando...' : 'Atualizar'}
+          </button>
+          <button className="primary-btn" type="button" onClick={handlePrintAll} disabled={signing}>
+            Imprimir todos
+          </button>
+          <button className="primary-btn" type="button" onClick={() => void signAllPdfs()} disabled={signing || !employees.length}>
+            {signing ? 'Gerando PDF...' : 'PDF de todos'}
+          </button>
         </div>
       </div>
 
       <div className="folha-competence-banner" role="status">
         <strong>{monthLabel(month).toUpperCase()}</strong>
-        <span>Período estrito: <b>{bounds.from}</b> → <b>{bounds.to}</b> · {bounds.lastDay} dias · America/Sao_Paulo</span>
+        <span>Período: <b>{bounds.from}</b> → <b>{bounds.to}</b> · {bounds.lastDay} dias · {visibleEmployees.length} folha(s)</span>
+        {batchProgress ? <span className="folha-batch-progress">{batchProgress}</span> : null}
       </div>
 
       {error ? <p className="status-msg">{error}</p> : null}
+
       {visibleEmployees.map((employee) => {
         const rows = dayRowsByEmployee.get(employee.id) || [];
         return (
@@ -286,9 +333,14 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                 <h3>{employee.name}</h3>
                 <p className="small-muted">{employee.employeeNumber || 'Sem matrícula'} · {monthLabel(month)}</p>
               </div>
-              <button className="primary-btn" type="button" disabled={signing} onClick={() => void signPdf(employee)}>
-                {signing ? 'Gerando...' : 'PDF assinado'}
-              </button>
+              <div className="row-actions no-print">
+                <button className="ghost-btn" type="button" onClick={() => window.print()} disabled={signing}>
+                  Imprimir
+                </button>
+                <button className="primary-btn" type="button" disabled={signing} onClick={() => void signPdf(employee)}>
+                  {signing ? 'Gerando...' : 'PDF assinado'}
+                </button>
+              </div>
             </div>
             <div className="folha-table-scroll">
               <table className="folha-table">
@@ -342,7 +394,6 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           </div>
         );
       })}
-      {!employeeId ? <p className="folha-hint">Selecione um colaborador ou &quot;Todos&quot; para ver a folha.</p> : null}
     </section>
   );
 }
