@@ -11,39 +11,19 @@ import CertificatesPanel from './certificates-panel';
 import RequestsPanel from './requests-panel';
 import NotificationsPanel from './notifications-panel';
 import HealthCard from './health-card';
+import CertificateConflictsPanel from './certificate-conflicts-panel';
 import './overview-layout.css';
 
 type EmployeeProfile = {
-  phone?: string;
-  personalEmail?: string;
-  address?: string;
-  city?: string;
-  uf?: string;
-  cep?: string;
-  pis?: string;
-  rg?: string;
-  birthDate?: string;
-  admissionDate?: string;
-  department?: string;
-  ctps?: string;
-  motherName?: string;
-  fatherName?: string;
-  [key: string]: string | undefined;
+  phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
+  pis?: string; rg?: string; birthDate?: string; admissionDate?: string; department?: string; ctps?: string;
+  motherName?: string; fatherName?: string; [key: string]: string | undefined;
 };
 
 type Employee = {
-  id: string;
-  name: string;
-  employeeNumber: string | null;
-  cpf?: string | null;
-  jobTitle?: string | null;
-  workDays?: string | null;
-  scheduleStart?: string | null;
-  scheduleEnd?: string | null;
-  scheduleByDay?: string | null;
-  profile?: EmployeeProfile | null;
-  active: boolean;
-  _count?: { punches: number };
+  id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null;
+  workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null;
+  profile?: EmployeeProfile | null; active: boolean; _count?: { punches: number };
 };
 type Issue = { id: string; type: string; status: string; description: string | null; detectedAt: string; user: { name: string; employeeNumber: string | null }; punch: { id: string; type: string; timestamp: string } | null };
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
@@ -52,10 +32,7 @@ type PresenceEmployee = { id: string; name: string; employeeNumber: string | nul
 const emptyForm = { name: '', employeeNumber: '', cpf: '', jobTitle: '', workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '18:00' };
 
 function formatProfileLine(employee: Employee) {
-  const parts = [
-    employee.employeeNumber || 'Sem matrícula',
-    employee.jobTitle || 'Cargo não informado',
-  ];
+  const parts = [employee.employeeNumber || 'Sem matrícula', employee.jobTitle || 'Cargo não informado'];
   if (employee.cpf) parts.push(`CPF ${employee.cpf}`);
   if (employee.profile?.phone) parts.push(`Tel ${employee.profile.phone}`);
   if (employee.profile?.personalEmail) parts.push(employee.profile.personalEmail);
@@ -97,19 +74,11 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const saveEmployee = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setMessage(''); const response = await fetch('/api/admin/employees', { method: editing ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing ? { ...form, id: editing.id } : form) }); const data = await response.json().catch(() => ({})); if (!response.ok) setMessage(data.error || 'Não foi possível salvar.'); else { setMessage(editing ? 'Colaborador atualizado.' : 'Colaborador cadastrado.'); resetForm(); await loadEmployees(); } setSaving(false); };
   const toggleEmployee = async (employee: Employee) => { const response = await fetch('/api/admin/employees', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: employee.id, active: !employee.active }) }); if (response.ok) { setMessage(employee.active ? 'Colaborador desativado.' : 'Colaborador ativado.'); await loadEmployees(); } };
   const enrichFromPdf = async () => {
-    setEnriching(true);
-    setMessage('');
-    const response = await fetch('/api/admin/enrich-employees', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fromBuiltin: true }),
-    });
+    setEnriching(true); setMessage('');
+    const response = await fetch('/api/admin/enrich-employees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fromBuiltin: true }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) setMessage(data.error || 'Não foi possível importar os dados cadastrais.');
-    else {
-      setMessage(`Dados cadastrais aplicados: ${data.updated || 0} atualizados (matrícula e jornada preservadas).${data.skipped ? ` ${data.skipped} ignorados.` : ''}`);
-      await loadEmployees();
-    }
+    else { setMessage(`Dados cadastrais aplicados: ${data.updated || 0} atualizados (matrícula e jornada preservadas).${data.skipped ? ` ${data.skipped} ignorados.` : ''}`); await loadEmployees(); }
     setEnriching(false);
   };
   const applySchedulePatterns = async () => { setScheduleApplying(true); setMessage(''); const response = await fetch('/api/admin/apply-schedule-patterns', { method: 'POST' }); const data = await response.json().catch(() => ({})); if (!response.ok) setMessage(data.error || 'Não foi possível aplicar os padrões.'); else { setMessage(`${data.updated || 0} jornadas atualizadas a partir das marcações de agosto.`); await loadEmployees(); } setScheduleApplying(false); };
@@ -125,17 +94,13 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
 
   return <>
     <nav className="admin-tabs" aria-label="Seções administrativas">{[['overview', 'Visão geral'], ['employees', 'Colaboradores'], ['shifts', 'Turnos e jornada'], ['punches', 'Registros de ponto'], ['timesheet', 'Folha de ponto'], ['issues', 'Inconsistências'], ['requests', 'Solicitações'], ['notifications', 'Notificações'], ['certificates', 'Atestados'], ['settings', 'Dados e documentos'], ['security', 'Segurança e auditoria']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
-    {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível. A equipe carregada é uma cópia local e alterações administrativas ficarão pendentes até a conexão ser restaurada.</div> : null}
+    {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
     {tab === 'overview' ? <section className="overview-layout">
       <div className="overview-top">
         <div className="card admin-hero overview-hero">
-          <div>
-            <span className="eyebrow">OPERAÇÃO EM TEMPO REAL</span>
-            <h2>Operação de hoje</h2>
-            <p className="small-muted">Presença da equipe, pendências e atalhos para o dia a dia.</p>
-          </div>
+          <div><span className="eyebrow">OPERAÇÃO EM TEMPO REAL</span><h2>Operação de hoje</h2><p className="small-muted">Presença da equipe, pendências e atalhos para o dia a dia.</p></div>
           <div className="row-actions overview-actions">
             <button className="primary-btn admin-action" onClick={() => setTab('punches')}>Ver marcações</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Abrir folha</button>
@@ -149,15 +114,10 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
           <div className="summary summary-alert"><span className="small-muted">Pendências abertas</span><strong>{stats.openInconsistencies}</strong></div>
         </div>
       </div>
-
       <div className="overview-main">
         <div className="card presence-card overview-presence">
           <div className="section-heading">
-            <div>
-              <span className="eyebrow">ACOMPANHAMENTO DO DIA</span>
-              <h2>Quem está no trabalho agora</h2>
-              <p className="small-muted">{presenceUpdatedAt ? `Atualizado às ${presenceUpdatedAt.toLocaleTimeString('pt-BR')}` : 'Carregando presença real...'}</p>
-            </div>
+            <div><span className="eyebrow">ACOMPANHAMENTO DO DIA</span><h2>Quem está no trabalho agora</h2><p className="small-muted">{presenceUpdatedAt ? `Atualizado às ${presenceUpdatedAt.toLocaleTimeString('pt-BR')}` : 'Carregando presença real...'}</p></div>
             <button type="button" className="ghost-btn" onClick={() => void loadPresence()}>Atualizar</button>
           </div>
           <div className="presence-summary">
@@ -171,12 +131,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
           <div className="presence-grid">
             {filteredPresence.map((employee) => (
               <div className={`presence-person presence-${employee.status.toLowerCase()}`} key={employee.id}>
-                <div className="presence-avatar">
-                  {employee.latestPunch?.hasPhoto
-                    ? <img src={`/api/admin/punches/${employee.latestPunch.id}/photo`} alt={`Foto de ${employee.name}`} />
-                    : <span>{employee.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>}
-                  <i aria-hidden="true" />
-                </div>
+                <div className="presence-avatar">{employee.latestPunch?.hasPhoto ? <img src={`/api/admin/punches/${employee.latestPunch.id}/photo`} alt={`Foto de ${employee.name}`} /> : <span>{employee.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>}<i aria-hidden="true" /></div>
                 <strong title={employee.name}>{employee.name}</strong>
                 <span>{employee.employeeNumber || 'Sem matrícula'}</span>
                 <small>{statusLabel(employee.status)}</small>
@@ -185,55 +140,42 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
           </div>
           {!filteredPresence.length ? <p className="small-muted presence-empty">Nenhum colaborador neste filtro.</p> : null}
         </div>
-
         <aside className="overview-side">
           <div className="card admin-guide overview-alerts">
-            <span className="eyebrow">ATENÇÃO DO DIA</span>
-            <h3>O que priorizar</h3>
-            <div className="guide-row">
-              <b className={presenceCounts.NAO_MARCOU > 0 ? 'guide-warn' : ''}>!</b>
-              <span>
-                {presenceCounts.NAO_MARCOU > 0
-                  ? <><strong>{presenceCounts.NAO_MARCOU}</strong> ainda não registraram dentro da escala.</>
-                  : <>Ninguém pendente de marcação na escala de hoje.</>}
-              </span>
-            </div>
-            <div className="guide-row">
-              <b className="guide-ok">✓</b>
-              <span><strong>{presenceCounts.PRESENTE}</strong> presença(s) confirmada(s) em tempo real.</span>
-            </div>
-            <div className="guide-row">
-              <b>→</b>
-              <span>
-                {stats.openInconsistencies > 0
-                  ? <><strong>{stats.openInconsistencies}</strong> inconsistência(s) aberta(s). <button type="button" className="link-btn" onClick={() => setTab('issues')}>Revisar</button></>
-                  : <>Nenhuma inconsistência aberta no momento.</>}
-              </span>
-            </div>
+            <span className="eyebrow">ATENÇÃO DO DIA</span><h3>O que priorizar</h3>
+            <div className="guide-row"><b className={presenceCounts.NAO_MARCOU > 0 ? 'guide-warn' : ''}>!</b><span>{presenceCounts.NAO_MARCOU > 0 ? <><strong>{presenceCounts.NAO_MARCOU}</strong> ainda não registraram dentro da escala.</> : <>Ninguém pendente de marcação na escala de hoje.</>}</span></div>
+            <div className="guide-row"><b className="guide-ok">✓</b><span><strong>{presenceCounts.PRESENTE}</strong> presença(s) confirmada(s) em tempo real.</span></div>
+            <div className="guide-row"><b>→</b><span>{stats.openInconsistencies > 0 ? <><strong>{stats.openInconsistencies}</strong> inconsistência(s) aberta(s). <button type="button" className="link-btn" onClick={() => setTab('issues')}>Revisar</button></> : <>Nenhuma inconsistência aberta no momento.</>}</span></div>
             <div className="overview-side-actions">
               <button type="button" className="ghost-btn" onClick={() => setTab('punches')}>Corrigir marcações</button>
               <button type="button" className="ghost-btn" onClick={() => setTab('timesheet')}>Conferir folha</button>
-              {stats.openInconsistencies > 0 ? <button type="button" className="ghost-btn" onClick={() => setTab('issues')}>Abrir pendências</button> : null}
+              <button type="button" className="ghost-btn" onClick={() => setTab('issues')}>Ver conflitos atestado × ponto</button>
             </div>
           </div>
           <HealthCard />
         </aside>
       </div>
-
-      <div className="overview-analytics">
-        <AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} />
-      </div>
+      <div className="overview-analytics"><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
     </section> : null}
 
     {tab === 'settings' ? <section className="admin-two-col"><CsvImporter /><PdfImporter /><SignatureSettings /></section> : null}
-    {tab === 'employees' ? <section className="admin-two-col"><div className="card"><div className="section-heading"><div><h2>{editing ? 'Editar colaborador' : 'Novo colaborador'}</h2><p className="small-muted">Cadastre matrícula, função e dados de jornada.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div><form onSubmit={saveEmployee} className="admin-form">{[['name', 'Nome completo'], ['employeeNumber', 'Matrícula'], ['cpf', 'CPF'], ['jobTitle', 'Cargo'], ['workDays', 'Dias trabalhados'], ['scheduleStart', 'Início da jornada'], ['scheduleEnd', 'Fim da jornada']].map(([key, label]) => <label key={key} className="small-muted">{label}<input className="input" required={key === 'name' || key === 'employeeNumber'} value={form[key as keyof typeof form]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}{editing?.profile ? <div className="small-muted" style={{ marginTop: 8, lineHeight: 1.5 }}><strong>Dados cadastrais salvos</strong><br />{[editing.profile.phone && `Tel: ${editing.profile.phone}`, editing.profile.personalEmail && `E-mail: ${editing.profile.personalEmail}`, editing.profile.rg && `RG: ${editing.profile.rg}`, editing.profile.pis && `PIS: ${editing.profile.pis}`, editing.profile.address && `End.: ${editing.profile.address}`, editing.profile.city && `${editing.profile.city}/${editing.profile.uf || ''}`, editing.profile.cep && `CEP ${editing.profile.cep}`, editing.profile.admissionDate && `Admissão ${editing.profile.admissionDate}`].filter(Boolean).join(' · ')}</div> : null}<button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar colaborador'}</button></form></div><div className="card"><div className="section-heading"><div><h2>Equipe</h2><p className="small-muted">{employees.length} colaboradores cadastrados. Matrícula e jornada não são alteradas na importação cadastral.</p></div><button type="button" className="ghost-btn" disabled={enriching} onClick={() => void enrichFromPdf()}>{enriching ? 'Importando...' : 'Importar documentos e contatos (PDF)'}</button></div><input className="input" placeholder="Buscar por nome, matrícula, cargo, CPF ou telefone" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} /><div className="employee-list">{filteredEmployees.map((employee) => <div className="employee-row" key={employee.id}><div><strong>{employee.name}</strong><div className="small-muted">{formatProfileLine(employee)}</div></div><div className="row-actions"><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button><button className="ghost-btn" onClick={() => void toggleEmployee(employee)}>{employee.active ? 'Desativar' : 'Ativar'}</button></div></div>)}</div></div></section> : null}
-    {tab === 'shifts' ? <section className="card"><div className="section-heading"><div><h2>Turnos e jornada</h2><p className="small-muted">A jornada é configurada por colaborador e alimenta a conferência operacional.</p></div><div className="row-actions"><button className="ghost-btn" onClick={() => void applySchedulePatterns()} disabled={scheduleApplying}>{scheduleApplying ? 'Aplicando...' : 'Aplicar padrões de agosto'}</button><button className="ghost-btn" onClick={() => setTab('employees')}>Gerenciar colaboradores</button></div></div><div className="shift-table"><div className="shift-header"><span>Colaborador</span><span>Dias</span><span>Jornada</span><span>Status</span><span>Ação</span></div>{employees.map((employee) => <div className="shift-row" key={employee.id}><span><b>{employee.name}</b><small>{employee.employeeNumber || '—'}</small></span><span>{employee.workDays || 'Não definido'}</span><span>{employee.scheduleStart || '—'} às {employee.scheduleEnd || '—'}</span><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button></div>)}</div></section> : null}
+    {tab === 'employees' ? <section className="admin-two-col"><div className="card"><div className="section-heading"><div><h2>{editing ? 'Editar colaborador' : 'Novo colaborador'}</h2><p className="small-muted">Cadastre matrícula, função e dados de jornada.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div><form onSubmit={saveEmployee} className="admin-form">{[['name', 'Nome completo'], ['employeeNumber', 'Matrícula'], ['cpf', 'CPF'], ['jobTitle', 'Cargo'], ['workDays', 'Dias trabalhados'], ['scheduleStart', 'Início da jornada'], ['scheduleEnd', 'Fim da jornada']].map(([key, label]) => <label key={key} className="small-muted">{label}<input className="input" required={key === 'name' || key === 'employeeNumber'} value={form[key as keyof typeof form]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}{editing?.profile ? <div className="small-muted" style={{ marginTop: 8, lineHeight: 1.5 }}><strong>Dados cadastrais salvos</strong><br />{[editing.profile.phone && `Tel: ${editing.profile.phone}`, editing.profile.personalEmail && `E-mail: ${editing.profile.personalEmail}`, editing.profile.rg && `RG: ${editing.profile.rg}`, editing.profile.pis && `PIS: ${editing.profile.pis}`, editing.profile.address && `End.: ${editing.profile.address}`, editing.profile.city && `${editing.profile.city}/${editing.profile.uf || ''}`, editing.profile.cep && `CEP ${editing.profile.cep}`, editing.profile.admissionDate && `Admissão ${editing.profile.admissionDate}`].filter(Boolean).join(' · ')}</div> : null}<button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar colaborador'}</button></form></div><div className="card"><div className="section-heading"><div><h2>Equipe</h2><p className="small-muted">{employees.length} colaboradores cadastrados.</p></div><button type="button" className="ghost-btn" disabled={enriching} onClick={() => void enrichFromPdf()}>{enriching ? 'Importando...' : 'Importar documentos e contatos (PDF)'}</button></div><input className="input" placeholder="Buscar por nome, matrícula, cargo, CPF ou telefone" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} /><div className="employee-list">{filteredEmployees.map((employee) => <div className="employee-row" key={employee.id}><div><strong>{employee.name}</strong><div className="small-muted">{formatProfileLine(employee)}</div></div><div className="row-actions"><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button><button className="ghost-btn" onClick={() => void toggleEmployee(employee)}>{employee.active ? 'Desativar' : 'Ativar'}</button></div></div>)}</div></div></section> : null}
+    {tab === 'shifts' ? <section className="card"><div className="section-heading"><div><h2>Turnos e jornada</h2><p className="small-muted">A jornada é configurada por colaborador.</p></div><div className="row-actions"><button className="ghost-btn" onClick={() => void applySchedulePatterns()} disabled={scheduleApplying}>{scheduleApplying ? 'Aplicando...' : 'Aplicar padrões de agosto'}</button><button className="ghost-btn" onClick={() => setTab('employees')}>Gerenciar colaboradores</button></div></div><div className="shift-table"><div className="shift-header"><span>Colaborador</span><span>Dias</span><span>Jornada</span><span>Status</span><span>Ação</span></div>{employees.map((employee) => <div className="shift-row" key={employee.id}><span><b>{employee.name}</b><small>{employee.employeeNumber || '—'}</small></span><span>{employee.workDays || 'Não definido'}</span><span>{employee.scheduleStart || '—'} às {employee.scheduleEnd || '—'}</span><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button></div>)}</div></section> : null}
     {tab === 'punches' ? <PunchesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /> : null}
     {tab === 'timesheet' ? <FolhaPontoPanel employees={employees.filter((item) => item.active)} /> : null}
-    {tab === 'security' ? <section className="card"><div className="section-heading"><div><span className="eyebrow">CONTROLES DE SEGURANÇA</span><h2>Segurança e auditoria</h2><p className="small-muted">Eventos administrativos encadeados para conferência no preview local.</p></div><button className="ghost-btn" onClick={() => void loadAudit()}>Atualizar</button></div>{audit ? <><div className="report-summary"><div className="summary"><span className="small-muted">Integridade da cadeia</span><strong className={audit.chainValid ? 'status-pill ok' : 'status-pill off'}>{audit.chainValid ? 'Íntegra' : 'Revisar'}</strong></div><div className="summary"><span className="small-muted">Modo</span><strong>{audit.mode}</strong></div><div className="summary"><span className="small-muted">Eventos exibidos</span><strong>{audit.events.length}</strong></div></div><div className="employee-list">{audit.events.length ? audit.events.map(event => <div className="employee-row" key={event.id}><div><strong>{event.action}</strong><div className="small-muted">{event.resource || '—'} · {new Date(event.createdAt).toLocaleString('pt-BR')}</div></div><code className="audit-hash">{event.hash.slice(0, 16)}…</code></div>) : <p className="small-muted">Nenhum evento registrado nesta sessão.</p>}</div></> : <p className="small-muted">Carregando controles de segurança...</p>}</section> : null}
+    {tab === 'security' ? <section className="card"><div className="section-heading"><div><span className="eyebrow">CONTROLES DE SEGURANÇA</span><h2>Segurança e auditoria</h2></div><button className="ghost-btn" onClick={() => void loadAudit()}>Atualizar</button></div>{audit ? <><div className="report-summary"><div className="summary"><span className="small-muted">Integridade</span><strong className={audit.chainValid ? 'status-pill ok' : 'status-pill off'}>{audit.chainValid ? 'Íntegra' : 'Revisar'}</strong></div></div><div className="employee-list">{audit.events.map(event => <div className="employee-row" key={event.id}><div><strong>{event.action}</strong><div className="small-muted">{event.resource || '—'} · {new Date(event.createdAt).toLocaleString('pt-BR')}</div></div></div>)}</div></> : <p className="small-muted">Carregando...</p>}</section> : null}
     {tab === 'requests' ? <RequestsPanel /> : null}
     {tab === 'notifications' ? <NotificationsPanel /> : null}
     {tab === 'certificates' ? <CertificatesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber, cpf }) => ({ id, name, employeeNumber, cpf }))} /> : null}
-    {tab === 'issues' ? <section className="card"><div className="section-heading"><div><h2>Inconsistências e auditoria</h2><p className="small-muted">Pendências identificadas para revisão do gestor.</p></div><button className="ghost-btn" onClick={() => void loadIssues()}>Atualizar</button></div>{!issues.length ? <p className="small-muted">Nenhuma inconsistência aberta.</p> : <div className="employee-list">{issues.map((issue) => <div className="employee-row" key={issue.id}><div><strong>{issue.user.name} · {issue.type}</strong><div className="small-muted">{issue.description || 'Sem descrição'} · {new Date(issue.detectedAt).toLocaleString('pt-BR')}</div></div><button className="primary-btn compact-btn" onClick={() => void resolveIssue(issue.id)}>Resolver</button></div>)}</div>}</section> : null}
+    {tab === 'issues' ? <section>
+      <section className="card">
+        <div className="section-heading">
+          <div><h2>Inconsistências e auditoria</h2><p className="small-muted">Pendências identificadas para revisão do gestor.</p></div>
+          <button className="ghost-btn" onClick={() => void loadIssues()}>Atualizar</button>
+        </div>
+        {!issues.length ? <p className="small-muted">Nenhuma inconsistência aberta.</p> : <div className="employee-list">{issues.map((issue) => <div className="employee-row" key={issue.id}><div><strong>{issue.user.name} · {issue.type}</strong><div className="small-muted">{issue.description || 'Sem descrição'} · {new Date(issue.detectedAt).toLocaleString('pt-BR')}</div></div><button className="primary-btn compact-btn" onClick={() => void resolveIssue(issue.id)}>Resolver</button></div>)}</div>}
+      </section>
+      <CertificateConflictsPanel />
+    </section> : null}
   </>;
 }
