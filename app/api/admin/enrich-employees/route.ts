@@ -9,6 +9,15 @@ import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
+function normalizeName(value: string | null | undefined) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function requireManager() {
   const session = (await getServerSession(authOptions as any)) as any;
   const id = session?.user?.id as string | undefined;
@@ -24,6 +33,45 @@ async function loadBuiltinItems() {
   const raw = await readFile(filePath, 'utf8');
   const parsed = JSON.parse(raw);
   return Array.isArray(parsed) ? parsed : [];
+}
+
+async function findEmployee(item: any) {
+  const cpf = item?.cpf ? normalizeCpf(String(item.cpf)) : '';
+  if (cpf) {
+    const byCpf = await prisma.user.findFirst({
+      where: { role: 'EMPLOYEE', cpf },
+      select: { id: true, cpf: true, profileJson: true, name: true, employeeNumber: true },
+    });
+    if (byCpf) return byCpf;
+  }
+
+  const nameKey = normalizeName(item?.nameKey || item?.name);
+  if (nameKey) {
+    const candidates = await prisma.user.findMany({
+      where: { role: 'EMPLOYEE' },
+      select: { id: true, cpf: true, profileJson: true, name: true, employeeNumber: true },
+    });
+    const exact = candidates.find((c) => normalizeName(c.name) === nameKey);
+    if (exact) return exact;
+    const tokens = nameKey.split(' ').filter((t) => t.length > 2);
+    if (tokens.length >= 2) {
+      const soft = candidates.find((c) => {
+        const n = normalizeName(c.name);
+        return tokens.every((t) => n.includes(t));
+      });
+      if (soft) return soft;
+    }
+  }
+
+  const employeeNumber = String(item?.employeeNumber ?? '').replace(/\D/g, '').trim();
+  if (employeeNumber) {
+    return prisma.user.findFirst({
+      where: { role: 'EMPLOYEE', employeeNumber },
+      select: { id: true, cpf: true, profileJson: true, name: true, employeeNumber: true },
+    });
+  }
+
+  return null;
 }
 
 export async function POST(request: Request) {
@@ -47,21 +95,13 @@ export async function POST(request: Request) {
   let updated = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const matched: string[] = [];
 
   for (const item of items) {
-    const employeeNumber = String(item?.employeeNumber ?? '').replace(/\D/g, '').trim();
-    if (!employeeNumber) {
-      skipped += 1;
-      continue;
-    }
-
-    const existing = await prisma.user.findFirst({
-      where: { employeeNumber, role: 'EMPLOYEE' },
-      select: { id: true, cpf: true, profileJson: true },
-    });
+    const existing = await findEmployee(item);
     if (!existing) {
       skipped += 1;
-      errors.push(`Matrícula ${employeeNumber} não encontrada`);
+      errors.push(`Não encontrado: ${item?.name || item?.employeeNumber || item?.cpf || '?'}`);
       continue;
     }
 
@@ -88,9 +128,10 @@ export async function POST(request: Request) {
     try {
       await prisma.user.update({ where: { id: existing.id }, data });
       updated += 1;
+      matched.push(`${existing.employeeNumber || '—'} ${existing.name}`);
     } catch (err: any) {
       skipped += 1;
-      errors.push(`Falha em ${employeeNumber}: ${err?.code || err?.message || 'erro'}`);
+      errors.push(`Falha em ${existing.name}: ${err?.code || err?.message || 'erro'}`);
     }
   }
 
@@ -101,5 +142,11 @@ export async function POST(request: Request) {
     metadata: { updated, skipped },
   });
 
-  return NextResponse.json({ ok: true, updated, skipped, errors: errors.slice(0, 20) });
+  return NextResponse.json({
+    ok: true,
+    updated,
+    skipped,
+    matched: matched.slice(0, 40),
+    errors: errors.slice(0, 30),
+  });
 }
