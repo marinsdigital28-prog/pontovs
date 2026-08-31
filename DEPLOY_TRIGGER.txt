@@ -1,2 +1,3 @@
-deploy-2026-08-31-12:00-production
-Mesa Brasil + trabalho externo + fichas + conflitos atestado
+deploy-2026-08-31-folha-fix
+competencia-strict-SP
+ui-legivel
