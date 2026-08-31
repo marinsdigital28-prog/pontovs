@@ -1,0 +1,31 @@
+/* Layout reorganizado da Visão geral administrativa */
+.overview-layout{display:grid;gap:1.1rem}
+.overview-top{display:grid;gap:1rem}
+.overview-hero{min-height:0!important;max-height:none!important;overflow:visible}
+.overview-kpis .summary{margin:0}
+.overview-kpis .summary-ok strong{color:var(--success)}
+.overview-kpis .summary-warn strong{color:var(--warn)}
+.overview-kpis .summary-alert strong{color:var(--error)}
+.overview-main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.7fr);gap:1rem;align-items:start}
+.overview-presence{min-height:0!important;max-height:none!important;overflow:visible}
+.overview-side{display:grid;gap:1rem;align-content:start}
+.overview-alerts{min-height:0!important;max-height:none!important;overflow:visible;padding:1.1rem 1.2rem}
+.overview-alerts h3{margin:.35rem 0 .55rem;font-size:1.15rem}
+.overview-alerts .guide-row:first-of-type{border-top:0;padding-top:.35rem}
+.overview-alerts .guide-row b.guide-warn{background:var(--warn);color:#11241d}
+.overview-alerts .guide-row b.guide-ok{background:var(--success);color:#11241d}
+.overview-side-actions{display:grid;gap:.45rem;margin-top:.85rem}
+.overview-side-actions .ghost-btn{width:100%;text-align:center}
+.link-btn{border:0;background:transparent;color:var(--gold);font-weight:800;cursor:pointer;padding:0;text-decoration:underline;font:inherit}
+.presence-empty{margin-top:.75rem;text-align:center}
+.overview-analytics{min-width:0}
+.overview-side .health-card{min-height:0!important;max-height:none!important;overflow:visible}
+.overview-side .health-grid{grid-template-columns:1fr}
+@media(max-width:1000px){
+  .overview-main{grid-template-columns:1fr}
+  .overview-side{grid-template-columns:1fr 1fr}
+}
+@media(max-width:760px){
+  .overview-side{grid-template-columns:1fr}
+  .overview-hero{flex-direction:column;align-items:stretch}
+}
