@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
@@ -22,20 +22,18 @@ export type TimesheetCertificate = {
 };
 export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; status: string; reason: string };
 
-/** A4 HORIZONTAL (paisagem): largura > altura */
-const A4_WIDTH = 841.89;  // 297mm
-const A4_HEIGHT = 595.28; // 210mm
-const MARGIN_X = 16;
-const FOOTER_H = 48;
-const HEADER_H = 42;
+/** A4 retrato (como Apponte.me) — 1 página */
+const PAGE_W = 595.28; // 210mm
+const PAGE_H = 841.89; // 297mm
+const MX = 22;
 
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const weekdayShort = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-const APP_TIME_ZONE = 'America/Sao_Paulo';
+const APP_TZ = 'America/Sao_Paulo';
 
 function formatTime(value: Date) {
-  return value.toLocaleTimeString('pt-BR', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' });
+  return value.toLocaleTimeString('pt-BR', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit' });
 }
 function minutesFromClock(value: string | null | undefined) {
   const match = value?.match(/^(\d{1,2}):(\d{2})/);
@@ -45,15 +43,17 @@ function minutesBetween(start: Date, end: Date) {
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000));
 }
 function formatMinutes(value: number | null) {
-  if (value === null) return '—';
-  return `${String(Math.floor(Math.abs(value) / 60)).padStart(2, '0')}:${String(Math.abs(value) % 60).padStart(2, '0')}`;
+  if (value === null) return '00:00';
+  const abs = Math.abs(Math.round(value));
+  return `${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;
 }
 function formatSignedMinutes(value: number | null) {
-  if (value === null) return '—';
-  return `${value < 0 ? '-' : ''}${formatMinutes(Math.abs(value))}`;
+  if (value === null) return '00:00';
+  const sign = value < 0 ? '-' : value > 0 ? '+' : '';
+  return `${sign}${formatMinutes(Math.abs(value))}`;
 }
 function rowDayKey(value: Date) {
-  return value.toLocaleDateString('en-CA', { timeZone: APP_TIME_ZONE });
+  return value.toLocaleDateString('en-CA', { timeZone: APP_TZ });
 }
 function shortType(type: string) {
   return ({ ENTRADA: 'E', INTERVALO: 'I', RETORNO: 'R', SAIDA: 'S' } as Record<string, string>)[type] || type.slice(0, 1);
@@ -84,37 +84,48 @@ export async function createSignedTimesheetPdf({
 }) {
   const [year, monthNumber] = month.split('-').map(Number);
   const lastDay = new Date(year, monthNumber, 0).getDate();
+  const periodLabel = `01/${String(monthNumber).padStart(2, '0')}/${year} até ${String(lastDay).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year}`;
+  const emitted = new Date().toLocaleString('pt-BR', { timeZone: APP_TZ });
 
   const pdfDoc = await PDFDocument.create();
-  // OBRIGATÓRIO: A4 horizontal (paisagem) — largura 297mm, altura 210mm
-  const page = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+  const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const pageWidth = page.getWidth();
-  const pageHeight = page.getHeight();
-  const green = rgb(0.05, 0.35, 0.25);
-  const dark = rgb(0.08, 0.12, 0.1);
-  const muted = rgb(0.38, 0.42, 0.4);
-  const contentRight = pageWidth - MARGIN_X;
+  const dark = rgb(0.12, 0.14, 0.16);
+  const muted = rgb(0.35, 0.38, 0.4);
+  const line = rgb(0.7, 0.72, 0.74);
+  const headerBg = rgb(0.93, 0.94, 0.95);
+  const green = rgb(0.05, 0.4, 0.28);
+  const right = PAGE_W - MX;
 
-  // Cabeçalho
-  page.drawRectangle({ x: 0, y: pageHeight - HEADER_H, width: pageWidth, height: HEADER_H, color: green });
-  page.drawText('ESPAÇO PROGREDIR — FOLHA DE PONTO · A4 HORIZONTAL', {
-    x: MARGIN_X, y: pageHeight - 18, size: 11, font: bold, color: rgb(1, 1, 1),
+  // —— Cabeçalho estilo Apponte ——
+  page.drawText('Espaço Progredir  |  Relatório de Ponto do Colaborador', {
+    x: MX, y: PAGE_H - 28, size: 10, font: bold, color: dark,
   });
-  page.drawText('Estrada da Grama, 21 — Miguel Couto · Nova Iguaçu — RJ · CNPJ 05.553.848/0001-61',
-    { x: MARGIN_X, y: pageHeight - 30, size: 7, font: regular, color: rgb(0.9, 0.98, 0.94) });
-  page.drawText(
-    `Competência 01/${String(monthNumber).padStart(2, '0')}/${year} a ${String(lastDay).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year} · ${monthNames[monthNumber - 1].toUpperCase()} · 1 página paisagem`,
-    { x: MARGIN_X, y: pageHeight - 40, size: 7, font: regular, color: rgb(0.95, 0.9, 0.55) },
-  );
+  page.drawText(`Data de Emissão: ${emitted}  ·  Período: ${periodLabel}`, {
+    x: MX, y: PAGE_H - 40, size: 7, font: regular, color: muted,
+  });
+  page.drawLine({ start: { x: MX, y: PAGE_H - 46 }, end: { x: right, y: PAGE_H - 46 }, thickness: 0.6, color: line });
 
-  const nameY = pageHeight - HEADER_H - 11;
-  page.drawText(employee.name, { x: MARGIN_X, y: nameY, size: 9, font: bold, color: dark, maxWidth: 400 });
-  page.drawText(
-    `Mat. ${employee.employeeNumber || '—'} · CPF ${employee.cpf || '—'} · ${employee.jobTitle || '—'}`,
-    { x: MARGIN_X + 410, y: nameY, size: 7, font: regular, color: muted, maxWidth: 380 },
-  );
+  // Bloco empregado / cargo / empresa
+  const boxY = PAGE_H - 108;
+  page.drawText('Empregado', { x: MX, y: PAGE_H - 58, size: 7, font: bold, color: muted });
+  page.drawText(`Nome: ${employee.name}`, { x: MX, y: PAGE_H - 70, size: 8, font: bold, color: dark, maxWidth: 200 });
+  page.drawText(`Matrícula: ${employee.employeeNumber || '—'}`, { x: MX, y: PAGE_H - 82, size: 7.5, font: regular, color: dark });
+  page.drawText('Departamento: ADMINISTRATIVO', { x: MX, y: PAGE_H - 94, size: 7.5, font: regular, color: dark });
+
+  page.drawText('Cargo:', { x: 230, y: PAGE_H - 58, size: 7, font: bold, color: muted });
+  page.drawText(employee.jobTitle || '—', { x: 230, y: PAGE_H - 70, size: 8, font: bold, color: dark, maxWidth: 140 });
+  page.drawText(`CPF: ${employee.cpf || '—'}`, { x: 230, y: PAGE_H - 82, size: 7.5, font: regular, color: dark });
+  page.drawText('Data de Admissão: —', { x: 230, y: PAGE_H - 94, size: 7.5, font: regular, color: dark });
+
+  page.drawText('Empresa', { x: 400, y: PAGE_H - 58, size: 7, font: bold, color: muted });
+  page.drawText('Espaço Progredir', { x: 400, y: PAGE_H - 70, size: 8, font: bold, color: dark });
+  page.drawText('Estrada da Grama, 21 — Miguel Couto', { x: 400, y: PAGE_H - 82, size: 6.5, font: regular, color: dark, maxWidth: 170 });
+  page.drawText('Nova Iguaçu — RJ', { x: 400, y: PAGE_H - 92, size: 6.5, font: regular, color: dark });
+  page.drawText('CNPJ: 05.553.848/0001-61', { x: 400, y: PAGE_H - 102, size: 6.5, font: regular, color: dark });
+
+  page.drawLine({ start: { x: MX, y: boxY }, end: { x: right, y: boxY }, thickness: 0.6, color: line });
 
   const workDays = employee.workDays ? parseWorkDays(employee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
   const scheduleStart = minutesFromClock(employee.scheduleStart);
@@ -123,31 +134,42 @@ export async function createSignedTimesheetPdf({
   const lunch = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
-  const columns = [MARGIN_X, 56, 160, 355, 405, 452, 502, 565, contentRight];
-  const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Saldo', 'Sit.', 'Obs.'];
+  // Colunas no estilo Apponte
+  // Data | Horários | Marcações | H.Trab | H.Prev | H.T.C | Saldo | Banco | Descontos | Justificativa
+  const cols = [MX, 78, 148, 268, 308, 348, 388, 430, 478, 528, right];
+  const headers = ['Data Marcação', 'Horários', 'Marcações', 'H.Trab', 'H.Prev', 'H.T.C.', 'Saldo', 'Banco de Horas', 'Descontos', 'Justificativa'];
 
-  const tableTop = nameY - 12;
-  const tableBottom = FOOTER_H + 16;
-  const headerRowH = 10;
-  const rowHeight = Math.min(12, (tableTop - tableBottom - headerRowH) / lastDay);
-  const fontSize = rowHeight >= 11 ? 7 : rowHeight >= 10 ? 6.5 : 6;
+  const tableTop = boxY - 8;
+  const footerReserve = 95;
+  const headerH = 14;
+  const rowH = Math.min(18, (tableTop - footerReserve - headerH) / lastDay);
+  const fs = rowH >= 16 ? 7 : rowH >= 14 ? 6.5 : 6;
 
+  // Cabeçalho da tabela
+  page.drawRectangle({ x: MX, y: tableTop - headerH, width: right - MX, height: headerH, color: headerBg });
   headers.forEach((h, i) => {
-    page.drawText(h, { x: columns[i] + 2, y: tableTop - 7, size: 6.5, font: bold, color: green });
+    page.drawText(h, {
+      x: cols[i] + 2,
+      y: tableTop - 10,
+      size: 5.5,
+      font: bold,
+      color: dark,
+      maxWidth: cols[i + 1] - cols[i] - 3,
+    });
   });
-  page.drawLine({
-    start: { x: MARGIN_X, y: tableTop - headerRowH },
-    end: { x: contentRight, y: tableTop - headerRowH },
-    thickness: 0.8, color: green,
-  });
+  page.drawLine({ start: { x: MX, y: tableTop - headerH }, end: { x: right, y: tableTop - headerH }, thickness: 0.5, color: line });
 
   let totalWorked = 0;
   let totalExpected = 0;
+  let totalBalance = 0;
   let absences = 0;
+  let bank = 0;
 
   for (let index = 0; index < lastDay; index += 1) {
     const date = new Date(year, monthNumber - 1, index + 1, 12, 0, 0);
     const dateKey = `${year}-${String(monthNumber).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`;
+    const dateBr = `${String(index + 1).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year}`;
+
     const rawDayPunches = punches.filter((p) => rowDayKey(p.timestamp) === dateKey);
     const dayCerts = certificates.map((c) => ({
       userId: '', startDate: c.startDate, endDate: c.endDate,
@@ -163,6 +185,7 @@ export async function createSignedTimesheetPdf({
     const expected = scheduled ? expectedBase : null;
     const configuredWorkday = scheduled && expected !== null;
     const worked = workedMinutes(dayPunches);
+
     const certificate = certificates.find((item) => {
       if (item.status !== 'APROVADO' && item.status !== 'ATIVO') return false;
       return rowDayKey(item.startDate) <= dateKey && rowDayKey(item.endDate) >= dateKey;
@@ -174,6 +197,7 @@ export async function createSignedTimesheetPdf({
       : 0;
     const creditedWorked =
       worked === null ? (certificateMinutes > 0 ? certificateMinutes : null) : worked + certificateMinutes;
+
     if (creditedWorked !== null) totalWorked += creditedWorked;
     if (expected !== null) totalExpected += expected;
 
@@ -187,93 +211,120 @@ export async function createSignedTimesheetPdf({
     const absent = configuredWorkday && !dayPunches.length && !coveredByCertificate && approvedRequest?.type !== 'AUSENCIA';
     if (absent) absences += 1;
 
-    const y = tableTop - headerRowH - rowHeight * (index + 1) + 2.5;
+    const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
+    if (balance !== null) {
+      totalBalance += balance;
+      bank += balance;
+    }
+
+    const y = tableTop - headerH - rowH * (index + 1) + 3;
     if (index % 2 === 1) {
       page.drawRectangle({
-        x: MARGIN_X, y: y - 2, width: contentRight - MARGIN_X, height: rowHeight,
-        color: rgb(0.96, 0.98, 0.97),
+        x: MX, y: y - 2.5, width: right - MX, height: rowH,
+        color: rgb(0.97, 0.97, 0.98),
       });
     }
 
-    const schedule = !scheduled
-      ? 'Folga'
+    const horarios = !scheduled
+      ? ''
       : employee.scheduleStart && employee.scheduleEnd
-        ? `${employee.scheduleStart.slice(0, 5)}-${employee.scheduleEnd.slice(0, 5)}`
-        : '—';
+        ? `${employee.scheduleStart.slice(0, 5)} a ${employee.scheduleEnd.slice(0, 5)}  (01:00)`
+        : '';
     const marks = dayPunches.length
-      ? dayPunches.map((p) => `${formatTime(p.timestamp)}${shortType(p.type)}`).join(' ')
-      : '—';
-    const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
-    const sit = coveredByCertificate
-      ? 'ATEST.'
+      ? dayPunches.map((p) => `${formatTime(p.timestamp)}`).join(' ')
+      : '';
+    const htc = expected !== null ? formatMinutes(expected) : '00:00'; // horas a cumprir
+    const desconto = absent && expected ? formatMinutes(expected) : balance !== null && balance < 0 ? formatMinutes(Math.abs(balance)) : '';
+    const just = coveredByCertificate
+      ? 'ATESTADO'
       : approvedRequest
-        ? approvedRequest.type === 'AUSENCIA' ? 'AUS.' : 'TROCA'
-        : absent ? 'FALTA' : !scheduled ? 'FOLGA' : '';
-    const obs = coveredByCertificate && dayPunches.length
-      ? 'abono+ponto'
-      : approvedRequest ? String(approvedRequest.reason || '').slice(0, 16) : '';
+        ? approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA' : 'TROCA'
+        : absent ? 'FALTA' : '';
 
     const values = [
-      `${String(index + 1).padStart(2, '0')} ${weekdayShort[weekday]}`,
-      schedule,
+      `${dateBr} ${weekdayShort[weekday]}`,
+      horarios,
       marks,
       formatMinutes(creditedWorked),
       formatMinutes(expected),
-      balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`,
-      sit,
-      obs,
+      htc,
+      balance === null ? '00:00' : formatSignedMinutes(balance),
+      balance === null ? '00:00' : formatSignedMinutes(balance),
+      desconto,
+      just,
     ];
 
-    values.forEach((value, valueIndex) => {
-      page.drawText(String(value).slice(0, valueIndex === 2 ? 34 : 20), {
-        x: columns[valueIndex] + 2,
+    values.forEach((value, i) => {
+      page.drawText(String(value).slice(0, i === 2 ? 28 : 18), {
+        x: cols[i] + 2,
         y,
-        size: valueIndex === 2 ? Math.max(5.5, fontSize - 0.3) : fontSize,
-        font: valueIndex === 6 && (absent || coveredByCertificate) ? bold : regular,
-        color: valueIndex === 6 && absent
-          ? rgb(0.65, 0.12, 0.12)
-          : valueIndex === 6 && coveredByCertificate ? green : dark,
-        maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 4,
+        size: i === 2 ? Math.max(5.2, fs - 0.5) : fs,
+        font: regular,
+        color: dark,
+        maxWidth: cols[i + 1] - cols[i] - 3,
       });
+    });
+
+    page.drawLine({
+      start: { x: MX, y: y - 2.5 },
+      end: { x: right, y: y - 2.5 },
+      thickness: 0.25,
+      color: line,
     });
   }
 
-  const totalsY = FOOTER_H + 6;
-  page.drawLine({
-    start: { x: MARGIN_X, y: totalsY + 12 }, end: { x: contentRight, y: totalsY + 12 },
-    thickness: 1, color: green,
+  // Totais
+  const totY = footerReserve - 8;
+  page.drawLine({ start: { x: MX, y: totY + 28 }, end: { x: right, y: totY + 28 }, thickness: 0.8, color: dark });
+  page.drawText('Totais:', { x: cols[2] + 2, y: totY + 18, size: 7, font: bold, color: dark });
+  page.drawText(formatMinutes(totalWorked), { x: cols[3] + 2, y: totY + 18, size: 7, font: bold, color: dark });
+  page.drawText(formatMinutes(totalExpected), { x: cols[4] + 2, y: totY + 18, size: 7, font: bold, color: dark });
+  page.drawText(formatMinutes(totalExpected), { x: cols[5] + 2, y: totY + 18, size: 7, font: bold, color: dark });
+  page.drawText(formatSignedMinutes(totalBalance), { x: cols[6] + 2, y: totY + 18, size: 7, font: bold, color: dark });
+  page.drawText(formatSignedMinutes(bank), { x: cols[7] + 2, y: totY + 18, size: 7, font: bold, color: dark });
+
+  page.drawText(`Total H. Positivas: ${formatMinutes(Math.max(0, totalBalance))}`, {
+    x: MX, y: totY + 4, size: 7, font: regular, color: dark,
   });
-  page.drawText(`Trab. ${formatMinutes(totalWorked)}`, { x: MARGIN_X, y: totalsY + 3, size: 8, font: bold, color: dark });
-  page.drawText(`Prev. ${formatMinutes(totalExpected)}`, { x: 115, y: totalsY + 3, size: 8, font: bold, color: dark });
-  page.drawText(`Saldo ${formatSignedMinutes(totalWorked - totalExpected)}`, { x: 220, y: totalsY + 3, size: 8, font: bold, color: dark });
-  page.drawText(`Faltas ${absences}`, { x: 340, y: totalsY + 3, size: 8, font: bold, color: dark });
-  page.drawText('A4 horizontal (paisagem) · 1 página', {
-    x: 420, y: totalsY + 3, size: 7, font: regular, color: muted,
+  page.drawText(`Total H. Negativas: ${formatMinutes(Math.max(0, -totalBalance))}`, {
+    x: MX, y: totY - 8, size: 7, font: regular, color: dark,
   });
+  page.drawText(`Saldo de Horas: ${formatSignedMinutes(totalBalance)}`, {
+    x: MX, y: totY - 20, size: 7, font: bold, color: dark,
+  });
+  page.drawText(`Banco de Horas: ${formatSignedMinutes(bank)}`, {
+    x: 220, y: totY + 4, size: 7, font: regular, color: dark,
+  });
+  page.drawText(`Faltas: ${String(absences).padStart(2, '0')}:00`, {
+    x: 220, y: totY - 8, size: 7, font: regular, color: dark,
+  });
+  page.drawText('Atrasos: 00:00', { x: 220, y: totY - 20, size: 7, font: regular, color: dark });
+
+  page.drawText('Concordo com as marcações acima registradas', {
+    x: 400, y: totY + 4, size: 6.5, font: regular, color: muted, maxWidth: 160,
+  });
+
+  // Assinatura
+  page.drawLine({ start: { x: 400, y: 42 }, end: { x: right, y: 42 }, thickness: 0.6, color: muted });
+  page.drawText('Assinatura do Colaborador', { x: 400, y: 32, size: 6.5, font: regular, color: muted });
+  page.drawText(employee.name, { x: 400, y: 22, size: 6, font: regular, color: muted, maxWidth: 160 });
 
   page.drawRectangle({
-    x: MARGIN_X, y: 6, width: 290, height: 26,
-    color: rgb(0.95, 1, 0.96), borderColor: rgb(0.24, 0.61, 0.39), borderWidth: 0.6,
+    x: MX, y: 18, width: 250, height: 22,
+    color: rgb(0.94, 0.98, 0.95), borderColor: green, borderWidth: 0.5,
   });
   page.drawText('✓ Assinado digitalmente — ESPAÇO PROGREDIR', {
-    x: MARGIN_X + 5, y: 22, size: 7, font: bold, color: green,
+    x: MX + 4, y: 30, size: 6.5, font: bold, color: green,
   });
   page.drawText('Certificado A1 · ICP-Brasil · CNPJ 05.553.848/0001-61', {
-    x: MARGIN_X + 5, y: 12, size: 6, font: regular, color: muted,
+    x: MX + 4, y: 21, size: 5.5, font: regular, color: muted,
   });
-
-  page.drawText('ASSINATURA DO COLABORADOR', { x: 500, y: 26, size: 7, font: bold, color: green });
-  page.drawLine({ start: { x: 500, y: 16 }, end: { x: contentRight, y: 16 }, thickness: 0.7, color: muted });
-  page.drawText(employee.name, { x: 500, y: 8, size: 6.5, font: regular, color: muted, maxWidth: 300 });
-
-  // evita unused import se degrees não for usado
-  void degrees;
 
   pdflibAddPlaceholder({
     pdfDoc, pdfPage: page,
     reason: 'Assinatura institucional da Folha de Ponto',
     contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ',
-    signatureLength: 20000, widgetRect: [MARGIN_X, 6, MARGIN_X + 290, 32],
+    signatureLength: 20000, widgetRect: [MX, 18, MX + 250, 40],
   });
   const pdfWithPlaceholder = Buffer.from(await pdfDoc.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
