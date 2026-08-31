@@ -23,13 +23,12 @@ export type TimesheetCertificate = {
 export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; status: string; reason: string };
 
 /** A4 paisagem (modelo Espaço Progredir) — 1 página por colaborador */
-const PAGE_W = 841.89; // 297mm
-const PAGE_H = 595.28; // 210mm
+const PAGE_W = 841.89;
+const PAGE_H = 595.28;
 const MX = 18;
 const MY = 14;
 
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
-const weekdayShort = ['sáb', 'dom', 'seg', 'ter', 'qua', 'qui', 'sex']; // adjusted below by getDay
 const weekdayLabels = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const APP_TZ = 'America/Sao_Paulo';
 
@@ -72,16 +71,14 @@ function workedMinutes(punches: TimesheetPunch[]) {
   return ordered.length ? pairs.reduce((t, [a, b]) => t + minutesBetween(a, b), 0) : null;
 }
 
-export async function createSignedTimesheetPdf({
-  employee, punches, certificates = [], requests = [], month, certificate, password,
+async function buildTimesheetDocument({
+  employee, punches, certificates = [], requests = [], month,
 }: {
   employee: TimesheetEmployee;
   punches: TimesheetPunch[];
   certificates?: TimesheetCertificate[];
   requests?: TimesheetRequest[];
   month: string;
-  certificate: Buffer;
-  password: string;
 }) {
   const [year, monthNumber] = month.split('-').map(Number);
   const lastDay = new Date(year, monthNumber, 0).getDate();
@@ -99,25 +96,17 @@ export async function createSignedTimesheetPdf({
   const green = rgb(0.05, 0.4, 0.28);
   const right = PAGE_W - MX;
 
-  // —— Cabeçalho estilo Progredir (paisagem) ——
-  page.drawText('EP  ESPAÇO PROGREDIR', {
-    x: MX, y: PAGE_H - MY - 2, size: 9, font: bold, color: dark,
-  });
+  page.drawText('EP  ESPAÇO PROGREDIR', { x: MX, y: PAGE_H - MY - 2, size: 9, font: bold, color: dark });
   page.drawText('Estrada da Grama, 21 — Miguel Couto, Nova Iguaçu — RJ  ·  CNPJ 05.553.848/0001-61', {
     x: MX, y: PAGE_H - MY - 12, size: 6, font: regular, color: muted,
   });
   page.drawText('RELATÓRIO DE PONTO DO COLABORADOR', {
     x: PAGE_W / 2 - 95, y: PAGE_H - MY - 2, size: 9, font: bold, color: dark,
   });
-  page.drawText(`Período: ${periodLabel}`, {
-    x: right - 160, y: PAGE_H - MY - 2, size: 7, font: regular, color: muted,
-  });
-  page.drawText(`Emissão: ${emitted}`, {
-    x: right - 160, y: PAGE_H - MY - 12, size: 6, font: regular, color: muted,
-  });
+  page.drawText(`Período: ${periodLabel}`, { x: right - 160, y: PAGE_H - MY - 2, size: 7, font: regular, color: muted });
+  page.drawText(`Emissão: ${emitted}`, { x: right - 160, y: PAGE_H - MY - 12, size: 6, font: regular, color: muted });
   page.drawLine({ start: { x: MX, y: PAGE_H - MY - 18 }, end: { x: right, y: PAGE_H - MY - 18 }, thickness: 0.7, color: line });
 
-  // Dados do colaborador
   const infoY = PAGE_H - MY - 30;
   const jornada =
     employee.scheduleStart && employee.scheduleEnd
@@ -128,11 +117,9 @@ export async function createSignedTimesheetPdf({
   page.drawText(`Matrícula: ${employee.employeeNumber || '—'}`, { x: MX + 270, y: infoY, size: 7.5, font: regular, color: dark });
   page.drawText(`CPF: ${employee.cpf || '—'}`, { x: MX + 380, y: infoY, size: 7.5, font: regular, color: dark });
   page.drawText(`Cargo: ${employee.jobTitle || '—'}`, { x: MX + 500, y: infoY, size: 7.5, font: regular, color: dark, maxWidth: 140 });
-
-  page.drawText(`Departamento: ADMINISTRATIVO`, { x: MX, y: infoY - 11, size: 7, font: regular, color: dark });
-  page.drawText(`Unidade: Espaço Progredir`, { x: MX + 200, y: infoY - 11, size: 7, font: regular, color: dark });
+  page.drawText('Departamento: ADMINISTRATIVO', { x: MX, y: infoY - 11, size: 7, font: regular, color: dark });
+  page.drawText('Unidade: Espaço Progredir', { x: MX + 200, y: infoY - 11, size: 7, font: regular, color: dark });
   page.drawText(`Jornada: ${jornada}`, { x: MX + 380, y: infoY - 11, size: 7, font: regular, color: dark });
-
   page.drawLine({ start: { x: MX, y: infoY - 17 }, end: { x: right, y: infoY - 17 }, thickness: 0.5, color: line });
 
   const workDays = employee.workDays ? parseWorkDays(employee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
@@ -142,11 +129,8 @@ export async function createSignedTimesheetPdf({
   const lunch = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
-  // Colunas estilo Progredir (paisagem)
-  // Data | Horários | Marcações | H.Trab | H.Just | H.Prev | H.Falt | H.Exc | Saldo | Justificativa
   const cols = [MX, 70, 175, 400, 445, 490, 535, 580, 625, 680, right];
   const headers = ['Data', 'Horários', 'Marcações', 'H.Trab', 'H.Just', 'H.Prev', 'H.Falt', 'H.Exc', 'Saldo', 'Justificativa'];
-
   const tableTop = infoY - 22;
   const footerReserve = 72;
   const headerH = 12;
@@ -154,15 +138,10 @@ export async function createSignedTimesheetPdf({
   const rowH = Math.min(14.2, available / lastDay);
   const fs = rowH >= 13 ? 6.5 : rowH >= 11.5 ? 6 : 5.5;
 
-  // Cabeçalho da tabela
   page.drawRectangle({ x: MX, y: tableTop - headerH, width: right - MX, height: headerH, color: headerBg });
   headers.forEach((h, i) => {
     page.drawText(h, {
-      x: cols[i] + 2,
-      y: tableTop - 9,
-      size: 5.5,
-      font: bold,
-      color: dark,
+      x: cols[i] + 2, y: tableTop - 9, size: 5.5, font: bold, color: dark,
       maxWidth: cols[i + 1] - cols[i] - 3,
     });
   });
@@ -179,11 +158,9 @@ export async function createSignedTimesheetPdf({
     const date = new Date(year, monthNumber - 1, index + 1, 12, 0, 0);
     const dateKey = `${year}-${String(monthNumber).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`;
     const dateBr = `${String(index + 1).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}`;
-
     const rawDayPunches = punches.filter((p) => rowDayKey(p.timestamp) === dateKey);
     const dayCerts = certificates.map((c) => ({
-      userId: '', startDate: c.startDate, endDate: c.endDate,
-      startTime: c.startTime, endTime: c.endTime, status: c.status,
+      userId: '', startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status,
     }));
     const dayPunches = filterPunchesOutsideCertificates(
       rawDayPunches.map((p, i) => ({ id: String(i), userId: '', type: p.type, timestamp: p.timestamp, status: 'VALID' })),
@@ -214,14 +191,8 @@ export async function createSignedTimesheetPdf({
     );
 
     const justified =
-      certificateMinutes > 0
-        ? certificateMinutes
-        : approvedRequest?.type === 'AUSENCIA'
-          ? expected || 0
-          : 0;
-
-    const creditedWorked =
-      worked === null ? (justified > 0 ? justified : null) : worked + justified;
+      certificateMinutes > 0 ? certificateMinutes : approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0;
+    const creditedWorked = worked === null ? (justified > 0 ? justified : null) : worked + justified;
 
     if (creditedWorked !== null) totalWorked += creditedWorked;
     if (expected !== null) totalExpected += expected;
@@ -234,25 +205,17 @@ export async function createSignedTimesheetPdf({
     const firstPunch = dayPunches[0];
     const firstMins = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
     const late =
-      configuredWorkday &&
-      firstMins !== null &&
-      scheduleStart !== null &&
-      firstMins > scheduleStart + 5 &&
-      justified === 0;
+      configuredWorkday && firstMins !== null && scheduleStart !== null && firstMins > scheduleStart + 5 && justified === 0;
     if (late) lateCount += 1;
 
     const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
     if (balance !== null) totalBalance += balance;
-
     const missing = expected === null || creditedWorked === null ? null : Math.max(0, expected - creditedWorked);
     const surplus = expected === null || creditedWorked === null ? null : Math.max(0, creditedWorked - expected);
 
     const y = tableTop - headerH - rowH * (index + 1) + 3;
     if (index % 2 === 1) {
-      page.drawRectangle({
-        x: MX, y: y - 2.2, width: right - MX, height: rowH,
-        color: rgb(0.97, 0.97, 0.98),
-      });
+      page.drawRectangle({ x: MX, y: y - 2.2, width: right - MX, height: rowH, color: rgb(0.97, 0.97, 0.98) });
     }
 
     const horarios = !scheduled
@@ -260,25 +223,14 @@ export async function createSignedTimesheetPdf({
       : employee.scheduleStart && employee.scheduleEnd
         ? `${employee.scheduleStart.slice(0, 5)} às ${employee.scheduleEnd.slice(0, 5)}${lunch > 0 ? ' · 1h almoço' : ' · meio exp.'}`
         : '';
-
     const marks = dayPunches.length
-      ? dayPunches
-          .map((p) => `${formatTime(p.timestamp)} (${shortType(p.type)})`)
-          .join('  ')
+      ? dayPunches.map((p) => `${formatTime(p.timestamp)} (${shortType(p.type)})`).join('  ')
       : '—';
-
-    const just =
-      coveredByCertificate
-        ? 'ATESTADO'
-        : approvedRequest
-          ? approvedRequest.type === 'AUSENCIA'
-            ? 'AUSÊNCIA'
-            : 'TROCA'
-          : absent
-            ? 'FALTA'
-            : late
-              ? 'ATRASO'
-              : '';
+    const just = coveredByCertificate
+      ? 'ATESTADO'
+      : approvedRequest
+        ? approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA' : 'TROCA'
+        : absent ? 'FALTA' : late ? 'ATRASO' : '';
 
     const values = [
       `${dateBr} ${weekdayLabels[weekday]}`,
@@ -292,74 +244,49 @@ export async function createSignedTimesheetPdf({
       balance === null ? '00:00' : formatSignedMinutes(balance),
       just,
     ];
-
     values.forEach((value, i) => {
       const maxLen = i === 2 ? 42 : i === 1 ? 28 : 12;
       page.drawText(String(value).slice(0, maxLen), {
-        x: cols[i] + 2,
-        y,
-        size: i === 2 ? Math.max(5, fs - 0.5) : fs,
-        font: regular,
-        color: dark,
+        x: cols[i] + 2, y, size: i === 2 ? Math.max(5, fs - 0.5) : fs, font: regular, color: dark,
         maxWidth: cols[i + 1] - cols[i] - 3,
       });
     });
-
-    page.drawLine({
-      start: { x: MX, y: y - 2.2 },
-      end: { x: right, y: y - 2.2 },
-      thickness: 0.2,
-      color: line,
-    });
+    page.drawLine({ start: { x: MX, y: y - 2.2 }, end: { x: right, y: y - 2.2 }, thickness: 0.2, color: line });
   }
 
-  // Totais / rodapé
   const totY = footerReserve - 6;
   page.drawLine({ start: { x: MX, y: totY + 36 }, end: { x: right, y: totY + 36 }, thickness: 0.8, color: dark });
+  page.drawText(`Total H. Positivas: ${formatMinutes(Math.max(0, totalBalance))}`, { x: MX, y: totY + 24, size: 7, font: regular, color: dark });
+  page.drawText(`Total H. Negativas: ${formatMinutes(Math.max(0, -totalBalance))}`, { x: MX, y: totY + 13, size: 7, font: regular, color: dark });
+  page.drawText(`Saldo de Horas: ${formatSignedMinutes(totalBalance)}`, { x: MX, y: totY + 2, size: 7.5, font: bold, color: dark });
+  page.drawText(`Total trabalhado: ${formatMinutes(totalWorked)}`, { x: 220, y: totY + 24, size: 7, font: regular, color: dark });
+  page.drawText(`Total previsto: ${formatMinutes(totalExpected)}`, { x: 220, y: totY + 13, size: 7, font: regular, color: dark });
+  page.drawText(`Horas justificadas: ${formatMinutes(totalJustified)}`, { x: 220, y: totY + 2, size: 7, font: regular, color: dark });
+  page.drawText(`Faltas: ${absences}`, { x: 420, y: totY + 24, size: 7, font: regular, color: dark });
+  page.drawText(`Atrasos: ${lateCount}`, { x: 420, y: totY + 13, size: 7, font: regular, color: dark });
 
-  page.drawText(`Total H. Positivas: ${formatMinutes(Math.max(0, totalBalance))}`, {
-    x: MX, y: totY + 24, size: 7, font: regular, color: dark,
-  });
-  page.drawText(`Total H. Negativas: ${formatMinutes(Math.max(0, -totalBalance))}`, {
-    x: MX, y: totY + 13, size: 7, font: regular, color: dark,
-  });
-  page.drawText(`Saldo de Horas: ${formatSignedMinutes(totalBalance)}`, {
-    x: MX, y: totY + 2, size: 7.5, font: bold, color: dark,
-  });
-
-  page.drawText(`Total trabalhado: ${formatMinutes(totalWorked)}`, {
-    x: 220, y: totY + 24, size: 7, font: regular, color: dark,
-  });
-  page.drawText(`Total previsto: ${formatMinutes(totalExpected)}`, {
-    x: 220, y: totY + 13, size: 7, font: regular, color: dark,
-  });
-  page.drawText(`Horas justificadas: ${formatMinutes(totalJustified)}`, {
-    x: 220, y: totY + 2, size: 7, font: regular, color: dark,
-  });
-
-  page.drawText(`Faltas: ${absences}`, {
-    x: 420, y: totY + 24, size: 7, font: regular, color: dark,
-  });
-  page.drawText(`Atrasos: ${lateCount}`, {
-    x: 420, y: totY + 13, size: 7, font: regular, color: dark,
-  });
-
-  // Assinaturas
-  page.drawRectangle({
-    x: MX, y: 10, width: 230, height: 28,
-    color: rgb(0.94, 0.98, 0.95), borderColor: green, borderWidth: 0.5,
-  });
-  page.drawText('✓ Assinado digitalmente — ESPAÇO PROGREDIR', {
-    x: MX + 4, y: 28, size: 6.5, font: bold, color: green,
-  });
-  page.drawText('Certificado A1 · ICP-Brasil · CNPJ 05.553.848/0001-61', {
-    x: MX + 4, y: 17, size: 5.5, font: regular, color: muted,
-  });
-
+  page.drawRectangle({ x: MX, y: 10, width: 230, height: 28, color: rgb(0.94, 0.98, 0.95), borderColor: green, borderWidth: 0.5 });
+  page.drawText('✓ Assinado digitalmente — ESPAÇO PROGREDIR', { x: MX + 4, y: 28, size: 6.5, font: bold, color: green });
+  page.drawText('Certificado A1 · ICP-Brasil · CNPJ 05.553.848/0001-61', { x: MX + 4, y: 17, size: 5.5, font: regular, color: muted });
   page.drawLine({ start: { x: right - 200, y: 28 }, end: { x: right, y: 28 }, thickness: 0.6, color: muted });
   page.drawText('Assinatura do Colaborador', { x: right - 200, y: 18, size: 6.5, font: regular, color: muted });
   page.drawText(employee.name, { x: right - 200, y: 8, size: 6, font: regular, color: muted, maxWidth: 190 });
 
+  return { pdfDoc, page };
+}
+
+export async function createSignedTimesheetPdf({
+  employee, punches, certificates = [], requests = [], month, certificate, password,
+}: {
+  employee: TimesheetEmployee;
+  punches: TimesheetPunch[];
+  certificates?: TimesheetCertificate[];
+  requests?: TimesheetRequest[];
+  month: string;
+  certificate: Buffer;
+  password: string;
+}) {
+  const { pdfDoc, page } = await buildTimesheetDocument({ employee, punches, certificates, requests, month });
   pdflibAddPlaceholder({
     pdfDoc, pdfPage: page,
     reason: 'Assinatura institucional da Folha de Ponto',
@@ -367,6 +294,52 @@ export async function createSignedTimesheetPdf({
     signatureLength: 20000, widgetRect: [MX, 10, MX + 230, 38],
   });
   const pdfWithPlaceholder = Buffer.from(await pdfDoc.save());
+  const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
+  return Buffer.from(signedPdf);
+}
+
+/** Um PDF multipágina: 1 página A4 horizontal por colaborador (padrão Progredir). */
+export async function createSignedTimesheetPdfBatch({
+  items, month, certificate, password,
+}: {
+  items: Array<{
+    employee: TimesheetEmployee;
+    punches: TimesheetPunch[];
+    certificates?: TimesheetCertificate[];
+    requests?: TimesheetRequest[];
+  }>;
+  month: string;
+  certificate: Buffer;
+  password: string;
+}) {
+  if (!items.length) throw new Error('Nenhum colaborador para gerar folha');
+  if (items.length === 1) {
+    return createSignedTimesheetPdf({ ...items[0], month, certificate, password });
+  }
+
+  const merged = await PDFDocument.create();
+  let lastPage: ReturnType<PDFDocument['addPage']> | null = null;
+
+  for (const item of items) {
+    const { pdfDoc: single } = await buildTimesheetDocument({ ...item, month });
+    const bytes = await single.save();
+    const src = await PDFDocument.load(bytes);
+    const pages = await merged.copyPages(src, src.getPageIndices());
+    for (const p of pages) {
+      merged.addPage(p);
+      lastPage = p;
+    }
+  }
+
+  if (!lastPage) throw new Error('Falha ao montar PDF em lote');
+
+  pdflibAddPlaceholder({
+    pdfDoc: merged, pdfPage: lastPage,
+    reason: 'Assinatura institucional da Folha de Ponto (lote)',
+    contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ',
+    signatureLength: 20000, widgetRect: [MX, 10, MX + 230, 38],
+  });
+  const pdfWithPlaceholder = Buffer.from(await merged.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
   return Buffer.from(signedPdf);
 }
