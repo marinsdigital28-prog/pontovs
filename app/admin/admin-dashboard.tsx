@@ -17,7 +17,6 @@ type Issue = { id: string; type: string; status: string; description: string | n
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
 type PresenceEmployee = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; status: 'PRESENTE' | 'NAO_MARCOU' | 'PENDENTE' | 'SAIU' | 'FOLGA'; scheduled: boolean; latestPunch: { id: string; type: string; timestamp: string; status: string; hasPhoto: boolean } | null };
 
-
 const emptyForm = { name: '', employeeNumber: '', cpf: '', jobTitle: '', workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '18:00' };
 
 export default function AdminDashboard({ employees: initialEmployees, stats, degraded = false }: { employees: Employee[]; stats: { employeeCount: number; punchesToday: number; openInconsistencies: number }; degraded?: boolean }) {
@@ -55,11 +54,119 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const applySchedulePatterns = async () => { setScheduleApplying(true); setMessage(''); const response = await fetch('/api/admin/apply-schedule-patterns', { method: 'POST' }); const data = await response.json().catch(() => ({})); if (!response.ok) setMessage(data.error || 'Não foi possível aplicar os padrões.'); else { setMessage(`${data.updated || 0} jornadas atualizadas a partir das marcações de agosto.`); await loadEmployees(); } setScheduleApplying(false); };
   const resolveIssue = async (id: string) => { const response = await fetch('/api/admin/inconsistencies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'RESOLVED' }) }); if (response.ok) { setMessage('Inconsistência resolvida.'); await loadIssues(); } };
 
+  const statusLabel = (status: PresenceEmployee['status']) => {
+    if (status === 'PRESENTE') return 'Presente';
+    if (status === 'NAO_MARCOU') return 'Não marcou';
+    if (status === 'PENDENTE') return 'Revisar';
+    if (status === 'SAIU') return 'Saiu';
+    return 'Folga';
+  };
+
   return <>
     <nav className="admin-tabs" aria-label="Seções administrativas">{[['overview', 'Visão geral'], ['employees', 'Colaboradores'], ['shifts', 'Turnos e jornada'], ['punches', 'Registros de ponto'], ['timesheet', 'Folha de ponto'], ['issues', 'Inconsistências'], ['requests', 'Solicitações'], ['notifications', 'Notificações'], ['certificates', 'Atestados'], ['settings', 'Dados e documentos'], ['security', 'Segurança e auditoria']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
     {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível. A equipe carregada é uma cópia local e alterações administrativas ficarão pendentes até a conexão ser restaurada.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
-    {tab === 'overview' ? <section className="admin-grid"><div className="card admin-hero"><div><span className="eyebrow">OPERAÇÃO EM TEMPO REAL</span><h2>Operação de hoje</h2><p className="small-muted">Acompanhe a presença da equipe, as pendências e os próximos ajustes em um só lugar.</p></div><div className="row-actions overview-actions"><button className="primary-btn admin-action" onClick={() => setTab('punches')}>Ver marcações</button><button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Abrir folha</button><button className="ghost-btn admin-action" onClick={() => setTab('employees')}>Equipe</button></div></div><div className="stat-grid admin-stat-grid">{[['Colaboradores ativos', stats.employeeCount], ['Presentes agora', presenceCounts.PRESENTE], ['Não marcaram', presenceCounts.NAO_MARCOU], ['Pendências abertas', stats.openInconsistencies]].map(([label, value]) => <div className="summary" key={String(label)}><span className="small-muted">{label}</span><strong>{value}</strong></div>)}</div><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /><HealthCard /><div className="card admin-guide"><h3>Leitura rápida</h3><div className="guide-row"><b>!</b><span><strong>{presenceCounts.NAO_MARCOU}</strong> colaborador(es) ainda não registraram hoje dentro da escala.</span></div><div className="guide-row"><b>✓</b><span><strong>{presenceCounts.PRESENTE}</strong> presença(s) confirmada(s) no acompanhamento em tempo real.</span></div><div className="guide-row"><b>→</b><span>Use <strong>Registros de ponto</strong> para corrigir esquecimentos e <strong>Folha de ponto</strong> para revisar o mês.</span></div></div><div className="card presence-card"><div className="section-heading"><div><span className="eyebrow">ACOMPANHAMENTO DO DIA</span><h2>Quem está no trabalho agora</h2><p className="small-muted">{presenceUpdatedAt ? `Atualizado às ${presenceUpdatedAt.toLocaleTimeString('pt-BR')}` : 'Carregando presença real...'}</p></div><button type="button" className="ghost-btn" onClick={() => void loadPresence()}>Atualizar</button></div><div className="presence-summary"><button type="button" className={presenceFilter === 'TODOS' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('TODOS')}><strong>{presence.length}</strong><span>Todos</span></button><button type="button" className={presenceFilter === 'PRESENTE' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('PRESENTE')}><strong>{presenceCounts.PRESENTE}</strong><span>Presentes</span></button><button type="button" className={presenceFilter === 'NAO_MARCOU' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('NAO_MARCOU')}><strong>{presenceCounts.NAO_MARCOU}</strong><span>Não marcaram</span></button><button type="button" className={presenceFilter === 'PENDENTE' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('PENDENTE')}><strong>{presenceCounts.PENDENTE}</strong><span>Pendências</span></button></div><div className="presence-grid">{filteredPresence.map((employee) => <div className={`presence-person presence-${employee.status.toLowerCase()}`} key={employee.id}><div className="presence-avatar">{employee.latestPunch?.hasPhoto ? <img src={`/api/admin/punches/${employee.latestPunch.id}/photo`} alt={`Foto de ${employee.name}`} /> : <span>{employee.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>}<i aria-hidden="true" /></div><strong title={employee.name}>{employee.name}</strong><span>{employee.employeeNumber || 'Sem matrícula'}</span><small>{employee.status === 'PRESENTE' ? 'Presente' : employee.status === 'NAO_MARCOU' ? 'Não marcou' : employee.status === 'PENDENTE' ? 'Revisar' : employee.status === 'SAIU' ? 'Saiu' : 'Folga'}</small></div>)}</div>{!filteredPresence.length ? <p className="small-muted">Nenhum colaborador neste filtro.</p> : null}</div></section> : null}
+
+    {tab === 'overview' ? <section className="overview-layout">
+      {/* 1. Cabeçalho operacional + KPIs */}
+      <div className="overview-top">
+        <div className="card admin-hero overview-hero">
+          <div>
+            <span className="eyebrow">OPERAÇÃO EM TEMPO REAL</span>
+            <h2>Operação de hoje</h2>
+            <p className="small-muted">Presença da equipe, pendências e atalhos para o dia a dia.</p>
+          </div>
+          <div className="row-actions overview-actions">
+            <button className="primary-btn admin-action" onClick={() => setTab('punches')}>Ver marcações</button>
+            <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Abrir folha</button>
+            <button className="ghost-btn admin-action" onClick={() => setTab('employees')}>Equipe</button>
+          </div>
+        </div>
+        <div className="stat-grid admin-stat-grid overview-kpis">
+          <div className="summary"><span className="small-muted">Colaboradores ativos</span><strong>{stats.employeeCount}</strong></div>
+          <div className="summary summary-ok"><span className="small-muted">Presentes agora</span><strong>{presenceCounts.PRESENTE}</strong></div>
+          <div className="summary summary-warn"><span className="small-muted">Não marcaram</span><strong>{presenceCounts.NAO_MARCOU}</strong></div>
+          <div className="summary summary-alert"><span className="small-muted">Pendências abertas</span><strong>{stats.openInconsistencies}</strong></div>
+        </div>
+      </div>
+
+      {/* 2. Zona principal: presença + lateral de alertas/saúde */}
+      <div className="overview-main">
+        <div className="card presence-card overview-presence">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">ACOMPANHAMENTO DO DIA</span>
+              <h2>Quem está no trabalho agora</h2>
+              <p className="small-muted">{presenceUpdatedAt ? `Atualizado às ${presenceUpdatedAt.toLocaleTimeString('pt-BR')}` : 'Carregando presença real...'}</p>
+            </div>
+            <button type="button" className="ghost-btn" onClick={() => void loadPresence()}>Atualizar</button>
+          </div>
+          <div className="presence-summary">
+            <button type="button" className={presenceFilter === 'TODOS' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('TODOS')}><strong>{presence.length}</strong><span>Todos</span></button>
+            <button type="button" className={presenceFilter === 'PRESENTE' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('PRESENTE')}><strong>{presenceCounts.PRESENTE}</strong><span>Presentes</span></button>
+            <button type="button" className={presenceFilter === 'NAO_MARCOU' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('NAO_MARCOU')}><strong>{presenceCounts.NAO_MARCOU}</strong><span>Não marcaram</span></button>
+            <button type="button" className={presenceFilter === 'PENDENTE' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('PENDENTE')}><strong>{presenceCounts.PENDENTE}</strong><span>Pendências</span></button>
+            <button type="button" className={presenceFilter === 'SAIU' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('SAIU')}><strong>{presenceCounts.SAIU}</strong><span>Saiu</span></button>
+            <button type="button" className={presenceFilter === 'FOLGA' ? 'presence-filter active' : 'presence-filter'} onClick={() => setPresenceFilter('FOLGA')}><strong>{presenceCounts.FOLGA}</strong><span>Folga</span></button>
+          </div>
+          <div className="presence-grid">
+            {filteredPresence.map((employee) => (
+              <div className={`presence-person presence-${employee.status.toLowerCase()}`} key={employee.id}>
+                <div className="presence-avatar">
+                  {employee.latestPunch?.hasPhoto
+                    ? <img src={`/api/admin/punches/${employee.latestPunch.id}/photo`} alt={`Foto de ${employee.name}`} />
+                    : <span>{employee.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase()}</span>}
+                  <i aria-hidden="true" />
+                </div>
+                <strong title={employee.name}>{employee.name}</strong>
+                <span>{employee.employeeNumber || 'Sem matrícula'}</span>
+                <small>{statusLabel(employee.status)}</small>
+              </div>
+            ))}
+          </div>
+          {!filteredPresence.length ? <p className="small-muted presence-empty">Nenhum colaborador neste filtro.</p> : null}
+        </div>
+
+        <aside className="overview-side">
+          <div className="card admin-guide overview-alerts">
+            <span className="eyebrow">ATENÇÃO DO DIA</span>
+            <h3>O que priorizar</h3>
+            <div className="guide-row">
+              <b className={presenceCounts.NAO_MARCOU > 0 ? 'guide-warn' : ''}>!</b>
+              <span>
+                {presenceCounts.NAO_MARCOU > 0
+                  ? <><strong>{presenceCounts.NAO_MARCOU}</strong> ainda não registraram dentro da escala.</>
+                  : <>Ninguém pendente de marcação na escala de hoje.</>}
+              </span>
+            </div>
+            <div className="guide-row">
+              <b className="guide-ok">✓</b>
+              <span><strong>{presenceCounts.PRESENTE}</strong> presença(s) confirmada(s) em tempo real.</span>
+            </div>
+            <div className="guide-row">
+              <b>→</b>
+              <span>
+                {stats.openInconsistencies > 0
+                  ? <><strong>{stats.openInconsistencies}</strong> inconsistência(s) aberta(s). <button type="button" className="link-btn" onClick={() => setTab('issues')}>Revisar</button></>
+                  : <>Nenhuma inconsistência aberta no momento.</>}
+              </span>
+            </div>
+            <div className="overview-side-actions">
+              <button type="button" className="ghost-btn" onClick={() => setTab('punches')}>Corrigir marcações</button>
+              <button type="button" className="ghost-btn" onClick={() => setTab('timesheet')}>Conferir folha</button>
+              {stats.openInconsistencies > 0 ? <button type="button" className="ghost-btn" onClick={() => setTab('issues')}>Abrir pendências</button> : null}
+            </div>
+          </div>
+          <HealthCard />
+        </aside>
+      </div>
+
+      {/* 3. Análise mensal — bloco secundário */}
+      <div className="overview-analytics">
+        <AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} />
+      </div>
+    </section> : null}
+
     {tab === 'settings' ? <section className="admin-two-col"><CsvImporter /><PdfImporter /><SignatureSettings /></section> : null}
     {tab === 'employees' ? <section className="admin-two-col"><div className="card"><div className="section-heading"><div><h2>{editing ? 'Editar colaborador' : 'Novo colaborador'}</h2><p className="small-muted">Cadastre matrícula, função e dados de jornada.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div><form onSubmit={saveEmployee} className="admin-form">{[['name', 'Nome completo'], ['employeeNumber', 'Matrícula'], ['cpf', 'CPF'], ['jobTitle', 'Cargo'], ['workDays', 'Dias trabalhados'], ['scheduleStart', 'Início da jornada'], ['scheduleEnd', 'Fim da jornada']].map(([key, label]) => <label key={key} className="small-muted">{label}<input className="input" required={key === 'name' || key === 'employeeNumber'} value={form[key as keyof typeof form]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} /></label>)}<button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar colaborador'}</button></form></div><div className="card"><div className="section-heading"><div><h2>Equipe</h2><p className="small-muted">{employees.length} colaboradores cadastrados.</p></div></div><input className="input" placeholder="Buscar por nome, matrícula ou cargo" value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} /><div className="employee-list">{filteredEmployees.map((employee) => <div className="employee-row" key={employee.id}><div><strong>{employee.name}</strong><div className="small-muted">{employee.employeeNumber || 'Sem matrícula'} · {employee.jobTitle || 'Cargo não informado'}</div></div><div className="row-actions"><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button><button className="ghost-btn" onClick={() => void toggleEmployee(employee)}>{employee.active ? 'Desativar' : 'Ativar'}</button></div></div>)}</div></div></section> : null}
     {tab === 'shifts' ? <section className="card"><div className="section-heading"><div><h2>Turnos e jornada</h2><p className="small-muted">A jornada é configurada por colaborador e alimenta a conferência operacional.</p></div><div className="row-actions"><button className="ghost-btn" onClick={() => void applySchedulePatterns()} disabled={scheduleApplying}>{scheduleApplying ? 'Aplicando...' : 'Aplicar padrões de agosto'}</button><button className="ghost-btn" onClick={() => setTab('employees')}>Gerenciar colaboradores</button></div></div><div className="shift-table"><div className="shift-header"><span>Colaborador</span><span>Dias</span><span>Jornada</span><span>Status</span><span>Ação</span></div>{employees.map((employee) => <div className="shift-row" key={employee.id}><span><b>{employee.name}</b><small>{employee.employeeNumber || '—'}</small></span><span>{employee.workDays || 'Não definido'}</span><span>{employee.scheduleStart || '—'} às {employee.scheduleEnd || '—'}</span><span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span><button className="ghost-btn" onClick={() => startEdit(employee)}>Editar</button></div>)}</div></section> : null}
