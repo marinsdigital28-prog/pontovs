@@ -3,6 +3,7 @@ import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
+import { filterPunchesOutsideCertificates } from './certificate-conflicts';
 
 export type TimesheetEmployee = {
   name: string;
@@ -20,10 +21,8 @@ export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; s
 
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const monthNames = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-
 const APP_TIME_ZONE = 'America/Sao_Paulo';
 function formatTime(value: Date) { return value.toLocaleTimeString('pt-BR', { timeZone: APP_TIME_ZONE, hour: '2-digit', minute: '2-digit' }); }
-function formatDate(value: Date) { return value.toLocaleDateString('pt-BR', { timeZone: APP_TIME_ZONE }); }
 function minutesFromClock(value: string | null) { const match = value?.match(/^(\d{1,2}):(\d{2})/); return match ? Number(match[1]) * 60 + Number(match[2]) : null; }
 function certificateMinutesForDay(item: TimesheetCertificate, date: Date) { if (!item.hoursPerDayMinutes || item.startDate > date || item.endDate < date) return 0; return item.hoursPerDayMinutes; }
 function minutesBetween(start: Date, end: Date) { return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000)); }
@@ -78,8 +77,6 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
   page.drawText(`Jornada: ${employee.scheduleStart || '—'} às ${employee.scheduleEnd || '—'}`, { x: 490, y: metaY - 15, size: 9, font: regular, color: dark });
 
   const tableTop = metaY - 35;
-  // A4 horizontal: 842 x 595 pt. A linha de totais e as assinaturas ficam
-  // dentro da mesma página, sem criar uma segunda página no visualizador.
   const rowHeight = 11.5;
   const columns = [26, 76, 190, 495, 555, 615, 675, 735, 816];
   page.drawRectangle({ x: 26, y: tableTop - rowHeight + 2, width: 790, height: rowHeight, color: rgb(0.91, 0.95, 0.92) });
@@ -92,7 +89,21 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
   for (let index = 0; index < lastDay; index += 1) {
     const date = new Date(year, monthNumber - 1, index + 1, 12, 0, 0);
     const dateKey = date.toISOString().slice(0, 10);
-    const dayPunches = punches.filter((punch) => rowDayKey(punch.timestamp) === dateKey);
+    const rawDayPunches = punches.filter((punch) => rowDayKey(punch.timestamp) === dateKey);
+    const dayCerts = certificates
+      .filter((item) => item.status === 'APROVADO' || item.status === 'ATIVO')
+      .map((item) => ({
+        userId: '',
+        startDate: item.startDate,
+        endDate: item.endDate,
+        startTime: item.startTime,
+        endTime: item.endTime,
+        status: item.status,
+      }));
+    const dayPunches = filterPunchesOutsideCertificates(
+      rawDayPunches.map((p) => ({ ...p, userId: '' })),
+      dayCerts,
+    );
     const scheduled = isScheduledDay(workDays, weekdayCodes[date.getDay()]);
     const configuredWorkday = scheduled && expectedMinutes !== null;
     const worked = workedMinutes(dayPunches);
@@ -112,7 +123,7 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
     const marks = dayPunches.length ? dayPunches.map((punch) => `${formatTime(punch.timestamp)} ${punch.type}`).join(' · ') : '—';
     const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
     const certificateLabel = certificateMinutes > 0 ? `ATESTADO ${certificate?.startTime || ''}–${certificate?.endTime || ''}` : 'ATESTADO';
-    const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(creditedWorked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, coveredByCertificate ? certificateLabel : approvedRequest ? (approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA APROVADA' : 'TROCA APROVADA') : absent ? 'FALTA' : '', coveredByCertificate && dayPunches.length ? `${certificateLabel} + MARCAÇÃO EXISTENTE` : approvedRequest ? approvedRequest.reason : ''];
+    const values = [`${String(index + 1).padStart(2, '0')} ${['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][date.getDay()]}`, schedule, marks, formatMinutes(creditedWorked), formatMinutes(expected), balance === null ? '—' : `${balance < 0 ? '-' : ''}${formatMinutes(Math.abs(balance))}`, coveredByCertificate ? certificateLabel : approvedRequest ? (approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA APROVADA' : 'TROCA APROVADA') : absent ? 'FALTA' : '', coveredByCertificate && dayPunches.length ? `${certificateLabel} + PONTO FORA DO ATESTADO` : approvedRequest ? approvedRequest.reason : ''];
     values.forEach((value, valueIndex) => page.drawText(value, { x: columns[valueIndex] + 3, y, size: valueIndex === 2 ? 6.8 : 7.6, font: valueIndex === 6 ? bold : regular, color: valueIndex === 6 && absent ? rgb(0.65, 0.12, 0.12) : valueIndex === 6 && (coveredByCertificate || Boolean(approvedRequest)) ? green : dark, maxWidth: columns[valueIndex + 1] - columns[valueIndex] - 6, lineHeight: 7.6 }));
     page.drawLine({ start: { x: 26, y: y - 4 }, end: { x: 816, y: y - 4 }, thickness: 0.35, color: rgb(0.76, 0.82, 0.78) });
   }
@@ -124,7 +135,6 @@ export async function createSignedTimesheetPdf({ employee, punches, certificates
   page.drawText(`Saldo: ${formatSignedMinutes(totalWorked - totalExpected)}`, { x: 345, y: totalsY, size: 9, font: bold, color: dark });
   page.drawText(`Faltas: ${absences}`, { x: 470, y: totalsY, size: 9, font: bold, color: dark });
 
-  // Rodapé institucional: A1 à esquerda e assinatura manuscrita do colaborador à direita.
   page.drawRectangle({ x: 26, y: 18, width: 310, height: 34, color: rgb(0.95, 1, 0.96), borderColor: rgb(0.24, 0.61, 0.39), borderWidth: 0.8 });
   page.drawText('✓ Assinado digitalmente por ESPAÇO PROGREDIR', { x: 32, y: 42, size: 8.2, font: bold, color: green });
   page.drawText('Certificado digital A1 · CNPJ 05.553.848/0001-61', { x: 32, y: 31, size: 7.1, font: regular, color: green });
