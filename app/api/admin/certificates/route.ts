@@ -14,7 +14,7 @@ const bodySchema = z.object({
   userId: z.string().min(1),
   type: z.enum(certificateTypes).default('DIA_INTEGRAL'),
   startDate: z.string().regex(dateOnly),
-  endDate: z.string().regex(dateOnly),
+  endDate: z.string().regex(dateOnly).optional().nullable(),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().nullable(),
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional().nullable(),
   observation: z.string().max(2000).optional().nullable(),
@@ -51,17 +51,32 @@ export async function POST(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Dados do atestado inválidos.', details: parsed.error.flatten() }, { status: 400 });
   const input = parsed.data;
-  const startDate = day(input.startDate); const endDate = day(input.endDate);
+  const hourly = input.type === 'HORAS' || input.type === 'PERIODO_HORAS';
+  if (hourly && !input.startTime) return NextResponse.json({ error: 'Informe a hora inicial do atestado por horas.' }, { status: 400 });
+  if (hourly && !input.endTime) return NextResponse.json({ error: 'Informe a hora final do atestado por horas.' }, { status: 400 });
+  if (!hourly && !input.endDate) return NextResponse.json({ error: 'Informe a data final do atestado por dias.' }, { status: 400 });
+  const startDate = day(input.startDate); const endDate = day(hourly ? input.startDate : input.endDate!);
   if (endDate < startDate) return NextResponse.json({ error: 'A data final não pode ser anterior à data inicial.' }, { status: 400 });
-  const hoursPerDayMinutes = minutesBetween(input.startTime, input.endTime);
-  if (hoursPerDayMinutes === -1) return NextResponse.json({ error: 'Informe a hora inicial e a hora final do atestado.' }, { status: 400 });
+  const hoursPerDayMinutes = hourly ? minutesBetween(input.startTime, input.endTime) : null;
+  if (hoursPerDayMinutes === -1 || (hourly && hoursPerDayMinutes === null)) return NextResponse.json({ error: 'Informe a hora inicial e a hora final do atestado.' }, { status: 400 });
   if (hoursPerDayMinutes !== null && (hoursPerDayMinutes < 1 || hoursPerDayMinutes > 1_440)) return NextResponse.json({ error: 'O horário final deve ser posterior ao horário inicial.' }, { status: 400 });
   if (input.documentData && (!input.documentMime || !allowedMimes.has(input.documentMime))) return NextResponse.json({ error: 'Documento deve ser PDF, JPG, JPEG ou PNG.' }, { status: 400 });
   const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true, name: true, workDays: true } });
   if (!user) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
-  const overlap = await prisma.medicalCertificate.findFirst({ where: { userId: input.userId, status: { not: 'CANCELADO' }, startDate: { lte: endDate }, endDate: { gte: startDate } }, select: { id: true } });
-  if (overlap) return NextResponse.json({ error: 'Já existe um atestado cadastrado para parte deste período.' }, { status: 409 });
-  const created = await prisma.medicalCertificate.create({ data: { userId: input.userId, createdById: session.user.id, type: input.type, startDate, endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes: hoursPerDayMinutes === null ? null : hoursPerDayMinutes, daysCount: inclusiveDays(startDate, endDate), documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null, observation: input.observation || null, status: 'PENDENTE' }, select: { id: true, type: true, startDate: true, endDate: true, status: true, daysCount: true } });
+  const candidates = await prisma.medicalCertificate.findMany({ where: { userId: input.userId, status: { not: 'CANCELADO' }, startDate: { lte: endDate }, endDate: { gte: startDate } }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true } });
+  const startMinutes = minutesBetween(input.startTime, input.endTime) === null ? null : Number(input.startTime!.slice(0, 2)) * 60 + Number(input.startTime!.slice(3));
+  const endMinutes = minutesBetween(input.startTime, input.endTime) === null ? null : Number(input.endTime!.slice(0, 2)) * 60 + Number(input.endTime!.slice(3));
+  const overlap = candidates.find(item => {
+    const existingHourly = (item.type === 'HORAS' || item.type === 'PERIODO_HORAS') && item.startTime && item.endTime;
+    if (hourly && existingHourly && item.startDate.getTime() === startDate.getTime()) {
+      const existingStart = Number(item.startTime!.slice(0, 2)) * 60 + Number(item.startTime!.slice(3));
+      const existingEnd = Number(item.endTime!.slice(0, 2)) * 60 + Number(item.endTime!.slice(3));
+      return startMinutes! < existingEnd && endMinutes! > existingStart;
+    }
+    return true;
+  });
+  if (overlap) return NextResponse.json({ error: hourly ? 'Existe sobreposição com outro lançamento de atestado neste horário.' : 'Já existe um atestado cadastrado para parte deste período.' }, { status: 409 });
+  const created = await prisma.medicalCertificate.create({ data: { userId: input.userId, createdById: session.user.id, type: input.type, startDate, endDate, startTime: hourly ? input.startTime : null, endTime: hourly ? input.endTime : null, hoursPerDayMinutes: hourly ? hoursPerDayMinutes : null, daysCount: hourly ? 0 : inclusiveDays(startDate, endDate), documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null, observation: input.observation || null, status: 'PENDENTE' }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, status: true, daysCount: true } });
   await appendAuditEvent({ action: 'ATESTADO_CRIADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: created.id, metadata: { userId: input.userId, type: input.type, startDate: input.startDate, endDate: input.endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes, daysCount: created.daysCount, status: 'PENDENTE' } });
   return NextResponse.json({ certificate: created }, { status: 201 });
 }

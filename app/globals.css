@@ -659,3 +659,5 @@ button,input{font:inherit}
   .ponto-info-panel .clock .time{font-size:clamp(3rem,13vw,4.35rem);color:#f2f7f4}
   .ponto-register-card .camera-preview-minimal{width:min(94vw,520px);height:min(68dvh,520px)}
 }
+
+.certificate-help{margin:6px 0 12px;color:#496357;font-size:12px;line-height:1.45}.certificate-day-count strong{color:#075c3b}.certificate-row .hour-certificate{color:#075c3b;font-weight:700}
