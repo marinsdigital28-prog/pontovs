@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { normalizeCpf } from '@/lib/employee-validation';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
-import { EMPLOYEE_ENRICH_ITEMS } from '@/lib/employee-enrich-data';
+import { readFile } from 'fs/promises';
+import path from 'path';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,13 @@ async function requireManager() {
   });
 }
 
+async function loadBuiltinItems() {
+  const filePath = path.join(process.cwd(), 'imports', 'employees-enrich-only.json');
+  const raw = await readFile(filePath, 'utf8');
+  const parsed = JSON.parse(raw);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 export async function POST(request: Request) {
   const manager = await requireManager();
   if (!manager) return NextResponse.json({ error: 'Acesso restrito ao gestor' }, { status: 401 });
@@ -28,7 +36,11 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   let items: any[] | null = Array.isArray(body?.items) ? body.items : null;
   if ((!items || !items.length) && body?.fromBuiltin) {
-    items = EMPLOYEE_ENRICH_ITEMS as any[];
+    try {
+      items = await loadBuiltinItems();
+    } catch {
+      return NextResponse.json({ error: 'Arquivo de enriquecimento não encontrado no deploy.' }, { status: 500 });
+    }
   }
   if (!items?.length) return NextResponse.json({ error: 'Lista de enriquecimento vazia.' }, { status: 400 });
 
