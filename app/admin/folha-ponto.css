@@ -1,4 +1,4 @@
-/* Folha tela + impressão modelo Apponte (A4 retrato, 1 página) */
+/* Folha tela + impressão modelo Progredir (A4 paisagem, 1 página por colaborador) */
 
 .folha-ponto-root { overflow: visible; }
 
@@ -142,11 +142,11 @@
 .folha-pos { color: #087443 !important; font-weight: 800; }
 .folha-hint { margin-top: 1rem; font-size: 1rem; color: var(--muted, #8a9a90); }
 
-/* Impressão = 1 página A4 (retrato, como Apponte) */
+/* Impressão = A4 paisagem (modelo Progredir) — 1 página por colaborador, sem vazar */
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 8mm;
+    size: A4 landscape;
+    margin: 6mm;
   }
 
   html, body {
@@ -180,8 +180,8 @@
   button { display: none !important; }
 
   .folha-competence-banner {
-    margin: 0 0 3mm;
-    padding: 2mm 3mm;
+    margin: 0 0 2mm;
+    padding: 1.5mm 2.5mm;
     border-radius: 0;
     background: #eee !important;
     color: #000 !important;
@@ -191,7 +191,7 @@
 
   .folha-competence-banner strong,
   .folha-competence-banner span,
-  .folha-competence-banner b { color: #000 !important; font-size: 9pt; }
+  .folha-competence-banner b { color: #000 !important; font-size: 8pt; }
 
   .folha-block {
     margin: 0;
@@ -199,10 +199,15 @@
     border: none;
     background: transparent;
     page-break-inside: avoid;
+    page-break-after: always;
+  }
+
+  .folha-block:last-child {
+    page-break-after: auto;
   }
 
   .folha-table-scroll {
-    overflow: visible;
+    overflow: visible !important;
     border: 1px solid #333;
     border-radius: 0;
     background: #fff;
@@ -211,32 +216,70 @@
   .folha-table {
     min-width: 0 !important;
     width: 100% !important;
-    font-size: 7pt !important;
-    line-height: 1.15 !important;
+    table-layout: fixed;
+    font-size: 6.5pt !important;
+    line-height: 1.12 !important;
   }
 
   .folha-table thead th {
     position: static;
     background: #e8e8e8 !important;
     color: #000 !important;
-    font-size: 6.5pt !important;
-    padding: 1mm !important;
+    font-size: 6pt !important;
+    padding: 0.8mm 1mm !important;
     border-bottom: 1px solid #000;
+    white-space: nowrap;
   }
 
   .folha-table tbody td {
-    padding: 0.8mm 1mm !important;
-    font-size: 6.5pt !important;
-    border-bottom: 0.3pt solid #ccc;
+    padding: 0.55mm 0.8mm !important;
+    font-size: 6pt !important;
+    border-bottom: 0.25pt solid #ccc;
     color: #000 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .folha-table tfoot td {
-    padding: 1.2mm 1mm !important;
-    font-size: 7.5pt !important;
+    padding: 1mm !important;
+    font-size: 7pt !important;
     background: #f0f0f0 !important;
     color: #000 !important;
   }
 
-  .signature-area { margin-top: 3mm; page-break-inside: avoid; }
+  .folha-col-date b { font-size: 7pt; }
+  .folha-col-date span { font-size: 5.5pt; }
+  .folha-col-scale { font-size: 5.5pt; }
+  .folha-mark {
+    padding: 0.3mm 0.8mm;
+    font-size: 5.5pt;
+    margin: 0 1mm 0 0;
+    background: #e8e8e8 !important;
+  }
+
+  .signature-area {
+    margin-top: 2mm;
+    page-break-inside: avoid;
+    display: flex;
+    justify-content: space-between;
+    gap: 8mm;
+  }
+
+  .signature-block {
+    flex: 1;
+    max-width: 45%;
+  }
+
+  .institution-signature {
+    max-height: 18mm;
+    width: auto;
+  }
+
+  .signature-certificate-block strong,
+  .signature-certificate-block span,
+  .signature-line,
+  .signature-caption {
+    font-size: 6.5pt !important;
+    color: #000 !important;
+  }
 }
