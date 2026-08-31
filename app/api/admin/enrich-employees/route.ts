@@ -29,10 +29,16 @@ async function requireManager() {
 }
 
 async function loadBuiltinItems() {
-  const filePath = path.join(process.cwd(), 'imports', 'employees-enrich-only.json');
-  const raw = await readFile(filePath, 'utf8');
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed) ? parsed : [];
+  try {
+    const filePath = path.join(process.cwd(), 'imports', 'employees-enrich-only.json');
+    const raw = await readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length) return parsed;
+  } catch {
+    /* fallback embutido */
+  }
+  const { BUILTIN_ENRICH } = await import('@/lib/builtin-enrich');
+  return Array.isArray(BUILTIN_ENRICH) ? [...BUILTIN_ENRICH] : [];
 }
 
 async function findEmployee(item: any) {
