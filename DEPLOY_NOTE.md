@@ -1,8 +1,3 @@
-# Deploy
+# Deploy produção
 
-Trigger production deploy for ponto.marinsdistemas.xyz
-- Folha A4 horizontal (Progredir)
-- Imprimir todos
-- PDF de todos (lote)
-
-Commit ref: botões + batch PDF
+Redeploy 01/09/2026 — folha A4 horizontal, Imprimir todos, PDF de todos.
