@@ -34,7 +34,7 @@ describe('navegação da folha de ponto', () => {
     expect(punch).toContain('ponto-info-panel');
     expect(punch).toContain('ponto-input-panel');
     expect(punch).toContain('Digite seu número de matrícula');
-    expect(punch).toContain('Marcar + Foto');
+    expect(punch).toContain('Marcar ponto');
     expect(punch).toContain('MARCAÇÃO CONFIRMADA');
   });
 

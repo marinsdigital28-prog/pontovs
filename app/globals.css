@@ -661,3 +661,14 @@ button,input{font:inherit}
 }
 
 .certificate-help{margin:6px 0 12px;color:#496357;font-size:12px;line-height:1.45}.certificate-day-count strong{color:#075c3b}.certificate-row .hour-certificate{color:#075c3b;font-weight:700}
+
+/* Totem compacto definitivo para telefones: foco exclusivo na câmera e na ação. */
+@media(max-width:760px){
+  .ponto-register-card .ponto-info-panel{display:none}
+  .ponto-register-card .ponto-input-panel{padding:.7rem .6rem;min-height:calc(100dvh - 5.4rem);display:flex;align-items:center;justify-content:center}
+  .ponto-register-card .register-stage-minimal{width:100%;margin:0}
+  .ponto-register-card .camera-stage-minimal{gap:.75rem}
+  .ponto-register-card .camera-preview-large{width:min(92vw,420px);height:min(92vw,420px);max-height:calc(100dvh - 10.25rem);border-radius:18px}
+  .ponto-register-card .photo-action-btn{width:min(92vw,420px);min-height:3.25rem;font-size:1rem}
+  .ponto-register-card .minimal-status{max-width:92vw;font-size:.78rem}
+}
