@@ -69,6 +69,15 @@ model Punch {
   type            String
   timestamp       DateTime
   clientTimestamp DateTime?
+  syncedAt        DateTime?
+  syncStatus      String       @default("SYNCED")
+  syncAttempts    Int          @default(0)
+  syncError       String?
+  deviceId        String?
+  deviceOs        String?
+  appVersion      String?
+  connectivity    String?
+  locationCapturedAt DateTime?
   latitude        Float?
   longitude       Float?
   accuracy        Float?
@@ -84,6 +93,8 @@ model Punch {
   @@index([userId, timestamp])
   @@index([unitId, timestamp])
   @@index([status])
+  @@index([syncStatus])
+  @@index([syncedAt])
 }
 
 model PunchAudit {
