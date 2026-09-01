@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-import prisma from '../../../../../lib/prisma';
-import { appendAuditEvent } from '../../../../../lib/security-controls';
+import prisma from '../../../../lib/prisma';
+import { appendAuditEvent } from '../../../../lib/security-controls';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +100,6 @@ export async function POST() {
         select: { id: true, type: true, timestamp: true },
       });
 
-      // Soft-remove: rejeita as válidas do dia antes de recriar a partir do backup
       for (const punch of existing) {
         await tx.punch.update({
           where: { id: punch.id },
