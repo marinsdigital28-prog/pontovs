@@ -102,8 +102,8 @@ export default function Page() {
       setNextType(recognizedNextType);
       setStep('register');
       setStatusMsg(data.offlineFallback
-        ? 'Funcionário reconhecido em contingência. Preparando a câmera para salvar a saída neste aparelho.'
-        : `Funcionário reconhecido. Preparando a câmera para ${recognizedNextType}.`);
+        ? 'Funcionário reconhecido. Preparando a câmera para salvar a marcação neste aparelho.'
+        : 'Funcionário reconhecido. Preparando a câmera...');
     } catch (err: any) {
       setStatusMsg(err?.message || 'Matrícula inválida');
     } finally {
@@ -171,7 +171,7 @@ export default function Page() {
         const pending = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
         pending.push(payload);
         localStorage.setItem('offlinePunches', JSON.stringify(pending));
-        setStatusMsg('Saída salva neste aparelho e aguardando sincronização quando o banco for liberado.');
+        setStatusMsg('Marcação salva neste aparelho e aguardando sincronização quando o banco for liberado.');
         return;
       }
       if (/jornada.*encerrad|todas.*marcaç|todas.*batida/i.test(errorMessage)) {
@@ -277,7 +277,7 @@ export default function Page() {
   async function handlePhotoSelection() {
     setPhoto(null);
     setConfirmation(null);
-    setStatusMsg('Solicitando câmera frontal...');
+    setStatusMsg('Abrindo câmera...');
     if (!navigator.mediaDevices?.getUserMedia) {
       setStatusMsg('Este navegador não permite câmera interna. Abra o endereço em HTTPS no celular.');
       return;
@@ -286,7 +286,7 @@ export default function Page() {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' }, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
       setCameraOpen(true);
-      setStatusMsg('Câmera pronta. Posicione o rosto no quadrado e toque em Registrar ponto.');
+      setStatusMsg('Câmera pronta. Posicione o rosto e toque em Marcar ponto.');
     } catch {
       setStatusMsg('Permita o acesso à câmera frontal para continuar.');
     }
@@ -314,7 +314,7 @@ export default function Page() {
     const capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
     setPhoto(capturedPhoto);
     closeCamera();
-    setStatusMsg('Foto capturada. Confirmando marcação...');
+    setStatusMsg('Foto capturada. Registrando...');
     await handlePunch(capturedPhoto);
   }
 
