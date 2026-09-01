@@ -2,6 +2,18 @@
 
 import React, { useEffect, useState } from 'react';
 
+type PunchType = 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO';
+
+type TodayPunch = { id?: string; type: string; timestamp: string };
+
+const TYPE_LABELS: Record<string, string> = {
+  ENTRADA: 'Entrada',
+  INTERVALO: 'Intervalo',
+  RETORNO: 'Retorno',
+  SAIDA: 'Saída',
+  PENDENTE: 'Pendente',
+};
+
 export default function Page() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -9,7 +21,10 @@ export default function Page() {
   const [step, setStep] = useState<'lookup' | 'register'>('lookup');
   const [matricula, setMatricula] = useState('');
   const [employee, setEmployee] = useState<any>(null);
-  const [nextType, setNextType] = useState<'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null>('ENTRADA');
+  const [nextType, setNextType] = useState<PunchType | null>('ENTRADA');
+  const [allowedTypes, setAllowedTypes] = useState<PunchType[]>(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
+  const [suggestionReason, setSuggestionReason] = useState('');
+  const [todayPunches, setTodayPunches] = useState<TodayPunch[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{ type: string; timestamp: string; location?: { lat: number; lng: number } | null } | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -18,6 +33,7 @@ export default function Page() {
   const pendingClientIdRef = React.useRef<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [journeyClosed, setJourneyClosed] = useState(false);
+  const [awaitingTypeConfirm, setAwaitingTypeConfirm] = useState(false);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
 
@@ -40,11 +56,9 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
-    if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading) return;
-    // A câmera tenta abrir assim que a identificação termina. Se o navegador exigir
-    // gesto explícito ou negar a permissão, a tela mantém o botão manual como fallback.
+    if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading || awaitingTypeConfirm) return;
     void handlePhotoSelection();
-  }, [step, employee, cameraOpen, photo, confirmation, loading]);
+  }, [step, employee, cameraOpen, photo, confirmation, loading, awaitingTypeConfirm]);
 
   useEffect(() => {
     const value = matricula.replace(/\D/g, '').trim();
@@ -64,6 +78,7 @@ export default function Page() {
     setLoading(true);
     setStatusMsg(null);
     setJourneyClosed(false);
+    setAwaitingTypeConfirm(false);
     const normalizedEmployeeNumber = matricula.replace(/\D/g, '').padStart(4, '0');
     try {
       const r = await fetch('/api/identify', {
@@ -77,33 +92,49 @@ export default function Page() {
           closeCamera();
           setEmployee({ employeeNumber: normalizedEmployeeNumber, name: 'Colaborador', offline: true });
           setNextType('ENTRADA');
+          setAllowedTypes(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
+          setSuggestionReason('Banco indisponível — escolha o tipo e salve no aparelho.');
+          setTodayPunches([]);
           setStep('register');
           setStatusMsg('Banco indisponível. A câmera será aberta para salvar a marcação no aparelho e sincronizar depois.');
           return;
         }
         throw new Error(data.error || 'Matrícula não encontrada');
       }
-      const recognizedNextType = data.nextType as 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null;
-      if (!recognizedNextType) {
+
+      if (data.journeyClosed || !data.suggestedType && !data.nextType) {
         closeCamera();
         setEmployee(null);
         setNextType('ENTRADA');
+        setAllowedTypes(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
+        setTodayPunches(Array.isArray(data.todayPunches) ? data.todayPunches : []);
         setStep('lookup');
         setMatricula('');
         setPhoto(null);
         setConfirmation(null);
         autoLookupRef.current = '';
         setJourneyClosed(true);
-        setStatusMsg('Jornada encerrada — todas as marcações de hoje já foram registradas.');
+        setStatusMsg(data.suggestionReason || 'Jornada encerrada — todas as marcações de hoje já foram registradas.');
         window.setTimeout(() => setJourneyClosed(false), 4500);
         return;
       }
+
+      const suggested = (data.suggestedType || data.nextType) as PunchType;
+      const allowed = (Array.isArray(data.allowedTypes) && data.allowedTypes.length
+        ? data.allowedTypes
+        : [suggested]) as PunchType[];
+
       setEmployee(data);
-      setNextType(recognizedNextType);
+      setNextType(suggested);
+      setAllowedTypes(allowed);
+      setSuggestionReason(data.suggestionReason || '');
+      setTodayPunches(Array.isArray(data.todayPunches) ? data.todayPunches : []);
       setStep('register');
-      setStatusMsg(data.offlineFallback
-        ? 'Funcionário reconhecido em contingência. Preparando a câmera para salvar a saída neste aparelho.'
-        : `Funcionário reconhecido. Preparando a câmera para ${recognizedNextType}.`);
+      setStatusMsg(
+        data.offlineFallback
+          ? 'Funcionário reconhecido em contingência. Confirme o tipo e a foto.'
+          : `Reconhecido. Sugerido: ${TYPE_LABELS[suggested] || suggested}.`,
+      );
     } catch (err: any) {
       setStatusMsg(err?.message || 'Matrícula inválida');
     } finally {
@@ -111,7 +142,30 @@ export default function Page() {
     }
   }
 
-  function queueOfflinePunch(payload: { employeeNumber: string; clientTimestamp: string; clientId: string; photo: string | null }, reason: string) {
+  function selectType(type: PunchType) {
+    if (!nextType) {
+      setNextType(type);
+      setAwaitingTypeConfirm(false);
+      return;
+    }
+    if (type === nextType) {
+      setAwaitingTypeConfirm(false);
+      return;
+    }
+    setNextType(type);
+    setAwaitingTypeConfirm(true);
+    setStatusMsg(`Você escolheu ${TYPE_LABELS[type]}. Confirme abaixo para continuar.`);
+  }
+
+  function confirmSelectedType() {
+    setAwaitingTypeConfirm(false);
+    setStatusMsg(`Tipo confirmado: ${TYPE_LABELS[nextType || ''] || nextType}. Preparando câmera...`);
+  }
+
+  function queueOfflinePunch(
+    payload: { employeeNumber: string; clientTimestamp: string; clientId: string; photo: string | null; type?: string },
+    reason: string,
+  ) {
     const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
     offline.push(payload);
     localStorage.setItem('offlinePunches', JSON.stringify(offline));
@@ -123,17 +177,23 @@ export default function Page() {
   }
 
   async function handlePunch(photoOverride?: string | null) {
-    if (!employee) return;
+    if (!employee || !nextType) return;
     const payload = {
       employeeNumber: employee.employeeNumber,
       clientTimestamp: new Date().toISOString(),
-      clientId: pendingClientIdRef.current ?? (pendingClientIdRef.current = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+      clientId:
+        pendingClientIdRef.current ??
+        (pendingClientIdRef.current = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
       photo: photoOverride ?? photo ?? null,
+      type: nextType,
     };
     if (employee.offline || employee.offlineFallback || !navigator.onLine) {
-      queueOfflinePunch(payload, employee.offline || employee.offlineFallback
-        ? 'Marcação salva no aparelho — será sincronizada assim que o banco voltar.'
-        : 'Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente');
+      queueOfflinePunch(
+        payload,
+        employee.offline || employee.offlineFallback
+          ? 'Marcação salva no aparelho — será sincronizada assim que o banco voltar.'
+          : 'Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente',
+      );
       return;
     }
     setLoading(true);
@@ -150,20 +210,21 @@ export default function Page() {
         (apiError as any).code = json.code;
         throw apiError;
       }
-      setNextType(nextAfter(json.type));
       pendingClientIdRef.current = null;
       setConfirmation({
         type: json.type,
         timestamp: json.timestamp,
       });
       const receiptStatus = json.receiptEmail?.status;
-      setStatusMsg(receiptStatus === 'sent'
-        ? 'Ponto registrado. Comprovante enviado para seu email.'
-        : receiptStatus === 'not_configured'
-          ? 'Ponto registrado. Comprovante pendente de configuração do email.'
-          : receiptStatus === 'failed'
-            ? 'Ponto registrado. Não foi possível enviar o comprovante por email.'
-            : 'Ponto registrado e sincronizado. Preparando a próxima matrícula...');
+      setStatusMsg(
+        receiptStatus === 'sent'
+          ? 'Ponto registrado. Comprovante enviado para seu email.'
+          : receiptStatus === 'not_configured'
+            ? 'Ponto registrado. Comprovante pendente de configuração do email.'
+            : receiptStatus === 'failed'
+              ? 'Ponto registrado. Não foi possível enviar o comprovante por email.'
+              : 'Ponto registrado e sincronizado. Preparando a próxima matrícula...',
+      );
       window.setTimeout(() => resetForNextCollaborator(), 2200);
     } catch (err: any) {
       const errorMessage = err?.message || 'Não foi possível registrar a marcação. Tente novamente.';
@@ -171,7 +232,7 @@ export default function Page() {
         const pending = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
         pending.push(payload);
         localStorage.setItem('offlinePunches', JSON.stringify(pending));
-        setStatusMsg('Saída salva neste aparelho e aguardando sincronização quando o banco for liberado.');
+        setStatusMsg('Marcação salva neste aparelho e aguardando sincronização quando o banco for liberado.');
         return;
       }
       if (/jornada.*encerrad|todas.*marcaç|todas.*batida/i.test(errorMessage)) {
@@ -213,9 +274,11 @@ export default function Page() {
       const remaining: any[] = [];
       try {
         for (const p of pending) {
-          const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
-          // Um 409 pode representar concorrência ou jornada encerrada; não confirma que esta
-          // marcação foi persistida. Mantemos o item para não perder a evidência local.
+          const response = await fetch('/api/punch', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(p),
+          });
           if (!response.ok) remaining.push(p);
         }
         if (remaining.length > 0) localStorage.setItem('offlinePunches', JSON.stringify(remaining));
@@ -231,7 +294,9 @@ export default function Page() {
       }
     };
     void sync();
-    const retryTimer = window.setInterval(() => { if (navigator.onLine) void sync(); }, 60000);
+    const retryTimer = window.setInterval(() => {
+      if (navigator.onLine) void sync();
+    }, 60000);
     window.addEventListener('online', sync);
     return () => {
       window.clearInterval(retryTimer);
@@ -248,18 +313,16 @@ export default function Page() {
     setMatricula('');
     setEmployee(null);
     setNextType('ENTRADA');
+    setAllowedTypes(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
+    setSuggestionReason('');
+    setTodayPunches([]);
     setPhoto(null);
     setConfirmation(null);
     setStatusMsg(null);
     setJourneyClosed(false);
+    setAwaitingTypeConfirm(false);
     autoLookupRef.current = '';
     pendingClientIdRef.current = null;
-  }
-
-  function nextAfter(type: string): 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null {
-    const order = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'];
-    const index = order.indexOf(type);
-    return index >= 0 && index < order.length - 1 ? order[index + 1] as 'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' : null;
   }
 
   useEffect(() => {
@@ -284,9 +347,12 @@ export default function Page() {
     }
     try {
       streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' }, width: { ideal: 1920 }, height: { ideal: 1920 } }, audio: false });
+      streamRef.current = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'user' }, width: { ideal: 1920 }, height: { ideal: 1920 } },
+        audio: false,
+      });
       setCameraOpen(true);
-      setStatusMsg('Câmera pronta. Posicione o rosto no quadrado e toque em Registrar ponto.');
+      setStatusMsg(`Câmera pronta. Registrando como ${TYPE_LABELS[nextType || ''] || nextType}.`);
     } catch {
       setStatusMsg('Permita o acesso à câmera frontal para continuar.');
     }
@@ -318,103 +384,246 @@ export default function Page() {
     await handlePunch(capturedPhoto);
   }
 
+  function formatPunchTime(timestamp: string) {
+    try {
+      return new Date(timestamp).toLocaleTimeString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return '--:--';
+    }
+  }
+
+  const otherTypes = allowedTypes.filter((type) => type !== nextType);
+
   return (
     <main className="container ponto-kiosk-container">
       <div className="header-row">
         <div>
           <div className="header-brand">Ponto Progredir</div>
-          <div className="header-greeting">{employee ? `Bom dia, ${employee.name}` : 'Identificação do funcionário'}</div>
+          <div className="header-greeting">{employee ? `Olá, ${employee.name}` : 'Identificação do funcionário'}</div>
         </div>
         <div className="avatar" aria-hidden />
       </div>
 
       <div className={`card ponto-kiosk-card ${step === 'register' ? 'ponto-register-card' : 'ponto-lookup-card'}`}>
         <section className="ponto-info-panel">
-        <div className="clock">
-          <div className="time">{timeString}</div>
-          <div className="date">{dayString}</div>
-        </div>
-        <div className="ponto-info-divider" />
-        <div className="ponto-reference-hint">👆 <strong>Digite seu número de matrícula</strong></div>
-        <div className="ponto-info-meta">Ponto Eletrônico Homologado · Portaria 671 MTE</div>
+          <div className="clock">
+            <div className="time">{timeString}</div>
+            <div className="date">{dayString}</div>
+          </div>
+          <div className="ponto-info-divider" />
+          <div className="ponto-reference-hint">
+            👆 <strong>Digite seu número de matrícula</strong>
+          </div>
+          <div className="ponto-info-meta">Ponto Eletrônico Homologado · Portaria 671 MTE</div>
         </section>
         <section className="ponto-input-panel">
-
-        {step === 'lookup' && (
-          <div className="lookup-stage">
-            {journeyClosed && statusMsg && (
-              <div className="journey-closed-notice" role="status">
-                <strong>Jornada encerrada</strong>
-                <span>{statusMsg}</span>
+          {step === 'lookup' && (
+            <div className="lookup-stage">
+              {journeyClosed && statusMsg && (
+                <div className="journey-closed-notice" role="status">
+                  <strong>Jornada encerrada</strong>
+                  <span>{statusMsg}</span>
+                </div>
+              )}
+              <div className="small-muted" style={{ marginBottom: 10, fontWeight: 700 }}>
+                Digite sua matrícula
               </div>
-            )}
-            <div className="small-muted" style={{ marginBottom: 10, fontWeight: 700 }}>Digite sua matrícula</div>
-            <div className="matricula-shell">
-              <div className="matricula-label">MATRÍCULA</div>
-              <div className="matricula-display">{matricula || '—'}</div>
+              <div className="matricula-shell">
+                <div className="matricula-label">MATRÍCULA</div>
+                <div className="matricula-display">{matricula || '—'}</div>
+              </div>
+
+              <div className="keypad-grid">
+                {keypadNumbers.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="keypad-btn"
+                    onClick={() => appendDigit(key)}
+                    aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+
+              <button className="primary-btn" style={{ marginTop: 18 }} onClick={handleLookup} disabled={loading || !matricula.trim()}>
+                {loading ? 'Buscando...' : 'Continuar'}
+              </button>
+              {statusMsg && !journeyClosed && <div className="status-msg">{statusMsg}</div>}
             </div>
+          )}
 
-            <div className="keypad-grid">
-              {keypadNumbers.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="keypad-btn"
-                  onClick={() => appendDigit(key)}
-                  aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
-                >
-                  {key}
-                </button>
-              ))}
-            </div>
-
-            <button className="primary-btn" style={{ marginTop: 18 }} onClick={handleLookup} disabled={loading || !matricula.trim()}>
-              {loading ? 'Buscando...' : 'Continuar'}
-            </button>
-            {statusMsg && !journeyClosed && <div className="status-msg">{statusMsg}</div>}
-          </div>
-        )}
-
-        {step === 'register' && employee && (
-          <div className="register-stage register-stage-minimal">
-            {!confirmation ? (
-              <>
-                {cameraOpen ? (
-                  <div className="camera-stage camera-stage-minimal">
-                    <div className="camera-preview-large camera-preview-minimal">
-                      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+          {step === 'register' && employee && (
+            <div className="register-stage register-stage-minimal">
+              {!confirmation ? (
+                <>
+                  <div className="smart-punch-panel" style={{ marginBottom: 14 }}>
+                    <div className="small-muted" style={{ fontWeight: 700, marginBottom: 6 }}>
+                      {employee.employeeNumber} · {employee.name}
                     </div>
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void capturePhoto()} disabled={loading}>
-                      {loading ? 'Registrando...' : `Marcar + Foto (${nextType || 'PONTO'})`}
-                    </button>
-                  </div>
-                ) : photo ? (
-                  <div className="camera-stage camera-stage-minimal photo-retry-stage">
-                    <img src={photo} alt="Foto capturada" className="camera-preview-large camera-preview-minimal" />
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePunch(photo)} disabled={loading}>
-                      {loading ? 'Registrando...' : 'Tentar registrar novamente'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="camera-stage camera-stage-minimal">
-                    <div className="status-msg">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePhotoSelection()} disabled={loading}>Abrir câmera</button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="summary confirmation-summary confirmation-minimal" role="status" aria-live="polite">
-                <div className="confirmation-animation" aria-hidden="true"><span className="confirmation-ball"><span className="confirmation-check">✓</span></span></div>
-                <div className="confirmation-title">{confirmation.type === 'PENDENTE' ? 'MARCAÇÃO SALVA OFFLINE' : 'MARCAÇÃO CONFIRMADA'}</div>
-                <div className="confirmation-name">{employee.name}</div>
-                <div className="confirmation-type">{confirmation.type === 'PENDENTE' ? 'Aguardando sincronização' : `${confirmation.type} · ${new Date(confirmation.timestamp).toLocaleTimeString()}`}</div>
-                {photo && <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />}
-              </div>
-            )}
-            {statusMsg && !confirmation && <div className="status-msg minimal-status">{statusMsg}</div>}
-          </div>
-        )}
+                    {suggestionReason ? (
+                      <div className="status-msg" style={{ marginBottom: 10 }}>
+                        {suggestionReason}
+                      </div>
+                    ) : null}
 
+                    <div className="small-muted" style={{ marginBottom: 6, fontWeight: 700 }}>
+                      Recomendado agora
+                    </div>
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      style={{ width: '100%', marginBottom: 10 }}
+                      onClick={() => nextType && selectType(nextType)}
+                      disabled={!nextType}
+                    >
+                      {TYPE_LABELS[nextType || ''] || nextType || '—'}
+                    </button>
+
+                    {otherTypes.length > 0 && (
+                      <>
+                        <div className="small-muted" style={{ marginBottom: 6 }}>
+                          Outras opções
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                          {otherTypes.map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              className="ghost-btn"
+                              onClick={() => selectType(type)}
+                              style={{
+                                flex: '1 1 30%',
+                                minWidth: 90,
+                                fontWeight: nextType === type ? 800 : 600,
+                              }}
+                            >
+                              {TYPE_LABELS[type]}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {awaitingTypeConfirm && (
+                      <button type="button" className="primary-btn" style={{ width: '100%', marginBottom: 12 }} onClick={confirmSelectedType}>
+                        Confirmar {TYPE_LABELS[nextType || ''] || nextType}
+                      </button>
+                    )}
+
+                    <div className="small-muted" style={{ marginBottom: 6, fontWeight: 700 }}>
+                      Marcações de hoje
+                    </div>
+                    <div
+                      style={{
+                        border: '1px solid rgba(0,0,0,0.08)',
+                        borderRadius: 12,
+                        padding: '10px 12px',
+                        background: 'rgba(255,255,255,0.7)',
+                      }}
+                    >
+                      {todayPunches.length === 0 ? (
+                        <div className="small-muted">Nenhuma marcação ainda hoje.</div>
+                      ) : (
+                        todayPunches.map((punch, index) => (
+                          <div
+                            key={punch.id || `${punch.type}-${punch.timestamp}-${index}`}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              gap: 12,
+                              padding: '4px 0',
+                              borderTop: index ? '1px solid rgba(0,0,0,0.06)' : undefined,
+                              fontWeight: 600,
+                            }}
+                          >
+                            <span>{TYPE_LABELS[punch.type] || punch.type}</span>
+                            <span className="small-muted">{formatPunchTime(punch.timestamp)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {!awaitingTypeConfirm &&
+                    (cameraOpen ? (
+                      <div className="camera-stage camera-stage-minimal">
+                        <div className="camera-preview-large camera-preview-minimal">
+                          <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          className="primary-btn photo-action-btn"
+                          onClick={() => void capturePhoto()}
+                          disabled={loading}
+                        >
+                          {loading ? 'Registrando...' : `Marcar + Foto (${TYPE_LABELS[nextType || ''] || nextType || 'PONTO'})`}
+                        </button>
+                      </div>
+                    ) : photo ? (
+                      <div className="camera-stage camera-stage-minimal photo-retry-stage">
+                        <img src={photo} alt="Foto capturada" className="camera-preview-large camera-preview-minimal" />
+                        <button
+                          type="button"
+                          className="primary-btn photo-action-btn"
+                          onClick={() => void handlePunch(photo)}
+                          disabled={loading}
+                        >
+                          {loading ? 'Registrando...' : 'Tentar registrar novamente'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="camera-stage camera-stage-minimal">
+                        <div className="status-msg">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
+                        <button
+                          type="button"
+                          className="primary-btn photo-action-btn"
+                          onClick={() => void handlePhotoSelection()}
+                          disabled={loading}
+                        >
+                          Abrir câmera
+                        </button>
+                      </div>
+                    ))}
+                </>
+              ) : (
+                <div className="summary confirmation-summary confirmation-minimal" role="status" aria-live="polite">
+                  <div className="confirmation-animation" aria-hidden="true">
+                    <span className="confirmation-ball">
+                      <span className="confirmation-check">✓</span>
+                    </span>
+                  </div>
+                  <div className="confirmation-title">
+                    {confirmation.type === 'PENDENTE' ? 'MARCAÇÃO SALVA OFFLINE' : 'MARCAÇÃO CONFIRMADA'}
+                  </div>
+                  <div className="confirmation-name">{employee.name}</div>
+                  <div className="confirmation-type">
+                    {confirmation.type === 'PENDENTE'
+                      ? 'Aguardando sincronização'
+                      : `${TYPE_LABELS[confirmation.type] || confirmation.type} · ${new Date(confirmation.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`}
+                  </div>
+                  {photo && <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />}
+                </div>
+              )}
+              {statusMsg && !confirmation && <div className="status-msg minimal-status">{statusMsg}</div>}
+              {!confirmation && (
+                <button type="button" className="ghost-btn" style={{ marginTop: 12, width: '100%' }} onClick={resetForNextCollaborator}>
+                  Trocar matrícula
+                </button>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </main>

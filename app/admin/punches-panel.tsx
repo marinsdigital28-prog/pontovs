@@ -24,8 +24,39 @@ function formatTime(timestamp: string) { return timeFormatter.format(new Date(ti
 function formatDateTime(timestamp: string) { return dateTimeFormatter.format(new Date(timestamp)); }
 
 function localDateString(date = new Date()) {
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+/** ISO → datetime-local no fuso de Brasília (evita gravar 3h a mais/menos). */
+function toBrazilDatetimeLocal(iso: string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(new Date(iso));
+  const v = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const hour = v.hour === '24' ? '00' : v.hour;
+  return `${v.year}-${v.month}-${v.day}T${hour}:${v.minute}`;
+}
+
+/** datetime-local digitado como horário de Brasília → ISO com offset -03:00 */
+function fromBrazilDatetimeLocal(value: string) {
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) return null;
+  const withSeconds = text.length === 16 ? `${text}:00` : text;
+  const date = new Date(`${withSeconds}-03:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export default function PunchesPanel({ employees }: { employees: Employee[] }) {
@@ -75,7 +106,18 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
     }
   }, [from, to, employeeId, type, status]);
 
-  useEffect(() => { void load(); const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void load(); }, 10000); const onFocus = () => void load(); window.addEventListener('focus', onFocus); return () => { window.clearInterval(timer); window.removeEventListener('focus', onFocus); }; }, [load]);
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load();
+    }, 10000);
+    const onFocus = () => void load();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [load]);
 
   const counts = useMemo(() => records.reduce((summary, record) => {
     summary.total += 1;
@@ -97,16 +139,39 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
     if (!actionRecord || !actionMode || actionReason.trim().length < 5) return;
     setActionSaving(true);
     try {
-      const response = await fetch(`/api/admin/punches/${actionRecord.id}`, { method: actionMode === 'cancel' ? 'DELETE' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(actionMode === 'cancel' ? { reason: actionReason } : { type: actionType, timestamp: actionTimestamp, reason: actionReason }) });
+      const timestampIso = actionMode === 'edit' ? fromBrazilDatetimeLocal(actionTimestamp) : null;
+      if (actionMode === 'edit' && !timestampIso) throw new Error('Data e hora inválidas.');
+      const response = await fetch(`/api/admin/punches/${actionRecord.id}`, {
+        method: actionMode === 'cancel' ? 'DELETE' : 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          actionMode === 'cancel'
+            ? { reason: actionReason }
+            : { type: actionType, timestamp: timestampIso, reason: actionReason },
+        ),
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a ação.');
-      setActionRecord(null); setActionMode(null); setActionReason(''); await load();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível concluir a ação.'); }
-    finally { setActionSaving(false); }
+      setActionRecord(null);
+      setActionMode(null);
+      setActionReason('');
+      setMessage(actionMode === 'cancel' ? 'Marcação cancelada.' : 'Marcação atualizada com horário de Brasília.');
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível concluir a ação.');
+    } finally {
+      setActionSaving(false);
+    }
   }
 
   function openAction(record: RecordItem, mode: 'edit' | 'cancel') {
-    setActionRecord(record); setActionMode(mode); setActionType(record.type); setActionTimestamp(new Date(record.timestamp).toISOString().slice(0, 16)); setActionReason(''); setError('');
+    setActionRecord(record);
+    setActionMode(mode);
+    setActionType(record.type);
+    setActionTimestamp(toBrazilDatetimeLocal(record.timestamp));
+    setActionReason('');
+    setError('');
+    setMessage('');
   }
 
   async function submitManualPunch(event: React.FormEvent) {
@@ -118,7 +183,13 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
       const response = await fetch('/api/admin/punches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: manualEmployeeId, type: manualType, date: manualDate, time: manualTime, reason: manualReason }),
+        body: JSON.stringify({
+          userId: manualEmployeeId,
+          type: manualType,
+          date: manualDate,
+          time: manualTime,
+          reason: manualReason,
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Não foi possível lançar a marcação manual.');
@@ -136,29 +207,301 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
   return (
     <section className="card reports-panel">
       <div className="section-heading reports-heading">
-        <div><span className="eyebrow">RELATÓRIO OPERACIONAL</span><h2>Registros de ponto</h2><p className="small-muted">Consulte, confira evidências e exporte as marcações salvas no sistema.</p></div>
-        <div className="report-actions"><button type="button" className="primary-btn" onClick={() => setManualOpen((open) => !open)} disabled={degraded}>Lançar marcação manual</button><button type="button" className="ghost-btn" onClick={exportCsv} disabled={loading || !records.length || degraded}>Exportar CSV</button><button type="button" className="primary-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar'}</button></div>
+        <div>
+          <span className="eyebrow">RELATÓRIO OPERACIONAL</span>
+          <h2>Registros de ponto</h2>
+          <p className="small-muted">Consulte, confira evidências e exporte as marcações salvas no sistema.</p>
+        </div>
+        <div className="report-actions">
+          <button type="button" className="primary-btn" onClick={() => setManualOpen((open) => !open)} disabled={degraded}>
+            Lançar marcação manual
+          </button>
+          <button type="button" className="ghost-btn" onClick={exportCsv} disabled={loading || !records.length || degraded}>
+            Exportar CSV
+          </button>
+          <button type="button" className="primary-btn" onClick={() => void load()} disabled={loading}>
+            {loading ? 'Atualizando...' : 'Atualizar'}
+          </button>
+        </div>
       </div>
 
-      {degraded ? <div className="status-msg admin-toast" role="status">Modo recuperação: os registros abaixo vêm do backup local e estão somente para consulta. Edições, exclusões e lançamentos ficam bloqueados até o banco voltar.</div> : null}
-      {manualOpen ? <form className="punch-action-box manual-punch-box" onSubmit={(event) => void submitManualPunch(event)}><div><span className="eyebrow">AJUSTE AUDITADO</span><h3>Lançar marcação manual</h3><p className="small-muted">Use quando o colaborador esquecer uma batida. A marcação será identificada como ajuste manual.</p></div><div className="punch-action-fields"><label className="small-muted">Colaborador<select className="input" required value={manualEmployeeId} onChange={(event) => setManualEmployeeId(event.target.value)}><option value="">Selecione um colaborador</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeNumber || 'sem matrícula'} — {employee.name}</option>)}</select></label><label className="small-muted">Tipo<select className="input" value={manualType} onChange={(event) => setManualType(event.target.value)}><option value="ENTRADA">Entrada</option><option value="INTERVALO">Intervalo</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select></label><label className="small-muted">Data<input className="input" type="date" required value={manualDate} onChange={(event) => setManualDate(event.target.value)} /></label><label className="small-muted">Horário<input className="input" type="time" required value={manualTime} onChange={(event) => setManualTime(event.target.value)} /></label></div><label className="small-muted">Motivo obrigatório<textarea className="input" rows={3} minLength={5} required value={manualReason} onChange={(event) => setManualReason(event.target.value)} placeholder="Ex.: colaborador esqueceu de registrar a entrada" /></label><div className="row-actions"><button type="button" className="ghost-btn" onClick={() => setManualOpen(false)}>Cancelar</button><button type="submit" className="primary-btn" disabled={manualSaving || !manualEmployeeId || manualReason.trim().length < 5}>{manualSaving ? 'Registrando...' : 'Registrar marcação'}</button></div></form> : null}
+      {degraded ? (
+        <div className="status-msg admin-toast" role="status">
+          Modo recuperação: os registros abaixo vêm do backup local e estão somente para consulta. Edições, exclusões e lançamentos ficam bloqueados até o banco voltar.
+        </div>
+      ) : null}
+
+      {manualOpen ? (
+        <form className="punch-action-box manual-punch-box" onSubmit={(event) => void submitManualPunch(event)}>
+          <div>
+            <span className="eyebrow">AJUSTE AUDITADO</span>
+            <h3>Lançar marcação manual</h3>
+            <p className="small-muted">Use quando o colaborador esquecer uma batida. A marcação será identificada como ajuste manual.</p>
+          </div>
+          <div className="punch-action-fields">
+            <label className="small-muted">
+              Colaborador
+              <select className="input" required value={manualEmployeeId} onChange={(event) => setManualEmployeeId(event.target.value)}>
+                <option value="">Selecione um colaborador</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.employeeNumber || 'sem matrícula'} — {employee.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="small-muted">
+              Tipo
+              <select className="input" value={manualType} onChange={(event) => setManualType(event.target.value)}>
+                <option value="ENTRADA">Entrada</option>
+                <option value="INTERVALO">Intervalo</option>
+                <option value="RETORNO">Retorno</option>
+                <option value="SAIDA">Saída</option>
+              </select>
+            </label>
+            <label className="small-muted">
+              Data
+              <input className="input" type="date" required value={manualDate} onChange={(event) => setManualDate(event.target.value)} />
+            </label>
+            <label className="small-muted">
+              Horário
+              <input className="input" type="time" required value={manualTime} onChange={(event) => setManualTime(event.target.value)} />
+            </label>
+          </div>
+          <label className="small-muted">
+            Motivo obrigatório
+            <textarea
+              className="input"
+              rows={3}
+              minLength={5}
+              required
+              value={manualReason}
+              onChange={(event) => setManualReason(event.target.value)}
+              placeholder="Ex.: colaborador esqueceu de registrar a entrada"
+            />
+          </label>
+          <div className="row-actions">
+            <button type="button" className="ghost-btn" onClick={() => setManualOpen(false)}>
+              Cancelar
+            </button>
+            <button type="submit" className="primary-btn" disabled={manualSaving || !manualEmployeeId || manualReason.trim().length < 5}>
+              {manualSaving ? 'Registrando...' : 'Registrar marcação'}
+            </button>
+          </div>
+        </form>
+      ) : null}
 
       <div className="report-filters">
-        <label className="small-muted">Data inicial<input className="input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
-        <label className="small-muted">Data final<input className="input" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
-        <label className="small-muted">Colaborador<select className="input" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}><option value="">Todos os colaboradores</option>{employees.map((employee) => <option key={employee.id} value={employee.id}>{employee.employeeNumber || 'sem matrícula'} — {employee.name}</option>)}</select></label>
-        <label className="small-muted">Tipo<select className="input" value={type} onChange={(event) => setType(event.target.value)}><option value="ALL">Todos os tipos</option><option value="ENTRADA">Entrada</option><option value="INTERVALO">Intervalo</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select></label>
-        <label className="small-muted">Status<select className="input" value={status} onChange={(event) => setStatus(event.target.value)}><option value="VALID">Válidos</option><option value="ALL">Todos</option><option value="REJECTED">Rejeitados</option><option value="PENDING">Pendentes</option></select></label>
+        <label className="small-muted">
+          Data inicial
+          <input className="input" type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
+        </label>
+        <label className="small-muted">
+          Data final
+          <input className="input" type="date" value={to} onChange={(event) => setTo(event.target.value)} />
+        </label>
+        <label className="small-muted">
+          Colaborador
+          <select className="input" value={employeeId} onChange={(event) => setEmployeeId(event.target.value)}>
+            <option value="">Todos os colaboradores</option>
+            {employees.map((employee) => (
+              <option key={employee.id} value={employee.id}>
+                {employee.employeeNumber || 'sem matrícula'} — {employee.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="small-muted">
+          Tipo
+          <select className="input" value={type} onChange={(event) => setType(event.target.value)}>
+            <option value="ALL">Todos os tipos</option>
+            <option value="ENTRADA">Entrada</option>
+            <option value="INTERVALO">Intervalo</option>
+            <option value="RETORNO">Retorno</option>
+            <option value="SAIDA">Saída</option>
+          </select>
+        </label>
+        <label className="small-muted">
+          Status
+          <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="VALID">Válidos</option>
+            <option value="ALL">Todos</option>
+            <option value="REJECTED">Rejeitados</option>
+            <option value="PENDING">Pendentes</option>
+          </select>
+        </label>
       </div>
 
-      <div className="report-summary"><div className="summary"><span className="small-muted">Registros encontrados</span><strong>{counts.total}</strong></div><div className="summary"><span className="small-muted">Entradas</span><strong>{counts.entries}</strong></div><div className="summary"><span className="small-muted">Saídas</span><strong>{counts.exits}</strong></div><div className="summary"><span className="small-muted">Com foto</span><strong>{counts.photos}</strong></div></div>
+      <div className="report-summary">
+        <div className="summary">
+          <span className="small-muted">Registros encontrados</span>
+          <strong>{counts.total}</strong>
+        </div>
+        <div className="summary">
+          <span className="small-muted">Entradas</span>
+          <strong>{counts.entries}</strong>
+        </div>
+        <div className="summary">
+          <span className="small-muted">Saídas</span>
+          <strong>{counts.exits}</strong>
+        </div>
+        <div className="summary">
+          <span className="small-muted">Com foto</span>
+          <strong>{counts.photos}</strong>
+        </div>
+      </div>
       {lastUpdated ? <div className="report-updated">Atualizado às {lastUpdated.toLocaleTimeString('pt-BR')}</div> : null}
-      {actionRecord && actionMode ? <form className="punch-action-box" onSubmit={submitAction}><div><span className="eyebrow">TRATAMENTO AUDITADO</span><h3>{actionMode === 'cancel' ? 'Cancelar marcação' : 'Editar marcação'}</h3><p className="small-muted">{actionRecord.user.name} · {formatDateTime(actionRecord.timestamp)}</p></div>{actionMode === 'edit' ? <div className="punch-action-fields"><label className="small-muted">Tipo<select className="input" value={actionType} onChange={(event) => setActionType(event.target.value)}><option value="ENTRADA">Entrada</option><option value="INTERVALO">Intervalo</option><option value="RETORNO">Retorno</option><option value="SAIDA">Saída</option></select></label><label className="small-muted">Data e hora<input className="input" type="datetime-local" value={actionTimestamp} onChange={(event) => setActionTimestamp(event.target.value)} /></label></div> : <div className="status-msg">O registro original será preservado e ficará com status “Rejeitado”.</div>}<label className="small-muted">Motivo obrigatório<textarea className="input" rows={3} minLength={5} required value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="Descreva o motivo do tratamento" /></label><div className="row-actions"><button type="button" className="ghost-btn" onClick={() => { setActionRecord(null); setActionMode(null); }}>Voltar</button><button type="submit" className={actionMode === 'cancel' ? 'danger-btn' : 'primary-btn'} disabled={actionSaving || actionReason.trim().length < 5}>{actionSaving ? 'Salvando...' : actionMode === 'cancel' ? 'Confirmar cancelamento' : 'Salvar edição'}</button></div></form> : null}
+
+      {actionRecord && actionMode ? (
+        <form className="punch-action-box" onSubmit={submitAction}>
+          <div>
+            <span className="eyebrow">TRATAMENTO AUDITADO</span>
+            <h3>{actionMode === 'cancel' ? 'Cancelar marcação' : 'Editar marcação'}</h3>
+            <p className="small-muted">
+              {actionRecord.user.name} · {formatDateTime(actionRecord.timestamp)}
+            </p>
+          </div>
+          {actionMode === 'edit' ? (
+            <div className="punch-action-fields">
+              <label className="small-muted">
+                Tipo
+                <select className="input" value={actionType} onChange={(event) => setActionType(event.target.value)}>
+                  <option value="ENTRADA">Entrada</option>
+                  <option value="INTERVALO">Intervalo</option>
+                  <option value="RETORNO">Retorno</option>
+                  <option value="SAIDA">Saída</option>
+                </select>
+              </label>
+              <label className="small-muted">
+                Data e hora (Brasília)
+                <input
+                  className="input"
+                  type="datetime-local"
+                  value={actionTimestamp}
+                  onChange={(event) => setActionTimestamp(event.target.value)}
+                />
+              </label>
+            </div>
+          ) : (
+            <div className="status-msg">O registro original será preservado e ficará com status “Rejeitado”.</div>
+          )}
+          <label className="small-muted">
+            Motivo obrigatório
+            <textarea
+              className="input"
+              rows={3}
+              minLength={5}
+              required
+              value={actionReason}
+              onChange={(event) => setActionReason(event.target.value)}
+              placeholder="Descreva o motivo do tratamento"
+            />
+          </label>
+          <div className="row-actions">
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => {
+                setActionRecord(null);
+                setActionMode(null);
+              }}
+            >
+              Voltar
+            </button>
+            <button
+              type="submit"
+              className={actionMode === 'cancel' ? 'danger-btn' : 'primary-btn'}
+              disabled={actionSaving || actionReason.trim().length < 5}
+            >
+              {actionSaving ? 'Salvando...' : actionMode === 'cancel' ? 'Confirmar cancelamento' : 'Salvar edição'}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
       {message ? <div className="status-msg admin-toast">{message}</div> : null}
       {error ? <div className="status-msg" style={{ marginTop: 14 }}>{error}</div> : null}
       {loading ? <p className="small-muted" style={{ marginTop: 16 }}>Buscando registros...</p> : null}
-      {!loading && !records.length ? <div className="report-empty"><strong>Nenhum registro encontrado</strong><span>Ajuste o período ou os filtros para consultar outras marcações.</span></div> : null}
-      {records.length ? <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Data e hora</th><th>Colaborador</th><th>Tipo</th><th>Status</th><th>Origem</th><th>Evidência</th><th>Ações</th></tr></thead><tbody>{records.map((record) => <tr key={record.id}><td><strong>{formatDate(record.timestamp)}</strong><div className="small-muted">{formatTime(record.timestamp)}</div></td><td><strong>{record.user.name}</strong><div className="small-muted">{record.user.employeeNumber || 'Sem matrícula'}{record.user.jobTitle ? ` · ${record.user.jobTitle}` : ''}</div></td><td><span className={`type-badge type-${record.type.toLowerCase()}`}>{typeLabels[record.type] || record.type}</span></td><td><span className={`status-pill ${record.status === 'VALID' ? 'ok' : 'off'}`}>{statusLabels[record.status] || record.status}</span></td><td>{record.origin || 'WEB'}</td><td>{record.hasPhoto ? <a href={`/api/admin/punches/${record.id}/photo`} target="_blank" rel="noreferrer">Ver foto</a> : <span className="small-muted">Sem foto</span>}</td><td><div className="row-actions"><button type="button" className="ghost-btn compact-btn" onClick={() => openAction(record, 'edit')} disabled={degraded || record.status === 'REJECTED'}>Editar</button><button type="button" className="danger-link" onClick={() => openAction(record, 'cancel')} disabled={degraded || record.status === 'REJECTED'}>Excluir</button></div></td></tr>)}</tbody></table></div> : null}
+      {!loading && !records.length ? (
+        <div className="report-empty">
+          <strong>Nenhum registro encontrado</strong>
+          <span>Ajuste o período ou os filtros para consultar outras marcações.</span>
+        </div>
+      ) : null}
+      {records.length ? (
+        <div className="report-table-wrap">
+          <table className="report-table">
+            <thead>
+              <tr>
+                <th>Data e hora</th>
+                <th>Colaborador</th>
+                <th>Tipo</th>
+                <th>Status</th>
+                <th>Origem</th>
+                <th>Evidência</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record) => (
+                <tr key={record.id}>
+                  <td>
+                    <strong>{formatDate(record.timestamp)}</strong>
+                    <div className="small-muted">{formatTime(record.timestamp)}</div>
+                  </td>
+                  <td>
+                    <strong>{record.user.name}</strong>
+                    <div className="small-muted">
+                      {record.user.employeeNumber || 'Sem matrícula'}
+                      {record.user.jobTitle ? ` · ${record.user.jobTitle}` : ''}
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`type-badge type-${record.type.toLowerCase()}`}>
+                      {typeLabels[record.type] || record.type}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-pill ${record.status === 'VALID' ? 'ok' : 'off'}`}>
+                      {statusLabels[record.status] || record.status}
+                    </span>
+                  </td>
+                  <td>{record.origin || 'WEB'}</td>
+                  <td>
+                    {record.hasPhoto ? (
+                      <a href={`/api/admin/punches/${record.id}/photo`} target="_blank" rel="noreferrer">
+                        Ver foto
+                      </a>
+                    ) : (
+                      <span className="small-muted">Sem foto</span>
+                    )}
+                  </td>
+                  <td>
+                    <div className="row-actions">
+                      <button
+                        type="button"
+                        className="ghost-btn compact-btn"
+                        onClick={() => openAction(record, 'edit')}
+                        disabled={degraded || record.status === 'REJECTED'}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-link"
+                        onClick={() => openAction(record, 'cancel')}
+                        disabled={degraded || record.status === 'REJECTED'}
+                      >
+                        Excluir
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </section>
   );
 }
