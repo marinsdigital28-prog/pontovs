@@ -154,7 +154,7 @@ async function buildTimesheetDocument({
   let totalBalance = 0;
   let totalJustified = 0;
   let absences = 0;
-  let lateCount = 0;
+
 
   for (let index = 0; index < lastDay; index += 1) {
     const date = new Date(year, monthNumber - 1, index + 1, 12, 0, 0);
@@ -208,7 +208,6 @@ async function buildTimesheetDocument({
     const firstMins = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
     const late =
       configuredWorkday && firstMins !== null && scheduleStart !== null && firstMins > scheduleStart + 5 && justified === 0;
-    if (late) lateCount += 1;
 
     const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
     if (balance !== null) totalBalance += balance;
@@ -229,10 +228,10 @@ async function buildTimesheetDocument({
       ? dayPunches.map((p) => `${formatTime(p.timestamp)} (${shortType(p.type)})`).join('  ')
       : '—';
     const just = coveredByCertificate
-      ? 'ATESTADO'
+      ? cert?.startTime && cert?.endTime ? `ATESTADO ${formatMinutes(certificateMinutes)}` : 'ATESTADO'
       : approvedRequest
         ? approvedRequest.type === 'AUSENCIA' ? 'AUSÊNCIA' : 'TROCA'
-        : absent ? 'FALTA' : late ? 'ATRASO' : '';
+        : absent ? 'FALTA' : '';
 
     const values = [
       `${dateBr} ${weekdayLabels[weekday]}`,
@@ -266,7 +265,6 @@ async function buildTimesheetDocument({
   page.drawText(`Total previsto: ${formatMinutes(totalExpected)}`, { x: 220, y: totY + 13, size: 7, font: regular, color: dark });
   page.drawText(`Horas justificadas: ${formatMinutes(totalJustified)}`, { x: 220, y: totY + 2, size: 7, font: regular, color: dark });
   page.drawText(`Faltas: ${absences}`, { x: 420, y: totY + 24, size: 7, font: regular, color: dark });
-  page.drawText(`Atrasos: ${lateCount}`, { x: 420, y: totY + 13, size: 7, font: regular, color: dark });
 
   page.drawRectangle({ x: MX, y: 10, width: 230, height: 28, color: rgb(0.94, 0.98, 0.95), borderColor: green, borderWidth: 0.5 });
   page.drawText('ASSINADO DIGITALMENTE - ESPACO PROGREDIR', { x: MX + 4, y: 28, size: 6.5, font: bold, color: green });
