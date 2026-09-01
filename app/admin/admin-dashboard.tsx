@@ -13,6 +13,7 @@ import NotificationsPanel from './notifications-panel';
 import HealthCard from './health-card';
 import CertificateConflictsPanel from './certificate-conflicts-panel';
 import EmployeesPanel from './employees-panel';
+import IntegrityCenter from './integrity-center';
 import './overview-layout.css';
 
 type EmployeeProfile = {
@@ -80,7 +81,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   };
 
   return <>
-    <nav className="admin-tabs" aria-label="Seções administrativas">{[['overview', 'Visão geral'], ['employees', 'Colaboradores'], ['shifts', 'Turnos e jornada'], ['punches', 'Registros de ponto'], ['timesheet', 'Folha de ponto'], ['issues', 'Inconsistências'], ['requests', 'Solicitações'], ['notifications', 'Notificações'], ['certificates', 'Atestados'], ['settings', 'Dados e documentos'], ['security', 'Segurança e auditoria']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
+    <nav className="admin-tabs" aria-label="Seções administrativas">{[['overview', 'Visão geral'], ['integrity', 'Central de Integridade'], ['employees', 'Colaboradores'], ['shifts', 'Turnos e jornada'], ['punches', 'Registros de ponto'], ['timesheet', 'Folha de ponto'], ['issues', 'Inconsistências'], ['requests', 'Solicitações'], ['notifications', 'Notificações'], ['certificates', 'Atestados'], ['settings', 'Dados e documentos'], ['security', 'Segurança e auditoria']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
     {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
@@ -92,6 +93,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
             <button className="primary-btn admin-action" onClick={() => setTab('punches')}>Ver marcações</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Abrir folha</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('employees')}>Equipe</button>
+            <button className="ghost-btn admin-action" onClick={() => setTab('integrity')}>Central de Integridade</button>
           </div>
         </div>
         <div className="stat-grid admin-stat-grid overview-kpis">
@@ -142,6 +144,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       <div className="overview-analytics"><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
     </section> : null}
 
+    {tab === 'integrity' ? <IntegrityCenter /> : null}
     {tab === 'settings' ? <section className="admin-two-col"><CsvImporter /><PdfImporter /><SignatureSettings /></section> : null}
     {tab === 'employees' ? <EmployeesPanel employees={employees} onChanged={() => void loadEmployees()} /> : null}
     {tab === 'shifts' ? <section className="admin-two-col">
