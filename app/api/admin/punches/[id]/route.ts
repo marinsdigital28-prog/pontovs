@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../../lib/security-controls';
+import { isPeriodClosed, periodFromDate } from '../../../../../lib/period-closure';
+import { evaluateLocation } from '../../../../../lib/punch-integrity';
 
 export const dynamic = 'force-dynamic';
 const allowedTypes = new Set(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
@@ -21,6 +23,19 @@ function parseTimestamp(value: unknown) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  const manager = await requireManager();
+  if (!manager) return NextResponse.json({ error: 'Acesso restrito ao gestor' }, { status: 401 });
+  const { id: rawId } = await context.params;
+  const id = String(rawId || '').trim();
+  const punch = await prisma.punch.findUnique({ where: { id }, select: { id: true, userId: true, type: true, timestamp: true, clientTimestamp: true, syncedAt: true, syncStatus: true, syncAttempts: true, syncError: true, origin: true, connectivity: true, deviceId: true, deviceOs: true, appVersion: true, latitude: true, longitude: true, accuracy: true, locationCapturedAt: true, locationValid: true, photoData: true, createdAt: true, updatedAt: true, status: true, unit: { select: { settings: { select: { latitude: true, longitude: true, geofenceRadiusMeters: true } } } }, user: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } }, audits: { orderBy: { createdAt: 'asc' }, select: { id: true, field: true, oldValue: true, newValue: true, reason: true, createdAt: true, changedBy: { select: { id: true, name: true, employeeNumber: true } } } } } });
+  if (!punch) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
+  const reference = punch.photoData ? null : await prisma.punch.findFirst({ where: { userId: punch.userId, id: { not: punch.id }, photoData: { not: null } }, orderBy: { timestamp: 'desc' }, select: { id: true, type: true, timestamp: true, createdAt: true } });
+  const settings = punch.unit?.settings;
+  const location = evaluateLocation({ latitude: punch.latitude, longitude: punch.longitude, accuracy: punch.accuracy, companyLatitude: settings?.latitude ?? null, companyLongitude: settings?.longitude ?? null, radiusMeters: settings?.geofenceRadiusMeters ?? 150 });
+  return NextResponse.json({ punch: { ...punch, photoData: undefined, hasPhoto: Boolean(punch.photoData), locationStatus: location.status, distanceMeters: location.distanceMeters, companyLocation: settings?.latitude !== null && settings?.latitude !== undefined && settings?.longitude !== null && settings?.longitude !== undefined ? { latitude: settings.latitude, longitude: settings.longitude, radiusMeters: settings.geofenceRadiusMeters } : null, referencePhoto: reference ? { ...reference, warning: 'Esta foto pertence a outra marcação e não é evidência do registro atual.' } : null } });
+}
+
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const manager = await requireManager();
   if (!manager) return NextResponse.json({ error: 'Acesso restrito ao gestor' }, { status: 401 });
@@ -34,6 +49,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true, userId: true } });
   if (!existing) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
   if (existing.status === 'REJECTED') return NextResponse.json({ error: 'Uma marcação cancelada não pode ser editada.' }, { status: 409 });
+  if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de editar.' }, { status: 423 });
 
   const nextType = body?.type === undefined ? existing.type : String(body.type).trim().toUpperCase();
   const nextTimestamp = body?.timestamp === undefined ? existing.timestamp : parseTimestamp(body.timestamp);
@@ -69,6 +85,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true } });
   if (!existing) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
   if (existing.status === 'REJECTED') return NextResponse.json({ error: 'A marcação já está cancelada.' }, { status: 409 });
+  if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de cancelar.' }, { status: 423 });
   try {
     const updated = await prisma.$transaction(async (tx) => {
       const punch = await tx.punch.update({ where: { id }, data: { status: 'REJECTED', origin: 'ADJUSTED' }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });

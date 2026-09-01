@@ -111,7 +111,7 @@ export default function Page() {
     }
   }
 
-  function queueOfflinePunch(payload: { employeeNumber: string; clientTimestamp: string; clientId: string; photo: string | null }, reason: string) {
+  function queueOfflinePunch(payload: { employeeNumber: string; clientTimestamp: string; clientId: string; photo: string | null; origin: 'OFFLINE'; connectivity: 'OFFLINE' | 'RETRYING'; location: { lat: number; lng: number; accuracy?: number; capturedAt: string } | null; device: { id?: string; os?: string; appVersion?: string } | null }, reason: string) {
     const offline = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
     offline.push(payload);
     localStorage.setItem('offlinePunches', JSON.stringify(offline));
@@ -122,16 +122,38 @@ export default function Page() {
     window.setTimeout(() => resetForNextCollaborator(), 2200);
   }
 
+  async function readCurrentLocation() {
+    if (!navigator.geolocation) return null;
+    return await new Promise<{ lat: number; lng: number; accuracy?: number; capturedAt: string } | null>((resolve) => {
+      navigator.geolocation.getCurrentPosition((position) => resolve({ lat: position.coords.latitude, lng: position.coords.longitude, accuracy: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : undefined, capturedAt: new Date().toISOString() }), () => resolve(null), { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+    });
+  }
+
+  function deviceDetails() {
+    try {
+      const storageKey = 'pontoDeviceId';
+      const id = localStorage.getItem(storageKey) || (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      localStorage.setItem(storageKey, id);
+      return { id, os: navigator.userAgent.slice(0, 80), appVersion: 'web' };
+    } catch { return { os: navigator.userAgent.slice(0, 80), appVersion: 'web' }; }
+  }
+
   async function handlePunch(photoOverride?: string | null) {
     if (!employee) return;
+    const offlineMode = Boolean(employee.offline || employee.offlineFallback || !navigator.onLine);
+    const location = await readCurrentLocation();
     const payload = {
       employeeNumber: employee.employeeNumber,
       clientTimestamp: new Date().toISOString(),
       clientId: pendingClientIdRef.current ?? (pendingClientIdRef.current = crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`),
+      origin: offlineMode ? 'OFFLINE' as const : 'WEB' as const,
+      connectivity: offlineMode ? 'OFFLINE' as const : 'ONLINE' as const,
+      location,
+      device: deviceDetails(),
       photo: photoOverride ?? photo ?? null,
     };
-    if (employee.offline || employee.offlineFallback || !navigator.onLine) {
-      queueOfflinePunch(payload, employee.offline || employee.offlineFallback
+    if (offlineMode) {
+      queueOfflinePunch({ ...payload, origin: 'OFFLINE', connectivity: 'OFFLINE' }, employee.offline || employee.offlineFallback
         ? 'Marcação salva no aparelho — será sincronizada assim que o banco voltar.'
         : 'Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente');
       return;
@@ -169,7 +191,7 @@ export default function Page() {
       const errorMessage = err?.message || 'Não foi possível registrar a marcação. Tente novamente.';
       if (err?.code === 'DATABASE_QUOTA_EXCEEDED') {
         const pending = JSON.parse(localStorage.getItem('offlinePunches') || '[]');
-        pending.push(payload);
+        pending.push({ ...payload, origin: 'OFFLINE', connectivity: 'RETRYING' });
         localStorage.setItem('offlinePunches', JSON.stringify(pending));
         setStatusMsg('Marcação salva neste aparelho e aguardando sincronização quando o banco for liberado.');
         return;
@@ -191,7 +213,7 @@ export default function Page() {
       }
       const isNetworkFailure = err instanceof TypeError || !navigator.onLine;
       if (isNetworkFailure) {
-        queueOfflinePunch(payload, 'Sem conexão — salvo localmente e será reenviado quando online');
+        queueOfflinePunch({ ...payload, origin: 'OFFLINE', connectivity: 'RETRYING' }, 'Sem conexão — salvo localmente e será reenviado quando online');
       } else {
         setStatusMsg(errorMessage);
       }
@@ -213,7 +235,7 @@ export default function Page() {
       const remaining: any[] = [];
       try {
         for (const p of pending) {
-          const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(p) });
+          const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...p, origin: 'OFFLINE', connectivity: 'RETRYING' }) });
           // Um 409 pode representar concorrência ou jornada encerrada; não confirma que esta
           // marcação foi persistida. Mantemos o item para não perder a evidência local.
           if (!response.ok) remaining.push(p);

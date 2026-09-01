@@ -5,6 +5,8 @@ import { authOptions } from '@/lib/auth';
 import prisma from '../../../../lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../lib/security-controls';
 import { isDatabaseQuotaExceeded } from '../../../../lib/database-errors';
+import { isPeriodClosed, periodFromDate } from '../../../../lib/period-closure';
+import { evaluateLocation } from '../../../../lib/punch-integrity';
 import recoveryData from '../../../../punches-recovery-2026-08-01-to-28.json';
 
 export const dynamic = 'force-dynamic';
@@ -50,6 +52,9 @@ export async function GET(request: Request) {
   const type = url.searchParams.get('type') || 'ALL';
   const status = url.searchParams.get('status') || 'VALID';
   const format = url.searchParams.get('format');
+  const evidence = url.searchParams.get('evidence') || 'ALL';
+  const syncFilter = url.searchParams.get('sync') || 'ALL';
+  const alteration = url.searchParams.get('alteration') || 'ALL';
   const from = parseBoundary(fromValue, false);
   const to = parseBoundary(toValue, true);
 
@@ -76,6 +81,20 @@ export async function GET(request: Request) {
         timestamp: true,
         status: true,
         origin: true,
+        syncedAt: true,
+        syncStatus: true,
+        syncAttempts: true,
+        syncError: true,
+        deviceId: true,
+        deviceOs: true,
+        appVersion: true,
+        connectivity: true,
+        latitude: true,
+        longitude: true,
+        accuracy: true,
+        locationCapturedAt: true,
+        locationValid: true,
+        unit: { select: { settings: { select: { latitude: true, longitude: true, geofenceRadiusMeters: true } } } },
         user: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } },
       },
     });
@@ -86,7 +105,7 @@ export async function GET(request: Request) {
       const timestamp = new Date(`${row.date}T${row.time}-03:00`);
       return (!employeeId || employeeId === `offline-${row.employeeNumber}`) && (type === 'ALL' || row.type === type) && (status === 'ALL' || status === 'VALID') && (!from || timestamp >= from) && (!to || timestamp <= to);
     }).slice(0, 5000);
-    punches = rows.map((row) => ({ id: `recovery-${row.sourceId}`, type: row.type, timestamp: new Date(`${row.date}T${row.time}-03:00`), status: 'VALID', origin: 'RECOVERY', user: { id: `offline-${row.employeeNumber}`, name: row.name, employeeNumber: row.employeeNumber, jobTitle: null } }));
+    punches = rows.map((row) => ({ id: `recovery-${row.sourceId}`, type: row.type, timestamp: new Date(`${row.date}T${row.time}-03:00`), status: 'VALID', origin: 'RECOVERY', syncedAt: null, syncStatus: 'SYNCED', syncAttempts: 0, syncError: null, deviceId: null, deviceOs: null, appVersion: null, connectivity: 'UNKNOWN', latitude: null, longitude: null, accuracy: null, locationCapturedAt: null, locationValid: false, unit: null, user: { id: `offline-${row.employeeNumber}`, name: row.name, employeeNumber: row.employeeNumber, jobTitle: null } }));
   }
 
   const photoFlags = new Map<string, boolean>();
@@ -98,11 +117,13 @@ export async function GET(request: Request) {
       // A failed metadata lookup must not transfer or expose photo contents.
     }
   }
-  const records = punches.map((punch) => ({ ...punch, hasPhoto: photoFlags.get(punch.id) ?? false }));
+  const records = (punches as any[]).map((punch) => { const settings = punch.unit?.settings; const location = evaluateLocation({ latitude: punch.latitude ?? null, longitude: punch.longitude ?? null, accuracy: punch.accuracy ?? null, companyLatitude: settings?.latitude ?? null, companyLongitude: settings?.longitude ?? null, radiusMeters: settings?.geofenceRadiusMeters ?? 150 }); return { ...punch, hasPhoto: photoFlags.get(punch.id) ?? false, locationStatus: location.status, distanceMeters: location.distanceMeters, companyLocation: settings?.latitude !== null && settings?.latitude !== undefined && settings?.longitude !== null && settings?.longitude !== undefined ? { latitude: settings.latitude, longitude: settings.longitude, radiusMeters: settings.geofenceRadiusMeters } : null, hasAdministrativeChange: false }; });
+  const candidateIds = records.filter((record) => record.id && !String(record.id).startsWith('recovery-')).map((record) => record.id);
+  if (candidateIds.length) { const auditCounts = await prisma.punchAudit.groupBy({ by: ['punchId'], where: { punchId: { in: candidateIds } }, _count: { punchId: true } }); const changedIds = new Set(auditCounts.filter((item) => item._count.punchId > 1).map((item) => item.punchId)); records.forEach((record) => { record.hasAdministrativeChange = changedIds.has(record.id) || record.origin === 'ADJUSTED'; }); }
+  const filteredRecords = records.filter((record) => evidence === 'ALL' || (evidence === 'WITH_PHOTO' && record.hasPhoto) || (evidence === 'WITHOUT_PHOTO' && !record.hasPhoto) || (evidence === 'WITH_LOCATION' && record.locationStatus !== 'UNAVAILABLE') || (evidence === 'WITHOUT_LOCATION' && record.locationStatus === 'UNAVAILABLE') || (evidence === 'WITHIN_RADIUS' && record.locationStatus === 'WITHIN_RADIUS') || (evidence === 'OUTSIDE_RADIUS' && record.locationStatus === 'OUTSIDE_RADIUS') || (evidence === 'LOW_ACCURACY' && record.locationStatus === 'LOW_ACCURACY')).filter((record) => syncFilter === 'ALL' || (syncFilter === 'ONLINE' && record.origin === 'WEB') || (syncFilter === 'OFFLINE' && record.origin === 'OFFLINE') || (syncFilter === 'PENDING' && ['PENDING', 'RETRYING'].includes(record.syncStatus)) || (syncFilter === 'FAILED' && record.syncStatus === 'FAILED') || (syncFilter === 'SYNCED_LATER' && record.origin === 'OFFLINE' && record.syncedAt)).filter((record) => alteration === 'ALL' || (alteration === 'ALTERED' && record.hasAdministrativeChange) || (alteration === 'UNCHANGED' && !record.hasAdministrativeChange));
   if (format === 'csv') {
-    await appendAuditEvent({ action: 'PUNCHES_EXPORTED', actorId: manager.id, resource: 'Punch', metadata: { from: fromValue, to: toValue, employeeId, type, status, count: records.length } });
-    const header = ['Data e hora', 'Colaborador', 'Matrícula', 'Cargo', 'Tipo', 'Status', 'Origem', 'Foto'];
-    const rows = records.map((record) => [
+    await appendAuditEvent({ action: 'PUNCHES_EXPORTED', actorId: manager.id, resource: 'Punch', metadata: { from: fromValue, to: toValue, employeeId, type, status, evidence, syncFilter, alteration, count: filteredRecords.length } });
+    const rows = filteredRecords.map((record) => [
       new Date(record.timestamp).toLocaleString('pt-BR'),
       record.user.name,
       record.user.employeeNumber || '',
@@ -111,8 +132,13 @@ export async function GET(request: Request) {
       record.status,
       record.origin,
       record.hasPhoto ? 'Sim' : 'Não',
+      record.locationStatus,
+      record.distanceMeters ?? '',
+      record.syncStatus,
+      record.syncedAt ? new Date(record.syncedAt).toLocaleString('pt-BR') : '',
+      record.hasAdministrativeChange ? 'Sim' : 'Não',
     ]);
-    const csv = [header, ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
+    const csv = [['Data e hora', 'Colaborador', 'Matrícula', 'Cargo', 'Tipo', 'Status', 'Origem', 'Foto', 'Localização', 'Distância (m)', 'Status sincronização', 'Sincronizado em', 'Alteração administrativa'], ...rows].map((row) => row.map(csvCell).join(';')).join('\r\n');
     return new Response(`\uFEFF${csv}`, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
@@ -121,7 +147,7 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.json({ records, total: records.length, limit: 5000, degraded });
+  return NextResponse.json({ records: filteredRecords, total: filteredRecords.length, limit: 5000, degraded, filters: { evidence, sync: syncFilter, alteration } });
 }
 
 
@@ -144,6 +170,7 @@ export async function POST(request: Request) {
   const timestamp = parseManualTimestamp(date, time);
   if (!timestamp) return NextResponse.json({ error: 'Informe uma data e horário válidos.' }, { status: 400 });
 
+  if (await isPeriodClosed(periodFromDate(timestamp))) return NextResponse.json({ error: 'A competência desta data está fechada. Reabra o período com autorização e justificativa antes de alterar o ponto.' }, { status: 423 });
   const employee = await prisma.user.findFirst({ where: { id: userId, role: 'EMPLOYEE' }, select: { id: true, unitId: true, name: true, employeeNumber: true } });
   if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
   const clientId = manualClientId(employee.id, date, time, type);

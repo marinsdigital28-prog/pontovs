@@ -59,6 +59,7 @@ model User {
   id            String    @id @default(cuid())
   name          String
   employeeNumber String?  @unique
+  registrationData String? @db.Text // dados cadastrais estruturados importados de fonte oficial
   email         String    @unique
   passwordHash  String?
   role          Role      @default(EMPLOYEE)
@@ -87,12 +88,21 @@ model Punch {
   unit            Unit?        @relation(fields: [unitId], references: [id])
 
   type            PunchType
-  timestamp       DateTime     // horário oficial do registro
-  clientTimestamp DateTime?    // horário que veio do dispositivo
+  timestamp       DateTime     // marked_at: horário original em que o funcionário realizou o registro
+  clientTimestamp DateTime?    // horário original informado pelo dispositivo, mantido para compatibilidade
+  syncedAt        DateTime?    // synced_at: horário em que o servidor recebeu a marcação
+  syncStatus      String       @default("SYNCED") // PENDING | SYNCED | FAILED | OFFLINE | RETRYING
+  syncAttempts    Int          @default(0)
+  syncError       String?
+  deviceId        String?
+  deviceOs        String?
+  appVersion      String?
+  connectivity    String?
 
   latitude        Float?
   longitude       Float?
   accuracy        Float?
+  locationCapturedAt DateTime?
   locationValid   Boolean      @default(false)
 
   status          PunchStatus  @default(VALID)
@@ -150,6 +160,7 @@ model Inconsistency {
 
 model MedicalCertificate {
   id             String   @id @default(cuid())
+  type           String   @default("DIA_INTEGRAL")
   userId         String
   user           User     @relation("CertificateEmployee", fields: [userId], references: [id])
   createdById    String
@@ -158,6 +169,9 @@ model MedicalCertificate {
   canceledBy     User?    @relation("CertificateCanceler", fields: [canceledById], references: [id])
   startDate      DateTime
   endDate        DateTime
+  startTime      String?
+  endTime        String?
+  hoursPerDayMinutes Int?
   daysCount      Int
   workDaysCount  Int?
   documentName   String?
