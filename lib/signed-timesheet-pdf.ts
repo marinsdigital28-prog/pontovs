@@ -134,7 +134,7 @@ async function buildTimesheetDocument({
   const cols = [MX, 70, 175, 400, 440, 480, 520, 560, 600, 645, 690, right];
   const headers = ['Data', 'Horários (escala)', 'Marcações', 'H.Trab', 'H.Just', 'H.Prev', 'H.Falt', 'H.Exc', 'Saldo', 'Desc.', 'Justificativa'];
   const tableTop = infoY - 22;
-  const footerReserve = 72;
+  const footerReserve = 96;
   const headerH = 12;
   const available = tableTop - footerReserve - headerH;
   const rowH = Math.min(14.2, available / lastDay);
@@ -257,7 +257,7 @@ async function buildTimesheetDocument({
     page.drawLine({ start: { x: MX, y: y - 2.2 }, end: { x: right, y: y - 2.2 }, thickness: 0.2, color: line });
   }
 
-  const totY = footerReserve - 6;
+  const totY = footerReserve - 48;
   page.drawLine({ start: { x: MX, y: totY + 36 }, end: { x: right, y: totY + 36 }, thickness: 0.8, color: dark });
   page.drawText(`Total H. Positivas: ${formatMinutes(Math.max(0, totalBalance))}`, { x: MX, y: totY + 24, size: 7, font: regular, color: dark });
   page.drawText(`Total H. Negativas: ${formatMinutes(Math.max(0, -totalBalance))}`, { x: MX, y: totY + 13, size: 7, font: regular, color: dark });
@@ -269,7 +269,7 @@ async function buildTimesheetDocument({
   page.drawText(`Atrasos: ${lateCount}`, { x: 420, y: totY + 13, size: 7, font: regular, color: dark });
 
   page.drawRectangle({ x: MX, y: 10, width: 230, height: 28, color: rgb(0.94, 0.98, 0.95), borderColor: green, borderWidth: 0.5 });
-  page.drawText('✓ Assinado digitalmente — ESPAÇO PROGREDIR', { x: MX + 4, y: 28, size: 6.5, font: bold, color: green });
+  page.drawText('ASSINADO DIGITALMENTE - ESPACO PROGREDIR', { x: MX + 4, y: 28, size: 6.5, font: bold, color: green });
   page.drawText('Certificado A1 · ICP-Brasil · CNPJ 05.553.848/0001-61', { x: MX + 4, y: 17, size: 5.5, font: regular, color: muted });
   page.drawLine({ start: { x: right - 200, y: 28 }, end: { x: right, y: 28 }, thickness: 0.6, color: muted });
   page.drawText('Assinatura do Colaborador', { x: right - 200, y: 18, size: 6.5, font: regular, color: muted });
