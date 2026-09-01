@@ -51,10 +51,11 @@ export async function POST(req: Request) {
       new Date().getDay(),
     );
     const mode = schedule?.mode === 'HALF' ? 'HALF' : 'FULL';
+    const resolvedScheduleEnd = schedule?.end ?? user.scheduleEnd?.slice(0, 5) ?? null;
     const smart = resolveSmartPunchSuggestion({
       punchesToday: user.punches,
       mode,
-      scheduleEnd: schedule?.end ?? user.scheduleEnd?.slice(0, 5),
+      scheduleEnd: resolvedScheduleEnd,
     });
 
     // Compatibilidade: nextType continua existindo para clientes antigos
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
         journeyClosed: smart.journeyClosed,
         todayPunches,
         scheduleMode: mode,
-        scheduleEnd: schedule?.end ?? user.scheduleEnd?.slice(0, 5) ?? null,
+        resolvedScheduleEnd,
       },
       { status: 200 },
     );
