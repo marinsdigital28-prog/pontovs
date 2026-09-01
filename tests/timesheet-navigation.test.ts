@@ -6,6 +6,8 @@ const root = process.cwd();
 const dashboard = readFileSync(resolve(root, 'app/admin/admin-dashboard.tsx'), 'utf8');
 const css = readFileSync(resolve(root, 'app/globals.css'), 'utf8');
 const timesheet = readFileSync(resolve(root, 'app/admin/folha-ponto-panel.tsx'), 'utf8');
+const timesheetPdfRoute = readFileSync(resolve(root, 'app/api/admin/timesheet-pdf/route.ts'), 'utf8');
+const signedTimesheetPdf = readFileSync(resolve(root, 'lib/signed-timesheet-pdf.ts'), 'utf8');
 const punch = readFileSync(resolve(root, 'app/ponto/page.tsx'), 'utf8');
 const employeePortal = readFileSync(resolve(root, 'app/colaborador/page.tsx'), 'utf8');
 const csvImporter = readFileSync(resolve(root, 'app/admin/csv-importer.tsx'), 'utf8');
@@ -79,17 +81,14 @@ describe('navegação da folha de ponto', () => {
     expect(employeePortal).toContain('modo de teste local');
   });
 
-  it('renderiza uma folha individual no modelo diário', () => {
-    expect(timesheet).toContain('RELATÓRIO DE PONTO DO COLABORADOR');
-    expect(timesheet).toContain('<th>Horários (escala)</th>');
-    expect(timesheet).toContain('<th>Marcações</th>');
-    expect(timesheet).toContain("const schedule = !scheduled ? 'Folga'");
-    expect(timesheet).toContain('const lunchMinutes = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0');
-    expect(timesheet).toContain("'1h de almoço' : 'meio expediente'");
-    expect(timesheet).toContain('<th>H.Trab</th>');
-    expect(timesheet).toContain('<th>H.Prev</th>');
-    expect(timesheet).toContain('<th>Saldo</th>');
-    expect(timesheet).toContain('Assinatura digital do Espaço Progredir');
-    expect(timesheet).toContain('Selecione um colaborador');
+  it('renderiza uma folha individual A4 assinada no modelo diário', () => {
+    expect(timesheet).toContain('PDF de todos');
+    expect(timesheetPdfRoute).toContain('createSignedTimesheetPdfBatch');
+    expect(timesheetPdfRoute).toContain('createSignedTimesheetPdf');
+    expect(signedTimesheetPdf).toContain('A4 paisagem');
+    expect(signedTimesheetPdf).toContain("'H.Trab', 'H.Just', 'H.Prev', 'H.Falt', 'H.Exc', 'Saldo', 'Desc.', 'Justificativa'");
+    expect(signedTimesheetPdf).toContain('ASSINADO DIGITALMENTE - ESPACO PROGREDIR');
+    expect(signedTimesheetPdf).toContain('Certificado A1');
+    expect(signedTimesheetPdf).toContain('const footerReserve = 96');
   });
 });
