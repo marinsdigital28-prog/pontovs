@@ -64,6 +64,7 @@ export async function POST(request: Request) {
           workDays: true,
           scheduleStart: true,
           scheduleEnd: true,
+          unit: { select: { name: true } },
         },
         orderBy: [{ employeeNumber: 'asc' }, { name: 'asc' }],
       });
@@ -115,6 +116,7 @@ export async function POST(request: Request) {
               workDays: emp.workDays,
               scheduleStart: emp.scheduleStart,
               scheduleEnd: emp.scheduleEnd,
+              unit: emp.unit?.name || null,
             },
             punches,
             certificates,
@@ -158,6 +160,7 @@ export async function POST(request: Request) {
         workDays: true,
         scheduleStart: true,
         scheduleEnd: true,
+        unit: { select: { name: true } },
       },
     });
     if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
@@ -196,7 +199,7 @@ export async function POST(request: Request) {
     ]);
 
     const signedPdf = await createSignedTimesheetPdf({
-      employee,
+      employee: { ...employee, unit: employee.unit?.name || null },
       punches,
       certificates,
       requests,

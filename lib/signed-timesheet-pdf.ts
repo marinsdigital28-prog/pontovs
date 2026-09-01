@@ -13,6 +13,8 @@ export type TimesheetEmployee = {
   workDays: string | null;
   scheduleStart: string | null;
   scheduleEnd: string | null;
+  department?: string | null;
+  unit?: string | null;
 };
 
 export type TimesheetPunch = { type: string; timestamp: Date };
@@ -117,8 +119,8 @@ async function buildTimesheetDocument({
   page.drawText(`Matrícula: ${employee.employeeNumber || '—'}`, { x: MX + 270, y: infoY, size: 7.5, font: regular, color: dark });
   page.drawText(`CPF: ${employee.cpf || '—'}`, { x: MX + 380, y: infoY, size: 7.5, font: regular, color: dark });
   page.drawText(`Cargo: ${employee.jobTitle || '—'}`, { x: MX + 500, y: infoY, size: 7.5, font: regular, color: dark, maxWidth: 140 });
-  page.drawText('Departamento: ADMINISTRATIVO', { x: MX, y: infoY - 11, size: 7, font: regular, color: dark });
-  page.drawText('Unidade: Espaço Progredir', { x: MX + 200, y: infoY - 11, size: 7, font: regular, color: dark });
+  page.drawText(`Departamento: ${employee.department || 'ADMINISTRATIVO'}`, { x: MX, y: infoY - 11, size: 7, font: regular, color: dark });
+  page.drawText(`Unidade: ${employee.unit || 'Espaço Progredir'}`, { x: MX + 200, y: infoY - 11, size: 7, font: regular, color: dark });
   page.drawText(`Jornada: ${jornada}`, { x: MX + 380, y: infoY - 11, size: 7, font: regular, color: dark });
   page.drawLine({ start: { x: MX, y: infoY - 17 }, end: { x: right, y: infoY - 17 }, thickness: 0.5, color: line });
 
@@ -129,8 +131,8 @@ async function buildTimesheetDocument({
   const lunch = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
-  const cols = [MX, 70, 175, 400, 445, 490, 535, 580, 625, 680, right];
-  const headers = ['Data', 'Horários', 'Marcações', 'H.Trab', 'H.Just', 'H.Prev', 'H.Falt', 'H.Exc', 'Saldo', 'Justificativa'];
+  const cols = [MX, 70, 175, 400, 440, 480, 520, 560, 600, 645, 690, right];
+  const headers = ['Data', 'Horários (escala)', 'Marcações', 'H.Trab', 'H.Just', 'H.Prev', 'H.Falt', 'H.Exc', 'Saldo', 'Desc.', 'Justificativa'];
   const tableTop = infoY - 22;
   const footerReserve = 72;
   const headerH = 12;
@@ -242,10 +244,11 @@ async function buildTimesheetDocument({
       formatMinutes(missing),
       formatMinutes(surplus),
       balance === null ? '00:00' : formatSignedMinutes(balance),
+      '00:00',
       just,
     ];
     values.forEach((value, i) => {
-      const maxLen = i === 2 ? 42 : i === 1 ? 28 : 12;
+      const maxLen = i === 2 ? 42 : i === 1 ? 28 : i === 10 ? 24 : 12;
       page.drawText(String(value).slice(0, maxLen), {
         x: cols[i] + 2, y, size: i === 2 ? Math.max(5, fs - 0.5) : fs, font: regular, color: dark,
         maxWidth: cols[i + 1] - cols[i] - 3,
