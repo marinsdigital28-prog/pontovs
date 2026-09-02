@@ -5,51 +5,45 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { signIn, signOut, useSession } from 'next-auth/react';
 
 type Punch = { id: string; type: string; timestamp: string; status: string; photoData?: string | null; hasPhoto?: boolean };
+type EmpProfile = {
+  phone?: string; personalEmail?: string; address?: string; number?: string; complement?: string; neighborhood?: string;
+  city?: string; uf?: string; cep?: string; pis?: string; rg?: string; birthDate?: string; sex?: string; maritalStatus?: string;
+  admissionDate?: string; department?: string; ctps?: string; ctpsSeries?: string; motherName?: string; fatherName?: string;
+  remuneration?: string; jobTitleFromPdf?: string; [key: string]: string | undefined;
+};
 type EmployeeData = {
-  employee: { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; scheduleStart: string | null; scheduleEnd: string | null; workDays: string | null };
+  employee: {
+    id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle: string | null;
+    scheduleStart: string | null; scheduleEnd: string | null; workDays: string | null;
+    scheduleByDay?: Record<string, { start?: string; end?: string; mode?: string }> | null;
+    profile?: EmpProfile | null; active?: boolean; unitName?: string | null;
+  };
   punches: Punch[];
   summary?: { workedMinutes?: number; plannedMinutes?: number; lateMinutes?: number };
 };
 type RequestItem = { id: string; type: string; status: string; startDate: string; endDate: string; reason: string; details?: string | null; createdAt: string };
 
 const TYPE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída' };
-
 const ABSENCE_REASONS = [
-  'Consulta médica',
-  'Exame médico',
-  'Atestado / problema de saúde',
-  'Compromisso pessoal',
-  'Problema familiar',
-  'Passeio / evento externo',
-  'Evento ou atividade externa',
-  'Curso / treinamento',
-  'Audiência / cartório / banco',
-  'Imprevisto no trajeto / transporte',
-  'Acompanhamento de familiar',
-  'Outros',
+  'Consulta médica', 'Exame médico', 'Atestado / problema de saúde', 'Compromisso pessoal', 'Problema familiar',
+  'Passeio / evento externo', 'Evento ou atividade externa', 'Curso / treinamento', 'Audiência / cartório / banco',
+  'Imprevisto no trajeto / transporte', 'Acompanhamento de familiar', 'Outros',
 ] as const;
-
 const COVERAGE_OPTIONS = [
   { value: 'PARCIAL_MANHA', label: 'Parcial — manhã' },
   { value: 'PARCIAL_TARDE', label: 'Parcial — tarde' },
   { value: 'DIA_INTEIRO', label: 'Dia inteiro' },
   { value: 'EMERGENCIA', label: 'Emergência (sem aviso prévio)' },
 ] as const;
-
 const COVERAGE_LABEL: Record<string, string> = {
-  PARCIAL_MANHA: 'Parcial manhã',
-  PARCIAL_TARDE: 'Parcial tarde',
-  DIA_INTEIRO: 'Dia inteiro',
-  EMERGENCIA: 'Emergência',
+  PARCIAL_MANHA: 'Parcial manhã', PARCIAL_TARDE: 'Parcial tarde', DIA_INTEIRO: 'Dia inteiro', EMERGENCIA: 'Emergência',
 };
 
 const APP_TZ = 'America/Sao_Paulo';
 const timeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit' });
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 const shortDate = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, day: '2-digit', month: '2-digit', year: 'numeric' });
-
 function padMat(v: string) { return v.replace(/\D/g, '').padStart(4, '0'); }
-
 type Tab = 'home' | 'journey' | 'month' | 'absences' | 'profile';
 
 export default function EmployeeAppPage() {
@@ -193,33 +187,22 @@ export default function EmployeeAppPage() {
     const endTime = isHours ? String(form.get('endTime') || '') : null;
     const returnTime = String(form.get('returnTime') || '') || null;
     const note = String(form.get('note') || '') || null;
-    const today = todayKey;
     let finalCoverage = coverage;
-    if (startDate === today && finalCoverage !== 'EMERGENCIA') {
-      finalCoverage = 'EMERGENCIA';
-    }
+    if (startDate === todayKey && finalCoverage !== 'EMERGENCIA') finalCoverage = 'EMERGENCIA';
     const reason = reasonChoice === 'Outros' ? (String(form.get('reasonOther') || '').trim() || 'Outros') : reasonChoice;
-    const detailsParts = [
+    const details = [
       `Tipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}`,
       startTime && endTime ? `Horário: ${startTime}–${endTime}` : null,
       returnTime ? `Previsão de volta: ${returnTime}` : null,
       note,
-    ].filter(Boolean);
-    const details = detailsParts.join(' · ');
+    ].filter(Boolean).join(' · ');
     const response = await fetch('/api/employee/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'AUSENCIA',
-        startDate,
-        endDate,
-        reason,
-        details: details || null,
-        classification: finalCoverage,
-        returnExpected: Boolean(returnTime),
-        documentName: documentFile?.name || null,
-        documentMime: documentFile?.type || null,
-        documentData,
+        type: 'AUSENCIA', startDate, endDate, reason, details: details || null,
+        classification: finalCoverage, returnExpected: Boolean(returnTime),
+        documentName: documentFile?.name || null, documentMime: documentFile?.type || null, documentData,
       }),
     });
     const json = await response.json().catch(() => ({}));
@@ -230,14 +213,10 @@ export default function EmployeeAppPage() {
         : `${shortDate.format(new Date(startDate + 'T12:00:00'))} até ${shortDate.format(new Date(endDate + 'T12:00:00'))}`;
       const timePart = startTime && endTime ? ` das ${startTime} às ${endTime}` : '';
       const returnPart = returnTime ? `\nPrevisão de volta: ${returnTime}` : '';
-      const wa = `Olá! Comuniquei ausência pelo app Ponto Progredir.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nPeríodo: ${period}${timePart}\nTipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\nMotivo: ${reason}${returnPart}\n\nAguardando análise da administração.`;
-      setWhatsappText(wa);
-      setAbsenceMsg(finalCoverage === 'EMERGENCIA'
-        ? 'Solicitação de emergência enviada. A administração já pode ver no painel.'
-        : 'Solicitação enviada. Aguarde a análise da administração.');
+      setWhatsappText(`Olá! Comuniquei ausência pelo app Ponto Progredir.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nPeríodo: ${period}${timePart}\nTipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\nMotivo: ${reason}${returnPart}\n\nAguardando análise da administração.`);
+      setAbsenceMsg(finalCoverage === 'EMERGENCIA' ? 'Solicitação de emergência enviada. A administração já pode ver no painel.' : 'Solicitação enviada. Aguarde a análise da administração.');
       (e.target as HTMLFormElement).reset();
-      setReasonChoice(ABSENCE_REASONS[0]);
-      setCoverage('DIA_INTEIRO');
+      setReasonChoice(ABSENCE_REASONS[0]); setCoverage('DIA_INTEIRO');
       await loadRequests();
     }
     setLoading(false);
@@ -253,11 +232,7 @@ export default function EmployeeAppPage() {
     return (
       <main className="emp-app emp-login">
         <div className="emp-login-card">
-          <div className="emp-brand">
-            {brandLogo}
-            <h1>Ponto <span>Progredir</span></h1>
-            <p>Consulte seus pontos e horários de trabalho</p>
-          </div>
+          <div className="emp-brand">{brandLogo}<h1>Ponto <span>Progredir</span></h1><p>Consulte seus pontos e horários de trabalho</p></div>
           <form onSubmit={login} className="emp-form">
             <label>Matrícula
               <input inputMode="numeric" maxLength={8} required value={matricula} onChange={(e) => setMatricula(e.target.value.replace(/\D/g, ''))} placeholder="Ex.: 1401" autoComplete="username" />
@@ -277,16 +252,11 @@ export default function EmployeeAppPage() {
   return (
     <main className="emp-app">
       {toast ? <div className="emp-toast" role="status"><strong>Nova marcação</strong><span>{toast}</span></div> : null}
-
       {showInstallHint ? (
         <div className="emp-install-banner">
-          <div>
-            <strong>Dica:</strong> instale o app na tela inicial para acesso mais rápido.
-          </div>
+          <div><strong>Dica:</strong> instale o app na tela inicial para acesso mais rápido.</div>
           <div className="emp-install-banner-actions">
-            {installPrompt ? (
-              <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar</button>
-            ) : null}
+            {installPrompt ? <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar</button> : null}
             <button type="button" className="emp-link" onClick={() => setDismissInstall(true)}>Agora não</button>
           </div>
         </div>
@@ -404,9 +374,7 @@ export default function EmployeeAppPage() {
               <form onSubmit={submitAbsence} className="emp-form">
                 <label>Tipo de ausência
                   <select value={coverage} onChange={(e) => setCoverage(e.target.value)} required>
-                    {COVERAGE_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
+                    {COVERAGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
                 <p className="emp-muted">Se for hoje e não deu tempo de avisar, use <strong>Emergência</strong> (ou o sistema marca automaticamente).</p>
@@ -421,9 +389,7 @@ export default function EmployeeAppPage() {
                 )}
                 <label>Motivo
                   <select value={reasonChoice} onChange={(e) => setReasonChoice(e.target.value)} required>
-                    {ABSENCE_REASONS.map((r) => (
-                      <option key={r} value={r}>{r}</option>
-                    ))}
+                    {ABSENCE_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </label>
                 {reasonChoice === 'Outros' ? (
@@ -435,9 +401,7 @@ export default function EmployeeAppPage() {
                 <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Enviar solicitação'}</button>
                 {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
                 {whatsappText ? (
-                  <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">
-                    Enviar confirmação no WhatsApp
-                  </a>
+                  <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">Enviar confirmação no WhatsApp</a>
                 ) : null}
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
@@ -466,14 +430,61 @@ export default function EmployeeAppPage() {
             <div className="emp-card profile">
               <div className="emp-logo-wrap" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
               <h2>{emp?.name}</h2>
-              <p>Matrícula {emp?.employeeNumber}</p>
-              <p>{emp?.jobTitle || 'Cargo não informado'}</p>
+              <p>Matrícula {emp?.employeeNumber || '—'}</p>
+              <p>{emp?.jobTitle || emp?.profile?.jobTitleFromPdf || 'Cargo não informado'}</p>
             </div>
+
             <div className="emp-card">
-              <div className="emp-row"><span>Jornada</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
-              <div className="emp-row"><span>Dias</span><strong>{emp?.workDays || '—'}</strong></div>
-              <div className="emp-row"><span>Status</span><strong className="emp-status ok">Ativo</strong></div>
+              <h2>Dados cadastrais</h2>
+              <div className="emp-row"><span>CPF</span><strong>{emp?.cpf || '—'}</strong></div>
+              <div className="emp-row"><span>RG</span><strong>{emp?.profile?.rg || '—'}</strong></div>
+              <div className="emp-row"><span>PIS</span><strong>{emp?.profile?.pis || '—'}</strong></div>
+              <div className="emp-row"><span>Nascimento</span><strong>{emp?.profile?.birthDate || '—'}</strong></div>
+              <div className="emp-row"><span>Sexo</span><strong>{emp?.profile?.sex || '—'}</strong></div>
+              <div className="emp-row"><span>Estado civil</span><strong>{emp?.profile?.maritalStatus || '—'}</strong></div>
+              <div className="emp-row"><span>Admissão</span><strong>{emp?.profile?.admissionDate || '—'}</strong></div>
+              <div className="emp-row"><span>Departamento</span><strong>{emp?.profile?.department || '—'}</strong></div>
+              <div className="emp-row"><span>Unidade</span><strong>{emp?.unitName || '—'}</strong></div>
+              <div className="emp-row"><span>Status</span><strong className="emp-status ok">{emp?.active === false ? 'Inativo' : 'Ativo'}</strong></div>
             </div>
+
+            <div className="emp-card">
+              <h2>Contato</h2>
+              <div className="emp-row"><span>Telefone</span><strong>{emp?.profile?.phone || '—'}</strong></div>
+              <div className="emp-row"><span>E-mail</span><strong>{emp?.profile?.personalEmail || '—'}</strong></div>
+            </div>
+
+            <div className="emp-card">
+              <h2>Endereço</h2>
+              <div className="emp-row"><span>Logradouro</span><strong>{[emp?.profile?.address, emp?.profile?.number ? `nº ${emp.profile.number}` : null, emp?.profile?.complement].filter(Boolean).join(', ') || '—'}</strong></div>
+              <div className="emp-row"><span>Bairro</span><strong>{emp?.profile?.neighborhood || '—'}</strong></div>
+              <div className="emp-row"><span>Cidade/UF</span><strong>{emp?.profile?.city ? `${emp.profile.city}${emp.profile.uf ? `/${emp.profile.uf}` : ''}` : '—'}</strong></div>
+              <div className="emp-row"><span>CEP</span><strong>{emp?.profile?.cep || '—'}</strong></div>
+            </div>
+
+            <div className="emp-card">
+              <h2>Jornada</h2>
+              <div className="emp-row"><span>Horário padrão</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
+              <div className="emp-row"><span>Dias</span><strong>{emp?.workDays || '—'}</strong></div>
+              {emp?.scheduleByDay && Object.keys(emp.scheduleByDay).length ? (
+                Object.entries(emp.scheduleByDay).map(([day, sch]) => (
+                  <div className="emp-row" key={day}>
+                    <span>{day}</span>
+                    <strong>{sch?.start || '--:--'}–{sch?.end || '--:--'}{sch?.mode ? ` · ${sch.mode}` : ''}</strong>
+                  </div>
+                ))
+              ) : null}
+            </div>
+
+            <div className="emp-card">
+              <h2>Documentos trabalhistas</h2>
+              <div className="emp-row"><span>CTPS</span><strong>{emp?.profile?.ctps || '—'}</strong></div>
+              <div className="emp-row"><span>Série CTPS</span><strong>{emp?.profile?.ctpsSeries || '—'}</strong></div>
+              <div className="emp-row"><span>Mãe</span><strong>{emp?.profile?.motherName || '—'}</strong></div>
+              <div className="emp-row"><span>Pai</span><strong>{emp?.profile?.fatherName || '—'}</strong></div>
+            </div>
+
+            <p className="emp-muted" style={{ textAlign: 'center' }}>Os dados vêm do cadastro administrativo. Em caso de divergência, fale com a ADM.</p>
             <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
           </section>
         )}
