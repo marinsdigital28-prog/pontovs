@@ -40,6 +40,9 @@ export default function EmployeeAppPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [absenceMode, setAbsenceMode] = useState<'HORAS' | 'DIAS'>('HORAS');
   const [absenceMsg, setAbsenceMsg] = useState('');
+  const [isStandalone, setIsStandalone] = useState<boolean | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isIOS, setIsIOS] = useState(false);
 
   const loadHistory = useCallback(async () => {
     const res = await fetch('/api/employee/history', { cache: 'no-store' });
@@ -57,6 +60,36 @@ export default function EmployeeAppPage() {
     const t = window.setInterval(() => { if (document.visibilityState === 'visible') { void loadHistory(); void loadRequests(); } }, 15000);
     return () => window.clearInterval(t);
   }, [sessionStatus, loadHistory, loadRequests]);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true ||
+      document.referrer.includes('android-app://');
+    setIsStandalone(standalone);
+    const ua = window.navigator.userAgent || '';
+    setIsIOS(/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
+    const onBip = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', onBip);
+    const onInstalled = () => setIsStandalone(true);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBip);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
+  }, []);
+
+  async function handleInstall() {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice?.outcome === 'accepted') setIsStandalone(true);
+    setInstallPrompt(null);
+  }
 
   async function login(e: FormEvent) {
     e.preventDefault(); setLoading(true); setError('');
@@ -144,6 +177,56 @@ export default function EmployeeAppPage() {
             {error ? <p className="emp-error" role="alert">{error}</p> : null}
           </form>
           <p className="emp-footer-note">Acesso exclusivo do colaborador · Espaço Progredir</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isStandalone === null) {
+    return (
+      <main className="emp-app emp-login">
+        <div className="emp-login-card"><p className="emp-muted" style={{textAlign:'center'}}>Verificando instalação…</p></div>
+      </main>
+    );
+  }
+
+  if (!isStandalone) {
+    return (
+      <main className="emp-app emp-login">
+        <div className="emp-login-card emp-install-card">
+          <div className="emp-brand">
+            <div className="emp-logo" aria-hidden />
+            <h1>Instale o aplicativo</h1>
+            <p>Para proteger seus dados, o acesso só é liberado com o app instalado no celular.</p>
+          </div>
+          {installPrompt ? (
+            <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>
+              Instalar agora
+            </button>
+          ) : isIOS ? (
+            <div className="emp-install-steps">
+              <p><strong>No iPhone / iPad:</strong></p>
+              <ol>
+                <li>Toque em <strong>Compartilhar</strong> (ícone □↑)</li>
+                <li>Escolha <strong>Adicionar à Tela de Início</strong></li>
+                <li>Confirme em <strong>Adicionar</strong></li>
+                <li>Abra o ícone <strong>Meu Ponto</strong></li>
+              </ol>
+            </div>
+          ) : (
+            <div className="emp-install-steps">
+              <p><strong>No Android:</strong></p>
+              <ol>
+                <li>Toque no menu <strong>⋮</strong> do navegador</li>
+                <li>Escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong></li>
+                <li>Confirme a instalação</li>
+                <li>Abra o ícone <strong>Meu Ponto</strong></li>
+              </ol>
+              <p className="emp-muted">Se o botão de instalar não aparecer, use o menu do Chrome.</p>
+            </div>
+          )}
+          <p className="emp-footer-note">Após instalar, a barra de endereço some e o app fica protegido.</p>
+          <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
         </div>
       </main>
     );
