@@ -13,6 +13,36 @@ type EmployeeData = {
 type RequestItem = { id: string; type: string; status: string; startDate: string; endDate: string; reason: string; details?: string | null; createdAt: string };
 
 const TYPE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída' };
+
+const ABSENCE_REASONS = [
+  'Consulta médica',
+  'Exame médico',
+  'Atestado / problema de saúde',
+  'Compromisso pessoal',
+  'Problema familiar',
+  'Passeio / evento externo',
+  'Evento ou atividade externa',
+  'Curso / treinamento',
+  'Audiência / cartório / banco',
+  'Imprevisto no trajeto / transporte',
+  'Acompanhamento de familiar',
+  'Outros',
+] as const;
+
+const COVERAGE_OPTIONS = [
+  { value: 'PARCIAL_MANHA', label: 'Parcial — manhã' },
+  { value: 'PARCIAL_TARDE', label: 'Parcial — tarde' },
+  { value: 'DIA_INTEIRO', label: 'Dia inteiro' },
+  { value: 'EMERGENCIA', label: 'Emergência (sem aviso prévio)' },
+] as const;
+
+const COVERAGE_LABEL: Record<string, string> = {
+  PARCIAL_MANHA: 'Parcial manhã',
+  PARCIAL_TARDE: 'Parcial tarde',
+  DIA_INTEIRO: 'Dia inteiro',
+  EMERGENCIA: 'Emergência',
+};
+
 const APP_TZ = 'America/Sao_Paulo';
 const timeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit' });
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
@@ -34,6 +64,9 @@ export default function EmployeeAppPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [absenceMode, setAbsenceMode] = useState<'HORAS' | 'DIAS'>('HORAS');
   const [absenceMsg, setAbsenceMsg] = useState('');
+  const [coverage, setCoverage] = useState<string>('DIA_INTEIRO');
+  const [reasonChoice, setReasonChoice] = useState<string>(ABSENCE_REASONS[0]);
+  const [whatsappText, setWhatsappText] = useState<string | null>(null);
   const [isStandalone, setIsStandalone] = useState<boolean | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -139,7 +172,7 @@ export default function EmployeeAppPage() {
   }, [data]);
 
   async function submitAbsence(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault(); setLoading(true); setAbsenceMsg(''); setError('');
+    e.preventDefault(); setLoading(true); setAbsenceMsg(''); setError(''); setWhatsappText(null);
     const form = new FormData(e.currentTarget);
     const file = form.get('document');
     const documentFile = file instanceof File && file.size > 0 ? file : null;
@@ -157,20 +190,55 @@ export default function EmployeeAppPage() {
     const endDate = isHours ? startDate : String(form.get('endDate') || startDate);
     const startTime = isHours ? String(form.get('startTime') || '') : null;
     const endTime = isHours ? String(form.get('endTime') || '') : null;
-    const reason = String(form.get('reason') || '');
-    const details = [startTime && endTime ? `Horário: ${startTime}–${endTime}` : null, String(form.get('note') || '') || null].filter(Boolean).join(' · ');
+    const returnTime = String(form.get('returnTime') || '') || null;
+    const note = String(form.get('note') || '') || null;
+    const today = todayKey;
+    let finalCoverage = coverage;
+    if (startDate === today && finalCoverage !== 'EMERGENCIA') {
+      finalCoverage = 'EMERGENCIA';
+    }
+    const reason = reasonChoice === 'Outros' ? (String(form.get('reasonOther') || '').trim() || 'Outros') : reasonChoice;
+    const detailsParts = [
+      `Tipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}`,
+      startTime && endTime ? `Horário: ${startTime}–${endTime}` : null,
+      returnTime ? `Previsão de volta: ${returnTime}` : null,
+      note,
+    ].filter(Boolean);
+    const details = detailsParts.join(' · ');
     const response = await fetch('/api/employee/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        type: 'AUSENCIA', startDate, endDate, reason, details: details || null,
-        classification: isHours ? 'POR_HORAS' : 'POR_DIAS',
-        documentName: documentFile?.name || null, documentMime: documentFile?.type || null, documentData,
+        type: 'AUSENCIA',
+        startDate,
+        endDate,
+        reason,
+        details: details || null,
+        classification: finalCoverage,
+        returnExpected: Boolean(returnTime),
+        documentName: documentFile?.name || null,
+        documentMime: documentFile?.type || null,
+        documentData,
       }),
     });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar a solicitação.');
-    else { setAbsenceMsg('Solicitação enviada. Aguarde a análise da administração.'); (e.target as HTMLFormElement).reset(); await loadRequests(); }
+    else {
+      const period = startDate === endDate
+        ? shortDate.format(new Date(startDate + 'T12:00:00'))
+        : `${shortDate.format(new Date(startDate + 'T12:00:00'))} até ${shortDate.format(new Date(endDate + 'T12:00:00'))}`;
+      const timePart = startTime && endTime ? ` das ${startTime} às ${endTime}` : '';
+      const returnPart = returnTime ? `\nPrevisão de volta: ${returnTime}` : '';
+      const wa = `Olá! Comuniquei ausência pelo app Ponto Progredir.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nPeríodo: ${period}${timePart}\nTipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\nMotivo: ${reason}${returnPart}\n\nAguardando análise da administração.`;
+      setWhatsappText(wa);
+      setAbsenceMsg(finalCoverage === 'EMERGENCIA'
+        ? 'Solicitação de emergência enviada. A administração já já pode ver no painel.'
+        : 'Solicitação enviada. Aguarde a análise da administração.');
+      (e.target as HTMLFormElement).reset();
+      setReasonChoice(ABSENCE_REASONS[0]);
+      setCoverage('DIA_INTEIRO');
+      await loadRequests();
+    }
     setLoading(false);
   }
 
@@ -212,7 +280,7 @@ export default function EmployeeAppPage() {
         <div className="emp-login-card emp-install-card">
           <div className="emp-brand">{brandLogo}<h1>Instale o aplicativo</h1><p>Tenha o Ponto Progredir disponível na tela inicial do seu celular.</p></div>
           <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar aplicativo</button>
-          {!installPrompt ? <p className="emp-muted emp-install-feedback">O navegador ainda não disponibilizou o botão nativo. Recarregue a página e tente novamente.</p> : null}
+          {!installPrompt ? <p className="emp-muted emp-install-feedback">O navegador ainda não disponibilizou o botão nativo. Use o menu do navegador ou peça ajuda à ADM.</p> : null}
           <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
         </div>
       </main>
@@ -251,7 +319,7 @@ export default function EmployeeAppPage() {
             ) : null}
             <div className="emp-card">
               <div className="emp-card-head">
-                <h2>Marcações de hoje</h2>
+                <h2>Marcações de hoje limpa</h2>
                 <button type="button" className="emp-link" onClick={() => void loadHistory()}>Atualizar</button>
               </div>
               {!todayPunches.length ? <p className="emp-muted">Nenhuma marcação registrada hoje ainda.</p> : (
@@ -286,9 +354,6 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Primeira marcação</span><strong>{todayPunches[0] ? timeFmt.format(new Date(todayPunches[0].timestamp)) : '—'}</strong></div>
               <div className="emp-row"><span>Última marcação</span><strong>{todayPunches.length ? timeFmt.format(new Date(todayPunches[todayPunches.length - 1].timestamp)) : '—'}</strong></div>
               <div className="emp-row"><span>Tipos registrados</span><strong>{todayPunches.length ? [...new Set(todayPunches.map((p) => TYPE_LABEL[p.type] || p.type))].join(', ') : '—'}</strong></div>
-            </div>
-            <div className="emp-card">
-              <p className="emp-muted" style={{ margin: 0 }}>Os totais oficiais de horas e atrasos seguem as regras do sistema principal e aparecem na folha administrativa. Aqui você acompanha a trajetória do seu dia.</p>
             </div>
           </section>
         )}
@@ -338,20 +403,43 @@ export default function EmployeeAppPage() {
                 <button type="button" className={absenceMode === 'DIAS' ? 'active' : ''} onClick={() => setAbsenceMode('DIAS')}>Por dias</button>
               </div>
               <form onSubmit={submitAbsence} className="emp-form">
+                <label>Tipo de ausência
+                  <select value={coverage} onChange={(e) => setCoverage(e.target.value)} required>
+                    {COVERAGE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="emp-muted">Se for hoje e não deu tempo de avisar, use <strong>Emergência</strong> (ou o sistema marca automaticamente).</p>
                 <label>Data {absenceMode === 'DIAS' ? 'inicial' : ''}<input name="startDate" type="date" required /></label>
                 {absenceMode === 'DIAS' ? (
                   <label>Data final<input name="endDate" type="date" required /></label>
                 ) : (
                   <div className="emp-grid-2">
-                    <label>Hora inicial<input name="startTime" type="time" required /></label>
-                    <label>Hora final<input name="endTime" type="time" required /></label>
+                    <label>Hora inicial<input name="startTime" type="time" /></label>
+                    <label>Hora final<input name="endTime" type="time" /></label>
                   </div>
                 )}
-                <label>Motivo<input name="reason" required maxLength={200} placeholder="Ex.: Consulta médica" /></label>
-                <label>Observação<textarea name="note" rows={2} maxLength={500} placeholder="Opcional" /></label>
+                <label>Motivo
+                  <select value={reasonChoice} onChange={(e) => setReasonChoice(e.target.value)} required>
+                    {ABSENCE_REASONS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </label>
+                {reasonChoice === 'Outros' ? (
+                  <label>Descreva o motivo<input name="reasonOther" required maxLength={200} placeholder="Descreva o motivo" /></label>
+                ) : null}
+                <label>Previsão de volta (horário)<input name="returnTime" type="time" /></label>
+                <label>Observação<textarea name="note" rows={2} maxLength={500} placeholder="Opcional — detalhes extras" /></label>
                 <label>Anexo (PDF, JPG ou PNG)<input name="document" type="file" accept=".pdf,image/jpeg,image/png" /></label>
                 <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Enviar solicitação'}</button>
                 {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
+                {whatsappText ? (
+                  <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">
+                    Enviar confirmação no WhatsApp
+                  </a>
+                ) : null}
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
             </div>
