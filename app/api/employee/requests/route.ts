@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'Dados da solicitação inválidos.' }, { status: 400 });
   const input = parsed.data; const startDate = day(input.startDate); const endDate = day(input.endDate);
   if (endDate < startDate) return NextResponse.json({ error: 'A data final não pode ser anterior à inicial.' }, { status: 400 });
-  if (input.type === 'AUSENCIA' && input.startDate !== input.endDate) return NextResponse.json({ error: 'A ausência deve ser enviada por dia.' }, { status: 400 });
+  // Ausência pode ser por horas (mesmo dia) ou por dias (intervalo).
   const duplicate = await prisma.employeeRequest.findFirst({ where: { employeeId, type: input.type, status: 'PENDENTE', startDate, endDate }, select: { id: true } });
   if (duplicate) return NextResponse.json({ error: 'Já existe uma solicitação pendente para este período.' }, { status: 409 });
   const created = await prisma.employeeRequest.create({ data: { employeeId, type: input.type, startDate, endDate, reason: input.reason, details: input.details || null, medicalSpecialty: input.medicalSpecialty || null, classification: input.classification || null, returnExpected: input.returnExpected ?? null, documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null }, select: { id: true, type: true, status: true, startDate: true, endDate: true, createdAt: true } });
