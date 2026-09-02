@@ -1,10 +1,10 @@
 'use client';
 
 import './emp-app.css';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 
-type Punch = { id: string; type: string; timestamp: string; status: string };
+type Punch = { id: string; type: string; timestamp: string; status: string; photoData?: string | null; hasPhoto?: boolean };
 type EmployeeData = {
   employee: { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; scheduleStart: string | null; scheduleEnd: string | null; workDays: string | null };
   punches: Punch[];
@@ -19,12 +19,6 @@ const dateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, weekday: 'l
 const shortDate = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, day: '2-digit', month: '2-digit', year: 'numeric' });
 
 function padMat(v: string) { return v.replace(/\D/g, '').padStart(4, '0'); }
-function minutesLabel(m?: number) {
-  if (m == null || Number.isNaN(m)) return '--:--';
-  const h = Math.floor(Math.abs(m) / 60);
-  const min = Math.abs(m) % 60;
-  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-}
 
 type Tab = 'home' | 'journey' | 'month' | 'absences' | 'profile';
 
@@ -43,10 +37,35 @@ export default function EmployeeAppPage() {
   const [isStandalone, setIsStandalone] = useState<boolean | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const knownPunchIds = useRef<Set<string>>(new Set());
+  const firstLoadDone = useRef(false);
 
   const loadHistory = useCallback(async () => {
     const res = await fetch('/api/employee/history', { cache: 'no-store' });
-    if (res.ok) { const json = await res.json(); setData({ employee: json.employee, punches: json.punches || [], summary: json.summary }); }
+    if (!res.ok) return;
+    const json = await res.json();
+    const punches: Punch[] = json.punches || [];
+    if (firstLoadDone.current) {
+      const newOnes = punches.filter((p) => !knownPunchIds.current.has(p.id));
+      if (newOnes.length) {
+        const latest = newOnes[0];
+        const label = TYPE_LABEL[latest.type] || latest.type;
+        const when = timeFmt.format(new Date(latest.timestamp));
+        const msg = `${label} registrada às ${when}`;
+        setToast(msg);
+        try { if (navigator.vibrate) navigator.vibrate([80, 40, 80]); } catch {}
+        try {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            new Notification('Ponto Progredir', { body: msg, icon: '/ponto-progredir-icon-circular.png', tag: `punch-${latest.id}` });
+          }
+        } catch {}
+        window.setTimeout(() => setToast(null), 4500);
+      }
+    }
+    knownPunchIds.current = new Set(punches.map((p) => p.id));
+    firstLoadDone.current = true;
+    setData({ employee: json.employee, punches, summary: json.summary });
   }, []);
 
   const loadRequests = useCallback(async () => {
@@ -57,30 +76,21 @@ export default function EmployeeAppPage() {
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
     void loadHistory(); void loadRequests();
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') { void loadHistory(); void loadRequests(); } }, 15000);
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission();
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') { void loadHistory(); void loadRequests(); } }, 12000);
     return () => window.clearInterval(t);
   }, [sessionStatus, loadHistory, loadRequests]);
 
   useEffect(() => {
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true ||
-      document.referrer.includes('android-app://');
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true || document.referrer.includes('android-app://');
     setIsStandalone(standalone);
     const ua = window.navigator.userAgent || '';
     setIsIOS(/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-
-    const onBip = (e: Event) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
+    const onBip = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener('beforeinstallprompt', onBip);
     const onInstalled = () => setIsStandalone(true);
     window.addEventListener('appinstalled', onInstalled);
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onBip);
-      window.removeEventListener('appinstalled', onInstalled);
-    };
+    return () => { window.removeEventListener('beforeinstallprompt', onBip); window.removeEventListener('appinstalled', onInstalled); };
   }, []);
 
   async function handleInstall() {
@@ -113,6 +123,11 @@ export default function EmployeeAppPage() {
       return `${v.year}-${v.month}-${v.day}` === todayKey;
     }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [data, todayKey]);
+
+  const lastPhoto = useMemo(() => {
+    const withPhoto = [...todayPunches].reverse().find((p) => p.photoData);
+    return withPhoto?.photoData || null;
+  }, [todayPunches]);
 
   const punchesByDay = useMemo(() => {
     const map = new Map<string, Punch[]>();
@@ -159,18 +174,23 @@ export default function EmployeeAppPage() {
     setLoading(false);
   }
 
+  const brandLogo = (
+    <div className="emp-logo-wrap" aria-hidden>
+      <img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" />
+    </div>
+  );
+
   if (sessionStatus !== 'authenticated') {
     return (
       <main className="emp-app emp-login">
         <div className="emp-login-card">
           <div className="emp-brand">
-            <div className="emp-logo" aria-hidden />
+            {brandLogo}
             <h1>Ponto <span>Progredir</span></h1>
             <p>Consulte seus pontos e horários de trabalho</p>
           </div>
           <form onSubmit={login} className="emp-form">
-            <label>
-              Matrícula
+            <label>Matrícula
               <input inputMode="numeric" maxLength={8} required value={matricula} onChange={(e) => setMatricula(e.target.value.replace(/\D/g, ''))} placeholder="Ex.: 1401" autoComplete="username" />
             </label>
             <button type="submit" className="emp-btn primary" disabled={loading || matricula.length < 3}>{loading ? 'Entrando…' : 'Entrar'}</button>
@@ -183,47 +203,20 @@ export default function EmployeeAppPage() {
   }
 
   if (isStandalone === null) {
-    return (
-      <main className="emp-app emp-login">
-        <div className="emp-login-card"><p className="emp-muted" style={{textAlign:'center'}}>Verificando instalação…</p></div>
-      </main>
-    );
+    return (<main className="emp-app emp-login"><div className="emp-login-card"><p className="emp-muted" style={{ textAlign: 'center' }}>Verificando instalação…</p></div></main>);
   }
 
   if (!isStandalone) {
     return (
       <main className="emp-app emp-login">
         <div className="emp-login-card emp-install-card">
-          <div className="emp-brand">
-            <div className="emp-logo" aria-hidden />
-            <h1>Instale o aplicativo</h1>
-            <p>Para proteger seus dados, o acesso só é liberado com o app instalado no celular.</p>
-          </div>
+          <div className="emp-brand">{brandLogo}<h1>Instale o aplicativo</h1><p>Para proteger seus dados, o acesso só é liberado com o app instalado no celular.</p></div>
           {installPrompt ? (
-            <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>
-              Instalar agora
-            </button>
+            <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar agora</button>
           ) : isIOS ? (
-            <div className="emp-install-steps">
-              <p><strong>No iPhone / iPad:</strong></p>
-              <ol>
-                <li>Toque em <strong>Compartilhar</strong> (ícone □↑)</li>
-                <li>Escolha <strong>Adicionar à Tela de Início</strong></li>
-                <li>Confirme em <strong>Adicionar</strong></li>
-                <li>Abra o ícone <strong>Meu Ponto</strong></li>
-              </ol>
-            </div>
+            <div className="emp-install-steps"><p><strong>No iPhone / iPad:</strong></p><ol><li>Toque em <strong>Compartilhar</strong> (ícone □↑)</li><li>Escolha <strong>Adicionar à Tela de Início</strong></li><li>Confirme em <strong>Adicionar</strong></li><li>Abra o ícone <strong>Meu Ponto</strong></li></ol></div>
           ) : (
-            <div className="emp-install-steps">
-              <p><strong>No Android:</strong></p>
-              <ol>
-                <li>Toque no menu <strong>⋮</strong> do navegador</li>
-                <li>Escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong></li>
-                <li>Confirme a instalação</li>
-                <li>Abra o ícone <strong>Meu Ponto</strong></li>
-              </ol>
-              <p className="emp-muted">Se o botão de instalar não aparecer, use o menu do Chrome.</p>
-            </div>
+            <div className="emp-install-steps"><p><strong>No Android:</strong></p><ol><li>Toque no menu <strong>⋮</strong> do navegador</li><li>Escolha <strong>Instalar app</strong> ou <strong>Adicionar à tela inicial</strong></li><li>Confirme a instalação</li><li>Abra o ícone <strong>Meu Ponto</strong></li></ol><p className="emp-muted">Se o botão de instalar não aparecer, use o menu do Chrome.</p></div>
           )}
           <p className="emp-footer-note">Após instalar, a barra de endereço some e o app fica protegido.</p>
           <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
@@ -236,21 +229,32 @@ export default function EmployeeAppPage() {
 
   return (
     <main className="emp-app">
+      {toast ? <div className="emp-toast" role="status"><strong>Nova marcação</strong><span>{toast}</span></div> : null}
+
       <header className="emp-top">
-        <div>
-          <span className="emp-greet">{emp ? `Olá, ${emp.name.split(' ')[0]}` : 'Carregando…'}</span>
-          <small>{dateFmt.format(new Date())}</small>
+        <div className="emp-top-left">
+          <div className="emp-logo-wrap sm" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
+          <div>
+            <span className="emp-greet">{emp ? `Olá, ${emp.name.split(' ')[0]}` : 'Carregando…'}</span>
+            <small>{dateFmt.format(new Date())}</small>
+          </div>
         </div>
-        <button type="button" className="emp-icon-btn" aria-label="Notificações" onClick={() => setTab('absences')}>🔔</button>
       </header>
 
       <div className="emp-content">
         {tab === 'home' && (
           <section className="emp-section">
-            <div className="emp-card">
-              <span className="emp-label">Jornada prevista</span>
+            <div className="emp-card emp-hero">
+              <span className="emp-label">Hoje</span>
               <strong className="emp-big">{emp?.scheduleStart || '--:--'} às {emp?.scheduleEnd || '--:--'}</strong>
+              <p className="emp-muted">Jornada prevista · {emp?.workDays || 'dias não informados'}</p>
             </div>
+            {lastPhoto ? (
+              <div className="emp-card emp-photo-card">
+                <span className="emp-label">Última foto registrada hoje</span>
+                <img src={lastPhoto} alt="Foto da marcação" className="emp-punch-photo" />
+              </div>
+            ) : null}
             <div className="emp-card">
               <div className="emp-card-head">
                 <h2>Marcações de hoje</h2>
@@ -259,18 +263,15 @@ export default function EmployeeAppPage() {
               {!todayPunches.length ? <p className="emp-muted">Nenhuma marcação registrada hoje ainda.</p> : (
                 <ul className="emp-timeline">
                   {todayPunches.map((p) => (
-                    <li key={p.id}>
+                    <li key={p.id} className="emp-timeline-row">
+                      {p.photoData ? <img src={p.photoData} alt="" className="emp-thumb" /> : <span className="emp-thumb placeholder" />}
                       <span className="emp-time">{timeFmt.format(new Date(p.timestamp))}</span>
                       <span>{TYPE_LABEL[p.type] || p.type}</span>
-                      <span className="emp-pill ok">Registrado</span>
+                      <span className="emp-pill ok">OK</span>
                     </li>
                   ))}
                 </ul>
               )}
-            </div>
-            <div className="emp-grid-2">
-              <div className="emp-card compact"><span className="emp-label">Status</span><strong className="emp-status ok">● Em andamento</strong></div>
-              <div className="emp-card compact"><span className="emp-label">Batidas hoje</span><strong className="emp-big">{todayPunches.length}</strong></div>
             </div>
           </section>
         )}
@@ -278,26 +279,22 @@ export default function EmployeeAppPage() {
         {tab === 'journey' && (
           <section className="emp-section">
             <div className="emp-card">
-              <span className="emp-label">Horário previsto</span>
+              <span className="emp-label">Sua jornada cadastrada</span>
               <strong className="emp-big">{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong>
               <p className="emp-muted">{emp?.workDays || 'Dias não informados'}</p>
             </div>
-            <div className="emp-card">
-              <h2>Batidas de hoje</h2>
-              <ul className="emp-timeline">
-                {todayPunches.map((p) => (
-                  <li key={p.id}>
-                    <span className="emp-time">{timeFmt.format(new Date(p.timestamp))}</span>
-                    <span>{TYPE_LABEL[p.type] || p.type}</span>
-                    <span className="emp-pill ok">Registrado</span>
-                  </li>
-                ))}
-                {!todayPunches.length ? <li className="emp-muted">Sem registros hoje</li> : null}
-              </ul>
-            </div>
             <div className="emp-grid-2">
-              <div className="emp-card compact"><span className="emp-label">Horas trabalhadas</span><strong className="emp-big">{minutesLabel(data?.summary?.workedMinutes)}</strong></div>
-              <div className="emp-card compact"><span className="emp-label">Horas previstas</span><strong className="emp-big">{minutesLabel(data?.summary?.plannedMinutes)}</strong></div>
+              <div className="emp-card compact"><span className="emp-label">Batidas hoje</span><strong className="emp-big">{todayPunches.length}</strong></div>
+              <div className="emp-card compact"><span className="emp-label">Status</span><strong className="emp-status ok">{todayPunches.length ? 'Em andamento' : 'Aguardando'}</strong></div>
+            </div>
+            <div className="emp-card">
+              <h2>Resumo do dia</h2>
+              <div className="emp-row"><span>Primeira marcação</span><strong>{todayPunches[0] ? timeFmt.format(new Date(todayPunches[0].timestamp)) : '—'}</strong></div>
+              <div className="emp-row"><span>Última marcação</span><strong>{todayPunches.length ? timeFmt.format(new Date(todayPunches[todayPunches.length - 1].timestamp)) : '—'}</strong></div>
+              <div className="emp-row"><span>Tipos registrados</span><strong>{todayPunches.length ? [...new Set(todayPunches.map((p) => TYPE_LABEL[p.type] || p.type))].join(', ') : '—'}</strong></div>
+            </div>
+            <div className="emp-card">
+              <p className="emp-muted" style={{ margin: 0 }}>Os totais oficiais de horas e atrasos seguem as regras do sistema principal e aparecem na folha administrativa. Aqui você acompanha a trajetória do seu dia.</p>
             </div>
           </section>
         )}
@@ -386,7 +383,7 @@ export default function EmployeeAppPage() {
         {tab === 'profile' && (
           <section className="emp-section">
             <div className="emp-card profile">
-              <div className="emp-avatar">{(emp?.name || '?').slice(0, 1)}</div>
+              <div className="emp-logo-wrap" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
               <h2>{emp?.name}</h2>
               <p>Matrícula {emp?.employeeNumber}</p>
               <p>{emp?.jobTitle || 'Cargo não informado'}</p>
