@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
 import { validateProfile } from '../../lib/employee-validation';
+import InstallAppButton from '../../components/InstallAppButton';
 
 type Employee = { id: string; name: string; employeeNumber: string; jobTitle: string | null; workDays: string | null; scheduleStart: string | null; scheduleEnd: string | null };
 type Punch = { id: string; type: string; timestamp: string };
@@ -69,7 +70,7 @@ export default function ColaboradorPage() {
   }
 
   return <main className="employee-portal">
-    <header className="employee-portal-header"><div><span className="eyebrow">PONTO PROGREDIR · PORTAL</span><h1>Área do colaborador</h1><p>Consulte sua jornada e suas marcações oficiais. A batida acontece somente no relógio autorizado.</p></div><div className="employee-header-actions">{session ? <><span className="local-badge">CONSULTA INDIVIDUAL</span><button className="ghost-btn" type="button" onClick={() => void signOut({ callbackUrl: '/colaborador' })}>Sair</button></> : null}</div></header>
+    <header className="employee-portal-header"><div><span className="eyebrow">PONTO PROGREDIR · PORTAL</span><h1>Área do colaborador</h1><p>Consulte sua jornada e suas marcações oficiais. A batida acontece somente no relógio autorizado.</p></div><div className="employee-header-actions"><InstallAppButton compact />{session ? <><span className="local-badge">CONSULTA INDIVIDUAL</span><button className="ghost-btn" type="button" onClick={() => void signOut({ callbackUrl: '/colaborador' })}>Sair</button></> : null}</div></header>
 
     {!session && <section className="employee-lookup panel"><div><h2>Entrar no portal</h2><p>Informe somente sua matrícula para consultar seus dados oficiais.</p></div><form onSubmit={login}><label htmlFor="employee-number">Matrícula<input id="employee-number" inputMode="numeric" maxLength={8} required value={employeeNumber} onChange={event => setEmployeeNumber(event.target.value.replace(/\D/g, ''))} autoComplete="off" placeholder="Ex.: 4041" /></label><button className="primary-btn" type="submit" disabled={loading}>{loading ? 'Entrando…' : 'Acessar portal'}</button></form>{error && <p className="form-error" role="alert">{error}</p>}</section>}
       {sessionStatus === 'authenticated' && !data && loading ? <section className="panel">Carregando seus dados oficiais…</section> : null}

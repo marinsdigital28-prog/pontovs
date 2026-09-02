@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
+import InstallAppButton from '../../components/InstallAppButton';
 
 export default function Page() {
   const [loading, setLoading] = useState(false);
@@ -347,7 +348,7 @@ export default function Page() {
           <div className="header-brand">Ponto Progredir</div>
           <div className="header-greeting">{employee ? `Bom dia, ${employee.name}` : 'Identificação do funcionário'}</div>
         </div>
-        <div className="avatar" aria-hidden />
+        <div className="ponto-header-actions"><InstallAppButton compact /><div className="avatar" aria-hidden /></div>
       </div>
 
       <div className={`card ponto-kiosk-card ${step === 'register' ? 'ponto-register-card' : 'ponto-lookup-card'}`}>
