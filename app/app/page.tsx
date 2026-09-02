@@ -81,7 +81,9 @@ export default function EmployeeAppPage() {
   }, [sessionStatus, loadHistory, loadRequests]);
 
   useEffect(() => {
-    const nativeShell = new URLSearchParams(window.location.search).get('native') === '1';
+    const nativeShell = new URLSearchParams(window.location.search).get('native') === '1'
+      || /PontoProgredirNative|Capacitor/i.test(window.navigator.userAgent)
+      || Boolean((window as Window & { Capacitor?: unknown }).Capacitor);
     const standalone = nativeShell || window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true || document.referrer.includes('android-app://');
     setIsStandalone(standalone);
     const onBip = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
