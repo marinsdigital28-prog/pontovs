@@ -8,3 +8,6 @@ dist/
 
 # Dados pessoais de importação — nunca versionar
 imports/report-employees-import.json
+
+# APKs gerados localmente — entregues separadamente
+releases/

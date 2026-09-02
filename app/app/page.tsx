@@ -81,7 +81,8 @@ export default function EmployeeAppPage() {
   }, [sessionStatus, loadHistory, loadRequests]);
 
   useEffect(() => {
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true || document.referrer.includes('android-app://');
+    const nativeShell = new URLSearchParams(window.location.search).get('native') === '1';
+    const standalone = nativeShell || window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true || document.referrer.includes('android-app://');
     setIsStandalone(standalone);
     const onBip = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener('beforeinstallprompt', onBip);
