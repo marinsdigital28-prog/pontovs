@@ -161,9 +161,6 @@
 .emp-bottom-nav button.active { color: var(--emp-green); }
 
 .emp-install-card { display: grid; gap: 1rem; }
-.emp-install-steps { background: #f4f8f5; border: 1px solid var(--emp-border); border-radius: 12px; padding: 1rem; text-align: left; }
-.emp-install-steps ol { margin: 0.5rem 0 0; padding-left: 1.2rem; color: #334155; font-size: 0.9rem; line-height: 1.5; }
-.emp-install-steps p { margin: 0; font-size: 0.9rem; color: var(--emp-text); }
 
 .emp-toast {
   position: fixed; top: 0.75rem; left: 50%; transform: translateX(-50%); z-index: 50;
@@ -180,3 +177,9 @@
 @media (min-width: 481px) {
   .emp-app { border-left: 1px solid var(--emp-border); border-right: 1px solid var(--emp-border); }
 }
+
+/* O conteúdo do aplicativo deve rolar com a página, inclusive em telas pequenas. */
+.emp-app { height: auto; min-height: 100dvh; max-height: none; overflow: visible; }
+.emp-content { flex: none; min-height: 0; height: auto; max-height: none; overflow: visible; }
+.emp-install-card { margin: 1rem 0; }
+.emp-install-feedback { text-align: center; line-height: 1.35; }

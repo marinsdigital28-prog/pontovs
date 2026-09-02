@@ -208,7 +208,7 @@ export default function EmployeeAppPage() {
       <main className="emp-app emp-login">
         <div className="emp-login-card emp-install-card">
           <div className="emp-brand">{brandLogo}<h1>Instale o aplicativo</h1><p>Tenha o Ponto Progredir disponível na tela inicial do seu celular.</p></div>
-          <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>{installPrompt ? 'Instalar aplicativo' : 'Instalação indisponível agora'}</button>
+          <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar aplicativo</button>
           {!installPrompt ? <p className="emp-muted emp-install-feedback">O navegador ainda não disponibilizou o botão nativo. Recarregue a página e tente novamente.</p> : null}
           <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
         </div>
