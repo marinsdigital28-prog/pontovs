@@ -66,3 +66,8 @@
 .emp-bottom-nav button span{font-size:1.15rem}
 .emp-bottom-nav button.active{color:#2563eb}
 @media(min-width:481px){.emp-app{border-left:1px solid #eef2f7;border-right:1px solid #eef2f7}}
+
+.emp-install-card{display:grid;gap:1rem}
+.emp-install-steps{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:1rem;text-align:left}
+.emp-install-steps ol{margin:.5rem 0 0;padding-left:1.2rem;color:#334155;font-size:.9rem;line-height:1.5}
+.emp-install-steps p{margin:0;font-size:.9rem;color:#1a2332}
