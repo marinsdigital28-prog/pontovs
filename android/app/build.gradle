@@ -1,6 +1,22 @@
 apply plugin: 'com.android.application'
 
+def signingPropertiesFile = rootProject.file('signing.properties')
+def signingProperties = new Properties()
+if (signingPropertiesFile.exists()) {
+    signingProperties.load(new FileInputStream(signingPropertiesFile))
+}
+
 android {
+    signingConfigs {
+        release {
+            if (signingPropertiesFile.exists()) {
+                storeFile file(signingProperties['storeFile'])
+                storePassword signingProperties['storePassword']
+                keyAlias signingProperties['keyAlias']
+                keyPassword signingProperties['keyPassword']
+            }
+        }
+    }
     namespace = "com.marinsdigital.pontoprogredir"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -18,6 +34,9 @@ android {
     }
     buildTypes {
         release {
+            if (signingPropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
