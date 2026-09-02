@@ -67,6 +67,7 @@ export default function EmployeeAppPage() {
   const [coverage, setCoverage] = useState<string>('DIA_INTEIRO');
   const [reasonChoice, setReasonChoice] = useState<string>(ABSENCE_REASONS[0]);
   const [whatsappText, setWhatsappText] = useState<string | null>(null);
+  const [dismissInstall, setDismissInstall] = useState(false);
   const [isStandalone, setIsStandalone] = useState<boolean | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -232,7 +233,7 @@ export default function EmployeeAppPage() {
       const wa = `Olá! Comuniquei ausência pelo app Ponto Progredir.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nPeríodo: ${period}${timePart}\nTipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\nMotivo: ${reason}${returnPart}\n\nAguardando análise da administração.`;
       setWhatsappText(wa);
       setAbsenceMsg(finalCoverage === 'EMERGENCIA'
-        ? 'Solicitação de emergência enviada. A administração já já pode ver no painel.'
+        ? 'Solicitação de emergência enviada. A administração já pode ver no painel.'
         : 'Solicitação enviada. Aguarde a análise da administração.');
       (e.target as HTMLFormElement).reset();
       setReasonChoice(ABSENCE_REASONS[0]);
@@ -270,28 +271,26 @@ export default function EmployeeAppPage() {
     );
   }
 
-  if (isStandalone === null) {
-    return (<main className="emp-app emp-login"><div className="emp-login-card"><p className="emp-muted" style={{ textAlign: 'center' }}>Verificando instalação…</p></div></main>);
-  }
-
-  if (!isStandalone) {
-    return (
-      <main className="emp-app emp-login">
-        <div className="emp-login-card emp-install-card">
-          <div className="emp-brand">{brandLogo}<h1>Instale o aplicativo</h1><p>Tenha o Ponto Progredir disponível na tela inicial do seu celular.</p></div>
-          <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar aplicativo</button>
-          {!installPrompt ? <p className="emp-muted emp-install-feedback">O navegador ainda não disponibilizou o botão nativo. Use o menu do navegador ou peça ajuda à ADM.</p> : null}
-          <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
-        </div>
-      </main>
-    );
-  }
-
   const emp = data?.employee;
+  const showInstallHint = isStandalone === false && !dismissInstall;
 
   return (
     <main className="emp-app">
       {toast ? <div className="emp-toast" role="status"><strong>Nova marcação</strong><span>{toast}</span></div> : null}
+
+      {showInstallHint ? (
+        <div className="emp-install-banner">
+          <div>
+            <strong>Dica:</strong> instale o app na tela inicial para acesso mais rápido.
+          </div>
+          <div className="emp-install-banner-actions">
+            {installPrompt ? (
+              <button type="button" className="emp-btn primary" onClick={() => void handleInstall()}>Instalar</button>
+            ) : null}
+            <button type="button" className="emp-link" onClick={() => setDismissInstall(true)}>Agora não</button>
+          </div>
+        </div>
+      ) : null}
 
       <header className="emp-top">
         <div className="emp-top-left">
@@ -319,7 +318,7 @@ export default function EmployeeAppPage() {
             ) : null}
             <div className="emp-card">
               <div className="emp-card-head">
-                <h2>Marcações de hoje limpa</h2>
+                <h2>Marcações de hoje</h2>
                 <button type="button" className="emp-link" onClick={() => void loadHistory()}>Atualizar</button>
               </div>
               {!todayPunches.length ? <p className="emp-muted">Nenhuma marcação registrada hoje ainda.</p> : (
