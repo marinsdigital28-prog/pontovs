@@ -38,6 +38,20 @@ const COVERAGE_OPTIONS = [
 const COVERAGE_LABEL: Record<string, string> = {
   PARCIAL_MANHA: 'Parcial manhã', PARCIAL_TARDE: 'Parcial tarde', DIA_INTEIRO: 'Dia inteiro', EMERGENCIA: 'Emergência',
 };
+const FORGOT_TYPES = [
+  { value: 'ENTRADA', label: 'Entrada' },
+  { value: 'INTERVALO', label: 'Intervalo' },
+  { value: 'RETORNO', label: 'Retorno' },
+  { value: 'SAIDA', label: 'Saída' },
+] as const;
+const FORGOT_REASONS = [
+  'Esqueci de bater no totem',
+  'Totem indisponível / com problema',
+  'Estava em atendimento / reunião',
+  'Cheguei e fui direto à atividade',
+  'Saí com urgência e não consegui marcar',
+  'Outros',
+] as const;
 
 const APP_TZ = 'America/Sao_Paulo';
 const timeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit' });
@@ -56,7 +70,10 @@ export default function EmployeeAppPage() {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [monthCursor, setMonthCursor] = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() }; });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [requestKind, setRequestKind] = useState<'AUSENCIA' | 'ESQUECI_PONTO'>('AUSENCIA');
   const [absenceMode, setAbsenceMode] = useState<'HORAS' | 'DIAS'>('HORAS');
+  const [forgotType, setForgotType] = useState<string>('ENTRADA');
+  const [forgotReason, setForgotReason] = useState<string>('Esqueci de bater no totem');
   const [absenceMsg, setAbsenceMsg] = useState('');
   const [coverage, setCoverage] = useState<string>('DIA_INTEIRO');
   const [reasonChoice, setReasonChoice] = useState<string>(ABSENCE_REASONS[0]);
@@ -222,6 +239,39 @@ export default function EmployeeAppPage() {
     setLoading(false);
   }
 
+  async function submitForgot(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault(); setLoading(true); setAbsenceMsg(''); setError(''); setWhatsappText(null);
+    const form = new FormData(e.currentTarget);
+    const day = String(form.get('forgotDate') || '');
+    const approxTime = String(form.get('forgotTime') || '');
+    const note = String(form.get('note') || '') || null;
+    const reason = forgotReason === 'Outros' ? (String(form.get('reasonOther') || '').trim() || 'Outros') : forgotReason;
+    const details = [
+      `Batida esquecida: ${TYPE_LABEL[forgotType] || forgotType}`,
+      approxTime ? `Horário aproximado: ${approxTime}` : null,
+      note,
+    ].filter(Boolean).join(' · ');
+    const response = await fetch('/api/employee/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ESQUECI_PONTO', startDate: day, endDate: day, reason, details: details || null,
+        classification: forgotType, returnExpected: null,
+      }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso.');
+    else {
+      setAbsenceMsg('Aviso de ponto esquecido enviado. A administração vai analisar.');
+      setWhatsappText(`Olá! Comuniquei que esqueci de marcar o ponto.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nData: ${shortDate.format(new Date(day + 'T12:00:00'))}\nTipo: ${TYPE_LABEL[forgotType] || forgotType}\nHorário aprox.: ${approxTime || 'não informado'}\nMotivo: ${reason}\n\nAguardando análise da administração.`);
+      (e.target as HTMLFormElement).reset();
+      setForgotType('ENTRADA');
+      setForgotReason('Esqueci de bater no totem');
+      await loadRequests();
+    }
+    setLoading(false);
+  }
+
   const brandLogo = (
     <div className="emp-logo-wrap" aria-hidden>
       <img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" />
@@ -366,7 +416,44 @@ export default function EmployeeAppPage() {
         {tab === 'absences' && (
           <section className="emp-section">
             <div className="emp-card">
-              <h2>Nova ausência</h2>
+              <div className="emp-segment">
+                <button type="button" className={requestKind === 'AUSENCIA' ? 'active' : ''} onClick={() => { setRequestKind('AUSENCIA'); setAbsenceMsg(''); setError(''); setWhatsappText(null); }}>Aviso de ausência</button>
+                <button type="button" className={requestKind === 'ESQUECI_PONTO' ? 'active' : ''} onClick={() => { setRequestKind('ESQUECI_PONTO'); setAbsenceMsg(''); setError(''); setWhatsappText(null); }}>Esqueci de marcar</button>
+              </div>
+            </div>
+
+            {requestKind === 'ESQUECI_PONTO' ? (
+            <div className="emp-card">
+              <h2>Esqueci de marcar o ponto</h2>
+              <p className="emp-muted">Informe o dia e o horário aproximado. A administração analisa e decide se registra a justificativa.</p>
+              <form onSubmit={submitForgot} className="emp-form">
+                <label>Data da batida esquecida<input name="forgotDate" type="date" required /></label>
+                <label>Horário aproximado<input name="forgotTime" type="time" required /></label>
+                <label>Qual batida?
+                  <select value={forgotType} onChange={(e) => setForgotType(e.target.value)} required>
+                    {FORGOT_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+                <label>Motivo
+                  <select value={forgotReason} onChange={(e) => setForgotReason(e.target.value)} required>
+                    {FORGOT_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </label>
+                {forgotReason === 'Outros' ? (
+                  <label>Descreva<input name="reasonOther" required maxLength={200} placeholder="Descreva o que aconteceu" /></label>
+                ) : null}
+                <label>Observação<textarea name="note" rows={2} maxLength={500} placeholder="Opcional" /></label>
+                <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Enviar aviso'}</button>
+                {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
+                {whatsappText ? (
+                  <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">Enviar no WhatsApp</a>
+                ) : null}
+                {error ? <p className="emp-error">{error}</p> : null}
+              </form>
+            </div>
+            ) : (
+            <div className="emp-card">
+              <h2>Aviso de ausência</h2>
               <div className="emp-segment">
                 <button type="button" className={absenceMode === 'HORAS' ? 'active' : ''} onClick={() => setAbsenceMode('HORAS')}>Por horas</button>
                 <button type="button" className={absenceMode === 'DIAS' ? 'active' : ''} onClick={() => setAbsenceMode('DIAS')}>Por dias</button>
@@ -406,6 +493,8 @@ export default function EmployeeAppPage() {
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
             </div>
+            )}
+
             <div className="emp-card">
               <h2>Minhas solicitações</h2>
               {!requests.length ? <p className="emp-muted">Nenhuma solicitação ainda.</p> : (
@@ -433,7 +522,6 @@ export default function EmployeeAppPage() {
               <p>Matrícula {emp?.employeeNumber || '—'}</p>
               <p>{emp?.jobTitle || emp?.profile?.jobTitleFromPdf || 'Cargo não informado'}</p>
             </div>
-
             <div className="emp-card">
               <h2>Dados cadastrais</h2>
               <div className="emp-row"><span>CPF</span><strong>{emp?.cpf || '—'}</strong></div>
@@ -447,13 +535,11 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Unidade</span><strong>{emp?.unitName || '—'}</strong></div>
               <div className="emp-row"><span>Status</span><strong className="emp-status ok">{emp?.active === false ? 'Inativo' : 'Ativo'}</strong></div>
             </div>
-
             <div className="emp-card">
               <h2>Contato</h2>
               <div className="emp-row"><span>Telefone</span><strong>{emp?.profile?.phone || '—'}</strong></div>
               <div className="emp-row"><span>E-mail</span><strong>{emp?.profile?.personalEmail || '—'}</strong></div>
             </div>
-
             <div className="emp-card">
               <h2>Endereço</h2>
               <div className="emp-row"><span>Logradouro</span><strong>{[emp?.profile?.address, emp?.profile?.number ? `nº ${emp.profile.number}` : null, emp?.profile?.complement].filter(Boolean).join(', ') || '—'}</strong></div>
@@ -461,7 +547,6 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Cidade/UF</span><strong>{emp?.profile?.city ? `${emp.profile.city}${emp.profile.uf ? `/${emp.profile.uf}` : ''}` : '—'}</strong></div>
               <div className="emp-row"><span>CEP</span><strong>{emp?.profile?.cep || '—'}</strong></div>
             </div>
-
             <div className="emp-card">
               <h2>Jornada</h2>
               <div className="emp-row"><span>Horário padrão</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
@@ -475,7 +560,6 @@ export default function EmployeeAppPage() {
                 ))
               ) : null}
             </div>
-
             <div className="emp-card">
               <h2>Documentos trabalhistas</h2>
               <div className="emp-row"><span>CTPS</span><strong>{emp?.profile?.ctps || '—'}</strong></div>
@@ -483,7 +567,6 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Mãe</span><strong>{emp?.profile?.motherName || '—'}</strong></div>
               <div className="emp-row"><span>Pai</span><strong>{emp?.profile?.fatherName || '—'}</strong></div>
             </div>
-
             <p className="emp-muted" style={{ textAlign: 'center' }}>Os dados vêm do cadastro administrativo. Em caso de divergência, fale com a ADM.</p>
             <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
           </section>
@@ -491,7 +574,7 @@ export default function EmployeeAppPage() {
       </div>
 
       <nav className="emp-bottom-nav" aria-label="Menu principal">
-        {([['home', 'Início', '🏠'], ['journey', 'Jornada', '⏱️'], ['month', 'Meu mês', '📅'], ['absences', 'Ausências', '📝'], ['profile', 'Perfil', '👤']] as const).map(([id, label, icon]) => (
+        {([['home', 'Início', '🏠'], ['journey', 'Jornada', '⏱️'], ['month', 'Meu mês', '📅'], ['absences', 'Avisos', '📝'], ['profile', 'Perfil', '👤']] as const).map(([id, label, icon]) => (
           <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
             <span aria-hidden>{icon}</span>{label}
           </button>
