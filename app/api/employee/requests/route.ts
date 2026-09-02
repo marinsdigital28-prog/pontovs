@@ -8,7 +8,7 @@ import { appendAuditEvent } from '../../../../lib/security-controls';
 export const dynamic = 'force-dynamic';
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
 const requestSchema = z.object({
-  type: z.enum(['AUSENCIA', 'TROCA_DIA', 'ESQUECI_PONTO']),
+  type: z.enum(['AUSENCIA', 'TROCA_DIA', 'ESQUECI_PONTO', 'AVISO_ATRASO']),
   startDate: z.string().regex(dateOnly),
   endDate: z.string().regex(dateOnly),
   reason: z.string().trim().min(3).max(500),
