@@ -7,31 +7,74 @@ import prisma from '../../../../lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-type BackupEmployee = { name: string; employeeNumber: string; jobTitle: string; schedule: string; jornada: string };
-type BackupRow = { employeeNumber: string; name: string; date: string; time: string; type: string };
+const APP_TZ = 'America/Sao_Paulo';
 
-function localBackupHistory(employeeNumber: string) {
-  const employees = JSON.parse(readFileSync(join(process.cwd(), 'imports/employees-from-pdf.json'), 'utf8')) as BackupEmployee[];
-  const backup = JSON.parse(readFileSync(join(process.cwd(), 'imports/punches-from-pdf.json'), 'utf8')) as { rows: BackupRow[] };
-  const source = employees.find(employee => employee.employeeNumber === employeeNumber && employee.employeeNumber !== '0000');
-  if (!source) return null;
-  const schedule = source.jornada.match(/(\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})/);
-  const punches = backup.rows.filter(row => row.employeeNumber === employeeNumber).slice(-100).reverse().map((row, index) => ({ id: `backup-${employeeNumber}-${row.date}-${row.time}-${index}`, type: row.type, timestamp: `${row.date}T${row.time}-03:00` }));
-  return { employee: { id: `backup-${employeeNumber}`, name: source.name, employeeNumber: source.employeeNumber, jobTitle: source.jobTitle, workDays: source.schedule.replace(/,\s*\d{2}:\d{2}\s*às\s*\d{2}:\d{2}/i, ''), scheduleStart: schedule?.[1] ?? null, scheduleEnd: schedule?.[2] ?? null }, punches };
+function todayKeySP(d = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d);
+  const v = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${v.year}-${v.month}-${v.day}`;
+}
+
+function dayKeyFromTs(ts: Date | string) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(ts));
+  const v = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${v.year}-${v.month}-${v.day}`;
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions as any) as any;
+  const session = (await getServerSession(authOptions as any)) as any;
   const employeeId = session?.user?.id as string | undefined;
   const role = String(session?.user?.role || '');
-  if (!employeeId || role !== 'EMPLOYEE') return NextResponse.json({ error: 'Faça login como colaborador para consultar o portal.' }, { status: 401 });
+  if (!employeeId || role !== 'EMPLOYEE') {
+    return NextResponse.json({ error: 'Faça login como colaborador para consultar o portal.' }, { status: 401 });
+  }
 
   try {
-    const employee = await prisma.user.findFirst({ where: { id: employeeId, active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true } });
+    const employee = await prisma.user.findFirst({
+      where: { id: employeeId, active: true, role: 'EMPLOYEE' },
+      select: {
+        id: true,
+        name: true,
+        employeeNumber: true,
+        jobTitle: true,
+        workDays: true,
+        scheduleStart: true,
+        scheduleEnd: true,
+      },
+    });
     if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado' }, { status: 404 });
-    const since = new Date(); since.setDate(since.getDate() - 30);
-      const punches = await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: since } }, select: { id: true, type: true, timestamp: true }, orderBy: { timestamp: 'desc' }, take: 100 });
-    return NextResponse.json({ employee, punches });
+
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+    const today = todayKeySP();
+
+    const punches = await prisma.punch.findMany({
+      where: { userId: employee.id, status: 'VALID', timestamp: { gte: since } },
+      select: { id: true, type: true, timestamp: true, status: true, photoData: true },
+      orderBy: { timestamp: 'desc' },
+      take: 100,
+    });
+
+    const shaped = punches.map((p) => ({
+      id: p.id,
+      type: p.type,
+      timestamp: p.timestamp,
+      status: p.status,
+      photoData: dayKeyFromTs(p.timestamp) === today && p.photoData ? p.photoData : null,
+      hasPhoto: Boolean(p.photoData),
+    }));
+
+    return NextResponse.json({ employee, punches: shaped });
   } catch (error) {
     if (process.env.NODE_ENV !== 'production') {
       return NextResponse.json({ error: 'A consulta está temporariamente indisponível. Tente novamente.' }, { status: 503 });

@@ -9,12 +9,12 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    background_color: '#f5f7fa',
-    theme_color: '#2563eb',
+    background_color: '#f4f7f2',
+    theme_color: '#1e5c2f',
     lang: 'pt-BR',
     icons: [
-      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/ponto-progredir-icon-circular.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/ponto-progredir-icon-circular.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
     ],
     shortcuts: [
