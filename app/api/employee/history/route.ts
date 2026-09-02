@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import prisma from '../../../../lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -31,6 +29,26 @@ function dayKeyFromTs(ts: Date | string) {
   return `${v.year}-${v.month}-${v.day}`;
 }
 
+function parseProfile(raw?: string | null) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseScheduleByDay(raw?: string | null) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const session = (await getServerSession(authOptions as any)) as any;
   const employeeId = session?.user?.id as string | undefined;
@@ -46,10 +64,15 @@ export async function GET() {
         id: true,
         name: true,
         employeeNumber: true,
+        cpf: true,
         jobTitle: true,
         workDays: true,
         scheduleStart: true,
         scheduleEnd: true,
+        scheduleByDay: true,
+        profileJson: true,
+        active: true,
+        unit: { select: { id: true, name: true } },
       },
     });
     if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado' }, { status: 404 });
@@ -74,11 +97,24 @@ export async function GET() {
       hasPhoto: Boolean(p.photoData),
     }));
 
-    return NextResponse.json({ employee, punches: shaped });
+    return NextResponse.json({
+      employee: {
+        id: employee.id,
+        name: employee.name,
+        employeeNumber: employee.employeeNumber,
+        cpf: employee.cpf,
+        jobTitle: employee.jobTitle,
+        workDays: employee.workDays,
+        scheduleStart: employee.scheduleStart,
+        scheduleEnd: employee.scheduleEnd,
+        scheduleByDay: parseScheduleByDay(employee.scheduleByDay),
+        profile: parseProfile(employee.profileJson),
+        active: employee.active,
+        unitName: employee.unit?.name || null,
+      },
+      punches: shaped,
+    });
   } catch (error) {
-    if (process.env.NODE_ENV !== 'production') {
-      return NextResponse.json({ error: 'A consulta está temporariamente indisponível. Tente novamente.' }, { status: 503 });
-    }
     console.error('Falha ao consultar histórico do colaborador', error);
     return NextResponse.json({ error: 'A consulta está temporariamente indisponível. Tente novamente.' }, { status: 503 });
   }
