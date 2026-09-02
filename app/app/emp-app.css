@@ -127,6 +127,8 @@
 }
 .emp-segment button { border: 0; background: transparent; padding: 0.55rem; border-radius: 10px; font-weight: 700; cursor: pointer; color: var(--emp-muted); }
 .emp-segment button.active { background: #fff; color: var(--emp-green); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
+.emp-segment-wrap{grid-template-columns:1fr 1fr;gap:.35rem}
+.emp-segment-wrap button{font-size:.72rem;padding:.5rem .35rem}
 
 .emp-req-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.65rem; }
 .emp-req-list li { display: flex; justify-content: space-between; gap: 0.75rem; align-items: flex-start; padding: 0.55rem 0; border-bottom: 1px solid #eef3ef; }
