@@ -634,13 +634,60 @@ export default function EmployeeAppPage() {
               <div className="emp-logo-wrap" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
               <h2>{emp?.name}</h2>
               <p>Matrícula {emp?.employeeNumber || '—'}</p>
-              <p>{emp?.jobTitle || 'Cargo não informado'}</p>
+              <p>{emp?.jobTitle || emp?.profile?.jobTitleFromPdf || 'Cargo não informado'}</p>
             </div>
+
             <div className="emp-card">
+              <h2>Dados cadastrais</h2>
               <div className="emp-row"><span>CPF</span><strong>{emp?.cpf || '—'}</strong></div>
-              <div className="emp-row"><span>Telefone</span><strong>{emp?.profile?.phone || '—'}</strong></div>
-              <div className="emp-row"><span>Jornada</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
+              <div className="emp-row"><span>RG</span><strong>{emp?.profile?.rg || '—'}</strong></div>
+              <div className="emp-row"><span>PIS</span><strong>{emp?.profile?.pis || '—'}</strong></div>
+              <div className="emp-row"><span>Nascimento</span><strong>{emp?.profile?.birthDate || '—'}</strong></div>
+              <div className="emp-row"><span>Sexo</span><strong>{emp?.profile?.sex || '—'}</strong></div>
+              <div className="emp-row"><span>Estado civil</span><strong>{emp?.profile?.maritalStatus || '—'}</strong></div>
+              <div className="emp-row"><span>Admissão</span><strong>{emp?.profile?.admissionDate || '—'}</strong></div>
+              <div className="emp-row"><span>Departamento</span><strong>{emp?.profile?.department || '—'}</strong></div>
+              <div className="emp-row"><span>Unidade</span><strong>{emp?.unitName || '—'}</strong></div>
+              <div className="emp-row"><span>Status</span><strong className="emp-status ok">{emp?.active === false ? 'Inativo' : 'Ativo'}</strong></div>
             </div>
+
+            <div className="emp-card">
+              <h2>Contato</h2>
+              <div className="emp-row"><span>Telefone</span><strong>{emp?.profile?.phone || '—'}</strong></div>
+              <div className="emp-row"><span>E-mail</span><strong>{emp?.profile?.personalEmail || '—'}</strong></div>
+            </div>
+
+            <div className="emp-card">
+              <h2>Endereço</h2>
+              <div className="emp-row"><span>Logradouro</span><strong>{[emp?.profile?.address, emp?.profile?.number ? `nº ${emp.profile.number}` : null, emp?.profile?.complement].filter(Boolean).join(', ') || '—'}</strong></div>
+              <div className="emp-row"><span>Bairro</span><strong>{emp?.profile?.neighborhood || '—'}</strong></div>
+              <div className="emp-row"><span>Cidade/UF</span><strong>{emp?.profile?.city ? `${emp.profile.city}${emp.profile.uf ? `/${emp.profile.uf}` : ''}` : '—'}</strong></div>
+              <div className="emp-row"><span>CEP</span><strong>{emp?.profile?.cep || '—'}</strong></div>
+            </div>
+
+            <div className="emp-card">
+              <h2>Jornada</h2>
+              <div className="emp-row"><span>Horário padrão</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
+              <div className="emp-row"><span>Dias</span><strong>{emp?.workDays || '—'}</strong></div>
+              {emp?.scheduleByDay && Object.keys(emp.scheduleByDay).length ? (
+                Object.entries(emp.scheduleByDay).map(([day, sch]) => (
+                  <div className="emp-row" key={day}>
+                    <span>{day}</span>
+                    <strong>{sch?.start || '--:--'}–{sch?.end || '--:--'}{sch?.mode ? ` · ${sch.mode}` : ''}</strong>
+                  </div>
+                ))
+              ) : null}
+            </div>
+
+            <div className="emp-card">
+              <h2>Documentos trabalhistas</h2>
+              <div className="emp-row"><span>CTPS</span><strong>{emp?.profile?.ctps || '—'}</strong></div>
+              <div className="emp-row"><span>Série CTPS</span><strong>{emp?.profile?.ctpsSeries || '—'}</strong></div>
+              <div className="emp-row"><span>Mãe</span><strong>{emp?.profile?.motherName || '—'}</strong></div>
+              <div className="emp-row"><span>Pai</span><strong>{emp?.profile?.fatherName || '—'}</strong></div>
+            </div>
+
+            <p className="emp-muted" style={{ textAlign: 'center' }}>Os dados vêm do cadastro administrativo. Em caso de divergência, fale com a ADM.</p>
             <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
           </section>
         )}
