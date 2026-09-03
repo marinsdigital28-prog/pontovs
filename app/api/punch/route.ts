@@ -97,15 +97,13 @@ export async function POST(req: Request) {
           type = (smart.suggestedType || smart.sequentialType)!;
         }
 
-        // Anti-duplicidade: evita clique duplo no totem (mesma batida em sequência rápida)
-        const lastValid = punchesToday.length
-          ? punchesToday[punchesToday.length - 1]
-          : null;
+        // Anti-duplicidade: evita clique duplo no totem
+        const lastValid = punchesToday.length ? punchesToday[punchesToday.length - 1] : null;
         if (lastValid) {
           const lastTs = new Date(lastValid.timestamp).getTime();
           const deltaMs = now.getTime() - lastTs;
-          const MIN_GAP_MS = 120_000; // 2 minutos entre qualquer marcação
-          const SAME_TYPE_GAP_MS = 5 * 60_000; // 5 minutos se for o mesmo tipo
+          const MIN_GAP_MS = 120_000; // 2 min entre qualquer batida
+          const SAME_TYPE_GAP_MS = 5 * 60_000; // 5 min se for o mesmo tipo
 
           if (deltaMs >= 0 && deltaMs < MIN_GAP_MS) {
             const existing = await tx.punch.findFirst({
@@ -116,16 +114,10 @@ export async function POST(req: Request) {
               },
               orderBy: { timestamp: 'desc' },
             });
-            if (existing) {
-              return { punch: existing, user, duplicate: true };
-            }
+            if (existing) return { punch: existing, user, duplicate: true };
           }
 
-          if (
-            lastValid.type === type &&
-            deltaMs >= 0 &&
-            deltaMs < SAME_TYPE_GAP_MS
-          ) {
+          if (lastValid.type === type && deltaMs >= 0 && deltaMs < SAME_TYPE_GAP_MS) {
             const existing = await tx.punch.findFirst({
               where: {
                 userId: user.id,
@@ -135,9 +127,7 @@ export async function POST(req: Request) {
               },
               orderBy: { timestamp: 'desc' },
             });
-            if (existing) {
-              return { punch: existing, user, duplicate: true };
-            }
+            if (existing) return { punch: existing, user, duplicate: true };
           }
         }
 
@@ -188,8 +178,10 @@ export async function POST(req: Request) {
           employeeNumber: result.user.employeeNumber,
           type: result.punch.type,
           timestamp: result.punch.timestamp,
+          photoData: result.punch.photoData,
         });
-        receiptEmail = sent.id ? { status: sent.status, id: sent.id } : { status: sent.status };
+        receiptEmail =
+          sent.status === 'sent' ? { status: sent.status, id: sent.id } : { status: sent.status };
       } catch {
         receiptEmail = { status: 'failed' };
       }
@@ -201,29 +193,41 @@ export async function POST(req: Request) {
         duplicate: result.duplicate,
         userName: result.user.name,
         employeeNumber: result.user.employeeNumber,
+        hasPhoto: Boolean(result.punch.photoData),
         receiptEmail,
       },
       { status: result.duplicate ? 200 : 201 },
     );
-  } catch (error: any) {
-    if (error instanceof HttpError) {
-      return NextResponse.json({ error: error.message }, { status: error.status });
-    }
-    if (error?.name === 'ZodError') {
-      return NextResponse.json({ error: 'Dados inválidos' }, { status: 400 });
+  } catch (error) {
+    if (error instanceof HttpError) return NextResponse.json({ error: error.message }, { status: error.status });
+    if (isConflict(error)) {
+      return NextResponse.json(
+        { error: 'Esta batida já foi registrada ou houve concorrência. Atualize e tente novamente.' },
+        { status: 409 },
+      );
     }
     if (isDatabaseQuotaExceeded(error)) {
-      return databaseUnavailableResponse();
+      return NextResponse.json(databaseUnavailableResponse(), { status: 503 });
     }
-    console.error('punch error', error);
-    return NextResponse.json({ error: 'Erro ao registrar ponto' }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Não foi possível registrar a batida' },
+      { status: 400 },
+    );
   }
 }
-
 class HttpError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
+  constructor(
+    public message: string,
+    public status: number,
+  ) {
     super(message);
-    this.status = status;
   }
+}
+function isConflict(error: unknown) {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    ((error as any).code === 'P2002' || (error as any).code === 'P2034')
+  );
 }
