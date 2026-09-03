@@ -18,5 +18,23 @@
     "prisma": "^4.16.2",
     "typescript": "5.8.2",
     "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@prisma/client": "^4.16.2",
+    "@signpdf/placeholder-pdf-lib": "3.3.0",
+    "@signpdf/signer-p12": "3.3.0",
+    "@signpdf/signpdf": "3.3.0",
+    "@upstash/redis": "^1.38.2",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "next": "^15.0.0",
+    "next-auth": "^4.24.15",
+    "pdf-lib": "1.17.1",
+    "pdf-parse": "^2.4.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zod": "^4.4.3"
   }
 }
