@@ -39,18 +39,12 @@ const COVERAGE_LABEL: Record<string, string> = {
   PARCIAL_MANHA: 'Parcial manhã', PARCIAL_TARDE: 'Parcial tarde', DIA_INTEIRO: 'Dia inteiro', EMERGENCIA: 'Emergência',
 };
 const FORGOT_TYPES = [
-  { value: 'ENTRADA', label: 'Entrada' },
-  { value: 'INTERVALO', label: 'Intervalo' },
-  { value: 'RETORNO', label: 'Retorno' },
-  { value: 'SAIDA', label: 'Saída' },
+  { value: 'ENTRADA', label: 'Entrada' }, { value: 'INTERVALO', label: 'Intervalo' },
+  { value: 'RETORNO', label: 'Retorno' }, { value: 'SAIDA', label: 'Saída' },
 ] as const;
 const FORGOT_REASONS = [
-  'Esqueci de bater no totem',
-  'Totem indisponível / com problema',
-  'Estava em atendimento / reunião',
-  'Cheguei e fui direto à atividade',
-  'Saí com urgência e não consegui marcar',
-  'Outros',
+  'Esqueci de bater no totem', 'Totem indisponível / com problema', 'Estava em atendimento / reunião',
+  'Cheguei e fui direto à atividade', 'Saí com urgência e não consegui marcar', 'Outros',
 ] as const;
 
 const APP_TZ = 'America/Sao_Paulo';
@@ -83,6 +77,7 @@ export default function EmployeeAppPage() {
   const [isStandalone, setIsStandalone] = useState<boolean | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   const knownPunchIds = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
 
@@ -248,8 +243,7 @@ export default function EmployeeAppPage() {
       note,
     ].filter(Boolean).join(' · ');
     const response = await fetch('/api/employee/requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         type: 'AUSENCIA', startDate, endDate, reason, details: details || null,
         classification: finalCoverage, returnExpected: Boolean(returnTime),
@@ -261,9 +255,8 @@ export default function EmployeeAppPage() {
     else {
       const period = startDate === endDate ? shortDate.format(new Date(startDate + 'T12:00:00')) : `${shortDate.format(new Date(startDate + 'T12:00:00'))} até ${shortDate.format(new Date(endDate + 'T12:00:00'))}`;
       const timePart = startTime && endTime ? ` das ${startTime} às ${endTime}` : '';
-      const returnPart = returnTime ? `\nPrevisão de volta: ${returnTime}` : '';
-      setWhatsappText(`Olá! Comuniquei ausência pelo app.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nPeríodo: ${period}${timePart}\nTipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\nMotivo: ${reason}${returnPart}`);
-      setAbsenceMsg('Solicitação enviada.');
+      setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de ausência*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${period}${timePart}\n📋 ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\n💬 ${reason}\n────────────────\nAguardando análise da ADM`);
+      setAbsenceMsg('Seu aviso de ausência foi registrado com sucesso.');
       (e.target as HTMLFormElement).reset();
       setReasonChoice(ABSENCE_REASONS[0]); setCoverage('DIA_INTEIRO');
       await loadRequests();
@@ -286,8 +279,8 @@ export default function EmployeeAppPage() {
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso.');
     else {
-      setAbsenceMsg('Aviso de ponto esquecido enviado.');
-      setWhatsappText(`Olá! Esqueci de marcar o ponto.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nData: ${shortDate.format(new Date(day + 'T12:00:00'))}\nTipo: ${TYPE_LABEL[forgotType] || forgotType}\nHorário aprox.: ${approxTime || '—'}\nMotivo: ${reason}`);
+      setAbsenceMsg('Aviso de ponto esquecido registrado com sucesso.');
+      setWhatsappText(`🌿 *Espaço Progredir*\n*Esqueci de marcar o ponto*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${shortDate.format(new Date(day + 'T12:00:00'))}\n⏱️ ${TYPE_LABEL[forgotType] || forgotType} · ${approxTime || '—'}\n💬 ${reason}`);
       (e.target as HTMLFormElement).reset(); setForgotType('ENTRADA'); setForgotReason('Esqueci de bater no totem');
       await loadRequests();
     }
@@ -308,8 +301,8 @@ export default function EmployeeAppPage() {
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar a troca de dia.');
     else {
-      setAbsenceMsg('Pedido de troca de dia enviado.');
-      setWhatsappText(`Olá! Solicitei troca de dia.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nDe: ${shortDate.format(new Date(fromDay + 'T12:00:00'))}\nPara: ${shortDate.format(new Date(toDay + 'T12:00:00'))}\nMotivo: ${reason}`);
+      setAbsenceMsg('Pedido de troca de dia registrado com sucesso.');
+      setWhatsappText(`🌿 *Espaço Progredir*\n*Troca de dia*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 De ${shortDate.format(new Date(fromDay + 'T12:00:00'))} → ${shortDate.format(new Date(toDay + 'T12:00:00'))}\n💬 ${reason}`);
       (e.target as HTMLFormElement).reset();
       await loadRequests();
     }
@@ -331,32 +324,41 @@ export default function EmployeeAppPage() {
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso de atraso.');
     else {
-      setAbsenceMsg('Aviso de atraso enviado.');
-      setWhatsappText(`Olá! Aviso de atraso.\n\nColaborador: ${data?.employee?.name || ''}\nMatrícula: ${data?.employee?.employeeNumber || ''}\nData: ${shortDate.format(new Date(day + 'T12:00:00'))}\nPrevisão: ${eta || '—'}\nMotivo: ${reason}`);
+      setAbsenceMsg('Aviso de atraso registrado com sucesso.');
+      setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de atraso*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${shortDate.format(new Date(day + 'T12:00:00'))}\n⏱️ Chegada prevista: ${eta || '—'}\n💬 ${reason}`);
       (e.target as HTMLFormElement).reset();
       await loadRequests();
     }
     setLoading(false);
   }
 
-  function shareComprovante() {
+  function buildReceiptText() {
     const emp = data?.employee;
-    if (!emp) return;
-    const lines = [
-      'COMPROVANTE DE PONTO — Espaço Progredir',
-      `Colaborador: ${emp.name}`,
-      `Matrícula: ${emp.employeeNumber || '—'}`,
-      `Data: ${shortDate.format(new Date())}`,
-      `Jornada: ${emp.scheduleStart || '--:--'}–${emp.scheduleEnd || '--:--'}`,
-      '',
+    if (!emp) return '';
+    return [
+      '🌿 ESPAÇO PROGREDIR',
+      'Ponto Progredir · Comprovante de ponto',
+      '────────────────────',
+      `👤 ${emp.name}`,
+      `🔢 Matrícula: ${emp.employeeNumber || '—'}`,
+      `📅 ${shortDate.format(new Date())}`,
+      `⏱️ Jornada: ${emp.scheduleStart || '--:--'} – ${emp.scheduleEnd || '--:--'}`,
+      '────────────────────',
       'Marcações de hoje:',
-      ...(todayPunches.length ? todayPunches.map((p) => `• ${timeFmt.format(new Date(p.timestamp))} — ${TYPE_LABEL[p.type] || p.type}`) : ['• Nenhuma marcação registrada']),
-      '',
-      'Documento gerado pelo App do Colaborador.',
-    ];
-    const text = lines.join('\n');
+      ...(todayPunches.length ? todayPunches.map((p) => `✓ ${timeFmt.format(new Date(p.timestamp))}  ·  ${TYPE_LABEL[p.type] || p.type}`) : ['• Nenhuma marcação registrada ainda']),
+      '────────────────────',
+      'Acreditando na Vida',
+      'Documento gerado pelo App do Colaborador',
+    ].join('\n');
+  }
+
+  function openComprovante() { setShowReceipt(true); }
+
+  function shareComprovante() {
+    const text = buildReceiptText();
+    if (!text) return;
     if (navigator.share) {
-      void navigator.share({ title: 'Comprovante de ponto', text }).catch(() => {
+      void navigator.share({ title: 'Comprovante — Espaço Progredir', text }).catch(() => {
         void navigator.clipboard?.writeText(text);
         setToast('Comprovante copiado');
         window.setTimeout(() => setToast(null), 2500);
@@ -371,11 +373,9 @@ export default function EmployeeAppPage() {
   function toggleReminders() {
     if (!remindersOn) {
       if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission();
-      setRemindersOn(true);
-      setToast('Lembretes ativados');
+      setRemindersOn(true); setToast('Lembretes ativados');
     } else {
-      setRemindersOn(false);
-      setToast('Lembretes desativados');
+      setRemindersOn(false); setToast('Lembretes desativados');
     }
     window.setTimeout(() => setToast(null), 2500);
   }
@@ -400,6 +400,24 @@ export default function EmployeeAppPage() {
 
   const emp = data?.employee;
   const showInstallHint = isStandalone === false && !dismissInstall;
+
+  const certBlock = absenceMsg ? (
+    <div className="emp-cert">
+      <div className="emp-cert-head">
+        <div className="emp-logo-wrap sm" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
+        <div>
+          <span className="emp-receipt-brand">Espaço Progredir</span>
+          <strong>Solicitação registrada</strong>
+        </div>
+      </div>
+      <div className="emp-receipt-goldline" />
+      <p className="emp-cert-msg">{absenceMsg}</p>
+      <p className="emp-receipt-footer">Aguardando análise da administração</p>
+      {whatsappText ? (
+        <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">Enviar pelo WhatsApp</a>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <main className="emp-app">
@@ -457,7 +475,7 @@ export default function EmployeeAppPage() {
               )}
             </div>
             <div className="emp-grid-2">
-              <button type="button" className="emp-btn primary" onClick={() => shareComprovante()}>📄 Comprovante</button>
+              <button type="button" className="emp-btn primary" onClick={() => openComprovante()}>📄 Comprovante</button>
               <button type="button" className="emp-btn primary" onClick={() => toggleReminders()}>{remindersOn ? '🔔 Lembretes ON' : '🔕 Lembretes'}</button>
             </div>
           </section>
@@ -474,12 +492,6 @@ export default function EmployeeAppPage() {
               <div className="emp-card compact"><span className="emp-label">Batidas hoje</span><strong className="emp-big">{todayPunches.length}</strong></div>
               <div className="emp-card compact"><span className="emp-label">Status</span><strong className="emp-status ok">{todayPunches.length ? 'Em andamento' : 'Aguardando'}</strong></div>
             </div>
-            <div className="emp-card">
-              <h2>Resumo do dia</h2>
-              <div className="emp-row"><span>Primeira marcação</span><strong>{todayPunches[0] ? timeFmt.format(new Date(todayPunches[0].timestamp)) : '—'}</strong></div>
-              <div className="emp-row"><span>Última marcação</span><strong>{todayPunches.length ? timeFmt.format(new Date(todayPunches[todayPunches.length - 1].timestamp)) : '—'}</strong></div>
-              <div className="emp-row"><span>Tipos registrados</span><strong>{todayPunches.length ? [...new Set(todayPunches.map((p) => TYPE_LABEL[p.type] || p.type))].join(', ') : '—'}</strong></div>
-            </div>
           </section>
         )}
 
@@ -491,7 +503,6 @@ export default function EmployeeAppPage() {
                 <strong>{new Date(monthCursor.year, monthCursor.month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</strong>
                 <button type="button" className="emp-link" onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })}>›</button>
               </div>
-              <div className="emp-cal-legend"><span><i className="dot green" /> Trabalhado</span><span><i className="dot gray" /> Sem registro</span></div>
               <div className="emp-cal-grid">
                 {Array.from({ length: new Date(monthCursor.year, monthCursor.month + 1, 0).getDate() }, (_, i) => {
                   const day = i + 1;
@@ -512,7 +523,6 @@ export default function EmployeeAppPage() {
                   {(punchesByDay.get(selectedDay) || []).map((p) => (
                     <li key={p.id}><span className="emp-time">{timeFmt.format(new Date(p.timestamp))}</span><span>{TYPE_LABEL[p.type] || p.type}</span></li>
                   ))}
-                  {!(punchesByDay.get(selectedDay) || []).length ? <li className="emp-muted">Sem marcações neste dia</li> : null}
                 </ul>
               </div>
             )}
@@ -541,8 +551,7 @@ export default function EmployeeAppPage() {
                 {forgotReason === 'Outros' ? <label>Descreva<input name="reasonOther" required maxLength={200} /></label> : null}
                 <label>Observação<textarea name="note" rows={2} maxLength={500} /></label>
                 <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Enviar aviso'}</button>
-                {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
-                {whatsappText ? <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+                {certBlock}
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
             </div>
@@ -555,8 +564,7 @@ export default function EmployeeAppPage() {
                 <label>Motivo<input name="reason" required maxLength={200} placeholder="Ex.: Trânsito" /></label>
                 <label>Observação<textarea name="note" rows={2} maxLength={500} /></label>
                 <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Enviar aviso de atraso'}</button>
-                {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
-                {whatsappText ? <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+                {certBlock}
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
             </div>
@@ -569,8 +577,7 @@ export default function EmployeeAppPage() {
                 <label>Motivo<input name="reason" required maxLength={200} /></label>
                 <label>Observação<textarea name="note" rows={2} maxLength={500} /></label>
                 <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Solicitar troca de dia'}</button>
-                {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
-                {whatsappText ? <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+                {certBlock}
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
             </div>
@@ -596,8 +603,7 @@ export default function EmployeeAppPage() {
                 <label>Observação<textarea name="note" rows={2} maxLength={500} /></label>
                 <label>Anexo<input name="document" type="file" accept=".pdf,image/jpeg,image/png" /></label>
                 <button type="submit" className="emp-btn primary" disabled={loading}>{loading ? 'Enviando…' : 'Enviar'}</button>
-                {absenceMsg ? <p className="emp-success">{absenceMsg}</p> : null}
-                {whatsappText ? <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">WhatsApp</a> : null}
+                {certBlock}
                 {error ? <p className="emp-error">{error}</p> : null}
               </form>
             </div>
@@ -611,7 +617,7 @@ export default function EmployeeAppPage() {
                     <li key={r.id}>
                       <div>
                         <strong>{r.reason}</strong>
-                        <small>{shortDate.format(new Date(r.startDate))}{r.endDate !== r.startDate ? ` → ${shortDate.format(new Date(r.endDate))}` : ''}{r.details ? ` · ${r.details}` : ''}</small>
+                        <small>{shortDate.format(new Date(r.startDate))}{r.endDate !== r.startDate ? ` → ${shortDate.format(new Date(r.endDate))}` : ''}</small>
                       </div>
                       <span className={`emp-pill ${r.status === 'APROVADO' ? 'ok' : r.status === 'REJEITADO' ? 'bad' : 'warn'}`}>{r.status}</span>
                     </li>
@@ -628,21 +634,60 @@ export default function EmployeeAppPage() {
               <div className="emp-logo-wrap" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
               <h2>{emp?.name}</h2>
               <p>Matrícula {emp?.employeeNumber || '—'}</p>
-              <p>{emp?.jobTitle || emp?.profile?.jobTitleFromPdf || 'Cargo não informado'}</p>
+              <p>{emp?.jobTitle || 'Cargo não informado'}</p>
             </div>
             <div className="emp-card">
-              <h2>Dados cadastrais</h2>
               <div className="emp-row"><span>CPF</span><strong>{emp?.cpf || '—'}</strong></div>
               <div className="emp-row"><span>Telefone</span><strong>{emp?.profile?.phone || '—'}</strong></div>
-              <div className="emp-row"><span>E-mail</span><strong>{emp?.profile?.personalEmail || '—'}</strong></div>
-              <div className="emp-row"><span>Departamento</span><strong>{emp?.profile?.department || '—'}</strong></div>
               <div className="emp-row"><span>Jornada</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
-              <div className="emp-row"><span>Dias</span><strong>{emp?.workDays || '—'}</strong></div>
             </div>
             <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
           </section>
         )}
       </div>
+
+      {showReceipt ? (
+        <div className="emp-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setShowReceipt(false)}>
+          <div className="emp-receipt" onClick={(e) => e.stopPropagation()}>
+            <div className="emp-receipt-top">
+              <div className="emp-logo-wrap sm" aria-hidden>
+                <img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" />
+              </div>
+              <div>
+                <span className="emp-receipt-brand">Espaço Progredir</span>
+                <strong>Comprovante de ponto</strong>
+              </div>
+            </div>
+            <div className="emp-receipt-goldline" />
+            <div className="emp-receipt-body">
+              <div className="emp-receipt-row"><span>Colaborador</span><strong>{emp?.name}</strong></div>
+              <div className="emp-receipt-row"><span>Matrícula</span><strong>{emp?.employeeNumber || '—'}</strong></div>
+              <div className="emp-receipt-row"><span>Data</span><strong>{shortDate.format(new Date())}</strong></div>
+              <div className="emp-receipt-row"><span>Jornada</span><strong>{emp?.scheduleStart || '--:--'} – {emp?.scheduleEnd || '--:--'}</strong></div>
+            </div>
+            <div className="emp-receipt-section">
+              <span className="emp-receipt-section-title">Marcações de hoje</span>
+              {todayPunches.length ? (
+                <ul className="emp-receipt-list">
+                  {todayPunches.map((p) => (
+                    <li key={p.id}>
+                      <span>{timeFmt.format(new Date(p.timestamp))}</span>
+                      <strong>{TYPE_LABEL[p.type] || p.type}</strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="emp-muted">Nenhuma marcação registrada ainda.</p>
+              )}
+            </div>
+            <p className="emp-receipt-footer">Acreditando na Vida · App do Colaborador</p>
+            <div className="emp-receipt-actions">
+              <button type="button" className="emp-btn primary" onClick={() => shareComprovante()}>Compartilhar</button>
+              <button type="button" className="emp-link" onClick={() => setShowReceipt(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <nav className="emp-bottom-nav" aria-label="Menu principal">
         {([['home', 'Início', '🏠'], ['journey', 'Jornada', '⏱️'], ['month', 'Meu mês', '📅'], ['absences', 'Avisos', '📝'], ['profile', 'Perfil', '👤']] as const).map(([id, label, icon]) => (
