@@ -29,3 +29,60 @@
   .overview-side{grid-template-columns:1fr}
   .overview-hero{flex-direction:column;align-items:stretch}
 }
+
+/* Calendário de marcações — Visão geral */
+.overview-calendar{padding:1.15rem 1.25rem;overflow:hidden}
+.ov-cal-head{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:.85rem}
+.ov-cal-title{margin:.2rem 0 .15rem;font-size:1.35rem;color:var(--text,#143d1f);text-transform:capitalize}
+.ov-cal-nav{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.ov-cal-nav .ghost-btn{min-width:2.4rem;padding:.4rem .65rem}
+.ov-cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);gap:.35rem;margin-bottom:.35rem}
+.ov-cal-weekdays span{text-align:center;font-size:.72rem;font-weight:800;color:#6b7c70;letter-spacing:.04em}
+.ov-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.4rem}
+.ov-cal-cell{
+  min-height:88px;border:1px solid #e3ebe4;border-radius:12px;background:#fafcf9;
+  padding:.4rem .35rem;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:.25rem;
+  transition:border-color .15s,box-shadow .15s,background .15s
+}
+.ov-cal-cell.empty{background:transparent;border-color:transparent;cursor:default;min-height:40px}
+.ov-cal-cell.has{background:#eef7f0;border-color:#c9e2d0}
+.ov-cal-cell.today{outline:2px solid #c9a227;outline-offset:1px}
+.ov-cal-cell.selected{border-color:#1e5c2f;box-shadow:0 0 0 2px rgba(30,92,47,.18)}
+.ov-cal-cell:not(.empty):hover{border-color:#1e5c2f}
+.ov-cal-daynum{font-weight:800;font-size:.9rem;color:#143d1f}
+.ov-cal-pills{display:flex;flex-direction:column;gap:.18rem;min-height:0}
+.ov-cal-pill{
+  display:block;font-size:.68rem;font-weight:700;line-height:1.2;
+  padding:.15rem .35rem;border-radius:999px;background:#d4edda;color:#143d1f;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%
+}
+.ov-cal-pill:nth-child(2){background:#cce5ff;color:#0c3d66}
+.ov-cal-pill:nth-child(3){background:#fff3cd;color:#6b4f00}
+.ov-cal-more{font-size:.65rem;font-weight:800;color:#1e5c2f;padding-left:.2rem}
+.ov-cal-detail{margin-top:1rem;padding-top:.85rem;border-top:1px solid #e3ebe4}
+.ov-cal-detail-head{display:flex;flex-direction:column;gap:.15rem;margin-bottom:.65rem}
+.ov-cal-detail-head strong{text-transform:capitalize;color:#143d1f}
+.ov-cal-detail-list{list-style:none;margin:0;padding:0;display:grid;gap:.55rem}
+.ov-cal-detail-list li{
+  display:grid;grid-template-columns:minmax(140px,.9fr) 1.4fr;gap:.75rem;
+  padding:.55rem .65rem;border-radius:12px;background:#f4f7f2;border:1px solid #e3ebe4
+}
+.ov-cal-detail-list strong{display:block;font-size:.92rem}
+.ov-cal-detail-list small{color:#6b7c70}
+.ov-cal-times{display:flex;flex-wrap:wrap;gap:.35rem;align-content:center}
+.ov-cal-type{
+  font-size:.72rem;font-weight:800;padding:.2rem .45rem;border-radius:999px;
+  background:#e8f0ea;color:#143d1f
+}
+.ov-cal-type-entrada{background:#d4edda}
+.ov-cal-type-intervalo{background:#fff3cd}
+.ov-cal-type-retorno{background:#cce5ff}
+.ov-cal-type-saida{background:#f8d7da;color:#7a1c24}
+@media(max-width:900px){
+  .ov-cal-cell{min-height:72px}
+  .ov-cal-detail-list li{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .ov-cal-pill{font-size:.62rem}
+  .ov-cal-cell{min-height:64px;padding:.3rem .25rem}
+}
