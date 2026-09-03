@@ -194,6 +194,63 @@
 .emp-install-banner-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
 .emp-install-banner .emp-btn{padding:.45rem .8rem;font-size:.85rem;width:auto}
 
+/* Comprovante e certificado de solicitação */
+.emp-modal-backdrop{
+  position:fixed;inset:0;z-index:60;background:rgba(20,61,31,.55);
+  display:grid;place-items:center;padding:1rem;backdrop-filter:blur(3px)
+}
+.emp-receipt,.emp-cert{
+  background:linear-gradient(180deg,#ffffff 0%,#f7faf6 100%);
+  border:2px solid var(--emp-gold);
+  border-radius:18px;
+  box-shadow:0 16px 40px rgba(20,61,31,.18);
+  padding:1.15rem 1.1rem 1rem;
+  width:100%;max-width:380px
+}
+.emp-cert{max-width:100%;margin-top:.35rem}
+.emp-receipt-top,.emp-cert-head{
+  display:flex;align-items:center;gap:.7rem;margin-bottom:.55rem
+}
+.emp-receipt-top strong,.emp-cert-head strong{
+  display:block;color:var(--emp-green-deep);font-size:1rem
+}
+.emp-receipt-brand{
+  display:block;font-size:.72rem;font-weight:800;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--emp-gold)
+}
+.emp-receipt-goldline{
+  height:3px;border-radius:999px;margin:.35rem 0 .75rem;
+  background:linear-gradient(90deg,var(--emp-gold),#f5e6b8,var(--emp-gold))
+}
+.emp-receipt-body{display:grid;gap:.35rem;margin-bottom:.75rem}
+.emp-receipt-row{
+  display:flex;justify-content:space-between;gap:.75rem;
+  font-size:.88rem;padding:.35rem 0;border-bottom:1px dashed #e3ebe4
+}
+.emp-receipt-row span{color:var(--emp-muted)}
+.emp-receipt-row strong{color:var(--emp-green-deep);text-align:right}
+.emp-receipt-section{margin:.35rem 0 .5rem}
+.emp-receipt-section-title{
+  display:block;font-size:.75rem;font-weight:800;color:var(--emp-green);
+  text-transform:uppercase;letter-spacing:.03em;margin-bottom:.4rem
+}
+.emp-receipt-list{list-style:none;margin:0;padding:0;display:grid;gap:.35rem}
+.emp-receipt-list li{
+  display:flex;justify-content:space-between;align-items:center;
+  background:#eef7f0;border:1px solid #c9e2d0;border-radius:10px;
+  padding:.45rem .65rem;font-size:.9rem
+}
+.emp-receipt-list li span{font-weight:800;font-variant-numeric:tabular-nums;color:var(--emp-green-deep)}
+.emp-receipt-footer{
+  text-align:center;font-size:.72rem;color:var(--emp-muted);
+  margin:.65rem 0 .5rem;font-style:italic
+}
+.emp-receipt-actions{display:grid;gap:.45rem}
+.emp-cert-msg{
+  margin:.2rem 0 .15rem;color:var(--emp-green-deep);
+  font-weight:700;font-size:.95rem;line-height:1.35;text-align:center
+}
+
 @media (min-width: 481px) {
   .emp-app { border-left: 1px solid var(--emp-border); border-right: 1px solid var(--emp-border); }
 }
