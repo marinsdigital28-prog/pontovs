@@ -77,6 +77,8 @@ export default function EmployeeAppPage() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [quickForgotLoading, setQuickForgotLoading] = useState(false);
+  const [quickForgotDone, setQuickForgotDone] = useState(false);
   const knownPunchIds = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
   const knownRequestStatus = useRef<Map<string, string>>(new Map());
@@ -89,23 +91,10 @@ export default function EmployeeAppPage() {
     try {
       if (typeof Notification !== 'undefined') {
         if (Notification.permission === 'granted') {
-          new Notification(title, {
-            body,
-            icon: '/ponto-progredir-icon-circular.png',
-            badge: '/ponto-progredir-icon-circular.png',
-            tag: tag || `aviso-${Date.now()}`,
-            requireInteraction: true,
-          });
+          new Notification(title, { body, icon: '/ponto-progredir-icon-circular.png', badge: '/ponto-progredir-icon-circular.png', tag: tag || `aviso-${Date.now()}`, requireInteraction: true });
         } else if (Notification.permission === 'default') {
           void Notification.requestPermission().then((p) => {
-            if (p === 'granted') {
-              new Notification(title, {
-                body,
-                icon: '/ponto-progredir-icon-circular.png',
-                tag: tag || `aviso-${Date.now()}`,
-                requireInteraction: true,
-              });
-            }
+            if (p === 'granted') new Notification(title, { body, icon: '/ponto-progredir-icon-circular.png', tag: tag || `aviso-${Date.now()}`, requireInteraction: true });
           });
         }
       }
@@ -148,11 +137,7 @@ export default function EmployeeAppPage() {
       for (const r of list) {
         const prev = knownRequestStatus.current.get(r.id);
         if (prev && prev !== r.status && (r.status === 'APROVADO' || r.status === 'REJEITADO')) {
-          const tipo = r.type === 'AUSENCIA' ? 'Aviso de ausência'
-            : r.type === 'ESQUECI_PONTO' ? 'Ponto esquecido'
-            : r.type === 'AVISO_ATRASO' ? 'Aviso de atraso'
-            : r.type === 'TROCA_DIA' ? 'Troca de dia'
-            : 'Solicitação';
+          const tipo = r.type === 'AUSENCIA' ? 'Aviso de ausência' : r.type === 'ESQUECI_PONTO' ? 'Ponto esquecido' : r.type === 'AVISO_ATRASO' ? 'Aviso de atraso' : r.type === 'TROCA_DIA' ? 'Troca de dia' : 'Solicitação';
           const decision = r.status === 'APROVADO' ? 'aprovada ✅' : 'rejeitada ❌';
           const extra = r.reviewNote ? ` · ${r.reviewNote}` : '';
           notifyPopup('Espaço Progredir', `${tipo} ${decision}${extra}`, `req-${r.id}-${r.status}`);
@@ -187,10 +172,7 @@ export default function EmployeeAppPage() {
       target.setMinutes(target.getMinutes() - 10);
       const delay = target.getTime() - now.getTime();
       if (delay < 0) return;
-      const id = window.setTimeout(() => {
-        notifyPopup('Lembrete de ponto', `${label} em cerca de 10 minutos`, `lembrete-${label}`);
-      }, delay);
-      timers.push(id);
+      timers.push(window.setTimeout(() => notifyPopup('Lembrete de ponto', `${label} em cerca de 10 minutos`, `lembrete-${label}`), delay));
     };
     if (start) scheduleAt(start, 'Horário de entrada');
     if (end) scheduleAt(end, 'Horário de saída');
@@ -198,9 +180,7 @@ export default function EmployeeAppPage() {
   }, [remindersOn, sessionStatus, data?.employee?.scheduleStart, data?.employee?.scheduleEnd]);
 
   useEffect(() => {
-    const nativeShell = new URLSearchParams(window.location.search).get('native') === '1'
-      || /PontoProgredirNative|Capacitor/i.test(window.navigator.userAgent)
-      || Boolean((window as Window & { Capacitor?: unknown }).Capacitor);
+    const nativeShell = new URLSearchParams(window.location.search).get('native') === '1' || /PontoProgredirNative|Capacitor/i.test(window.navigator.userAgent) || Boolean((window as Window & { Capacitor?: unknown }).Capacitor);
     const standalone = nativeShell || window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true || document.referrer.includes('android-app://');
     setIsStandalone(standalone);
     const onBip = (e: Event) => { e.preventDefault(); setInstallPrompt(e); };
@@ -245,6 +225,53 @@ export default function EmployeeAppPage() {
     }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [data, todayKey]);
 
+  const missingPunchHint = useMemo(() => {
+    const start = data?.employee?.scheduleStart;
+    const end = data?.employee?.scheduleEnd;
+    if (!start && !end) return null as null | { type: string; label: string; message: string };
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const hv = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+    const nowMin = Number(hv.hour) * 60 + Number(hv.minute);
+    const toMin = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); if (Number.isNaN(h) || Number.isNaN(m)) return null; return h * 60 + m; };
+    const types = new Set(todayPunches.map((p) => p.type));
+    const startMin = start ? toMin(start) : null;
+    const endMin = end ? toMin(end) : null;
+    if (startMin !== null && nowMin >= startMin + 15 && !types.has('ENTRADA')) {
+      return { type: 'ENTRADA', label: 'Entrada', message: `Não encontramos a marcação de entrada de hoje (prevista às ${start}).` };
+    }
+    if (endMin !== null && nowMin >= endMin + 15 && types.has('ENTRADA') && !types.has('SAIDA')) {
+      return { type: 'SAIDA', label: 'Saída', message: `Não encontramos a marcação de saída de hoje (prevista às ${end}).` };
+    }
+    if (startMin !== null && nowMin >= startMin + 60 && todayPunches.length === 0) {
+      return { type: 'ENTRADA', label: 'Entrada', message: 'Ainda não há marcações registradas hoje no sistema.' };
+    }
+    return null;
+  }, [data?.employee?.scheduleStart, data?.employee?.scheduleEnd, todayPunches]);
+
+  async function quickForgot(type: string) {
+    if (quickForgotLoading || quickForgotDone) return;
+    setQuickForgotLoading(true); setError('');
+    const nowParts = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const tv = Object.fromEntries(nowParts.map((p) => [p.type, p.value]));
+    const approxTime = `${tv.hour}:${tv.minute}`;
+    const reason = 'Esqueci de bater no totem';
+    const details = `Batida esquecida: ${TYPE_LABEL[type] || type} · Horário aproximado: ${approxTime} · Aviso rápido pela tela inicial`;
+    const response = await fetch('/api/employee/requests', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ESQUECI_PONTO', startDate: todayKey, endDate: todayKey, reason, details, classification: type }),
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(json.error || 'Não foi possível avisar a administração.');
+      notifyPopup('Aviso', json.error || 'Falha ao enviar. Tente em Avisos.', 'quick-forgot-err');
+    } else {
+      setQuickForgotDone(true);
+      notifyPopup('Esqueci de marcar', `${TYPE_LABEL[type] || type} enviado ao painel da ADM.`, 'quick-forgot-ok');
+      await loadRequests();
+    }
+    setQuickForgotLoading(false);
+  }
+
   const lastPhoto = useMemo(() => {
     const withPhoto = [...todayPunches].reverse().find((p) => p.photoData);
     return withPhoto?.photoData || null;
@@ -283,19 +310,10 @@ export default function EmployeeAppPage() {
     let finalCoverage = coverage;
     if (startDate === todayKey && finalCoverage !== 'EMERGENCIA') finalCoverage = 'EMERGENCIA';
     const reason = reasonChoice === 'Outros' ? (String(form.get('reasonOther') || '').trim() || 'Outros') : reasonChoice;
-    const details = [
-      `Tipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}`,
-      startTime && endTime ? `Horário: ${startTime}–${endTime}` : null,
-      returnTime ? `Previsão de volta: ${returnTime}` : null,
-      note,
-    ].filter(Boolean).join(' · ');
+    const details = [`Tipo: ${COVERAGE_LABEL[finalCoverage] || finalCoverage}`, startTime && endTime ? `Horário: ${startTime}–${endTime}` : null, returnTime ? `Previsão de volta: ${returnTime}` : null, note].filter(Boolean).join(' · ');
     const response = await fetch('/api/employee/requests', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'AUSENCIA', startDate, endDate, reason, details: details || null,
-        classification: finalCoverage, returnExpected: Boolean(returnTime),
-        documentName: documentFile?.name || null, documentMime: documentFile?.type || null, documentData,
-      }),
+      body: JSON.stringify({ type: 'AUSENCIA', startDate, endDate, reason, details: details || null, classification: finalCoverage, returnExpected: Boolean(returnTime), documentName: documentFile?.name || null, documentMime: documentFile?.type || null, documentData }),
     });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar a solicitação.');
@@ -305,8 +323,7 @@ export default function EmployeeAppPage() {
       setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de ausência*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${period}${timePart}\n📋 ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\n💬 ${reason}`);
       setAbsenceMsg('Seu aviso de ausência foi registrado com sucesso.');
       notifyPopup('Aviso de ausência', 'Solicitação enviada. A ADM vai analisar.', 'aviso-ausencia');
-      (e.target as HTMLFormElement).reset();
-      setReasonChoice(ABSENCE_REASONS[0]); setCoverage('DIA_INTEIRO');
+      (e.target as HTMLFormElement).reset(); setReasonChoice(ABSENCE_REASONS[0]); setCoverage('DIA_INTEIRO');
       await loadRequests();
     }
     setLoading(false);
@@ -320,10 +337,7 @@ export default function EmployeeAppPage() {
     const note = String(form.get('note') || '') || null;
     const reason = forgotReason === 'Outros' ? (String(form.get('reasonOther') || '').trim() || 'Outros') : forgotReason;
     const details = [`Batida esquecida: ${TYPE_LABEL[forgotType] || forgotType}`, approxTime ? `Horário aproximado: ${approxTime}` : null, note].filter(Boolean).join(' · ');
-    const response = await fetch('/api/employee/requests', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'ESQUECI_PONTO', startDate: day, endDate: day, reason, details: details || null, classification: forgotType }),
-    });
+    const response = await fetch('/api/employee/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'ESQUECI_PONTO', startDate: day, endDate: day, reason, details: details || null, classification: forgotType }) });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso.');
     else {
@@ -343,18 +357,14 @@ export default function EmployeeAppPage() {
     const toDay = String(form.get('toDate') || '');
     const reason = String(form.get('reason') || '').trim();
     const note = String(form.get('note') || '') || null;
-    const response = await fetch('/api/employee/requests', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'TROCA_DIA', startDate: fromDay, endDate: toDay, reason, details: note, classification: 'TROCA_DIA' }),
-    });
+    const response = await fetch('/api/employee/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'TROCA_DIA', startDate: fromDay, endDate: toDay, reason, details: note, classification: 'TROCA_DIA' }) });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar a troca de dia.');
     else {
       setAbsenceMsg('Pedido de troca de dia registrado com sucesso.');
       notifyPopup('Troca de dia', 'Pedido enviado. Aguarde a análise.', 'aviso-troca');
       setWhatsappText(`🌿 *Espaço Progredir*\n*Troca de dia*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 De ${shortDate.format(new Date(fromDay + 'T12:00:00'))} → ${shortDate.format(new Date(toDay + 'T12:00:00'))}\n💬 ${reason}`);
-      (e.target as HTMLFormElement).reset();
-      await loadRequests();
+      (e.target as HTMLFormElement).reset(); await loadRequests();
     }
     setLoading(false);
   }
@@ -367,18 +377,14 @@ export default function EmployeeAppPage() {
     const reason = String(form.get('reason') || '').trim();
     const note = String(form.get('note') || '') || null;
     const details = [eta ? `Previsão de chegada: ${eta}` : null, note].filter(Boolean).join(' · ');
-    const response = await fetch('/api/employee/requests', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'AVISO_ATRASO', startDate: day, endDate: day, reason, details: details || null, classification: 'ATRASO', returnExpected: Boolean(eta) }),
-    });
+    const response = await fetch('/api/employee/requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'AVISO_ATRASO', startDate: day, endDate: day, reason, details: details || null, classification: 'ATRASO', returnExpected: Boolean(eta) }) });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso de atraso.');
     else {
       setAbsenceMsg('Aviso de atraso registrado com sucesso.');
       notifyPopup('Aviso de atraso', 'A administração foi notificada.', 'aviso-atraso');
       setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de atraso*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${shortDate.format(new Date(day + 'T12:00:00'))}\n⏱️ Chegada prevista: ${eta || '—'}\n💬 ${reason}`);
-      (e.target as HTMLFormElement).reset();
-      await loadRequests();
+      (e.target as HTMLFormElement).reset(); await loadRequests();
     }
     setLoading(false);
   }
@@ -386,32 +392,18 @@ export default function EmployeeAppPage() {
   function buildReceiptText() {
     const emp = data?.employee;
     if (!emp) return '';
-    return [
-      '🌿 ESPAÇO PROGREDIR', 'Ponto Progredir · Comprovante de ponto', '────────────────────',
-      `👤 ${emp.name}`, `🔢 Matrícula: ${emp.employeeNumber || '—'}`, `📅 ${shortDate.format(new Date())}`,
-      `⏱️ Jornada: ${emp.scheduleStart || '--:--'} – ${emp.scheduleEnd || '--:--'}`, '────────────────────', 'Marcações de hoje:',
-      ...(todayPunches.length ? todayPunches.map((p) => `✓ ${timeFmt.format(new Date(p.timestamp))}  ·  ${TYPE_LABEL[p.type] || p.type}`) : ['• Nenhuma marcação registrada ainda']),
-      '────────────────────', 'Acreditando na Vida', 'Documento gerado pelo App do Colaborador',
-    ].join('\n');
+    return ['🌿 ESPAÇO PROGREDIR', 'Ponto Progredir · Comprovante de ponto', '────────────────────', `👤 ${emp.name}`, `🔢 Matrícula: ${emp.employeeNumber || '—'}`, `📅 ${shortDate.format(new Date())}`, `⏱️ Jornada: ${emp.scheduleStart || '--:--'} – ${emp.scheduleEnd || '--:--'}`, '────────────────────', 'Marcações de hoje:', ...(todayPunches.length ? todayPunches.map((p) => `✓ ${timeFmt.format(new Date(p.timestamp))}  ·  ${TYPE_LABEL[p.type] || p.type}`) : ['• Nenhuma marcação registrada ainda']), '────────────────────', 'Acreditando na Vida', 'Documento gerado pelo App do Colaborador'].join('\n');
   }
-
   function openComprovante() { setShowReceipt(true); }
   function shareComprovante() {
     const text = buildReceiptText();
     if (!text) return;
-    if (navigator.share) {
-      void navigator.share({ title: 'Comprovante — Espaço Progredir', text }).catch(() => {
-        void navigator.clipboard?.writeText(text); setToast('Comprovante copiado'); window.setTimeout(() => setToast(null), 2500);
-      });
-    } else {
-      void navigator.clipboard?.writeText(text); setToast('Comprovante copiado'); window.setTimeout(() => setToast(null), 3000);
-    }
+    if (navigator.share) void navigator.share({ title: 'Comprovante — Espaço Progredir', text }).catch(() => { void navigator.clipboard?.writeText(text); setToast('Comprovante copiado'); window.setTimeout(() => setToast(null), 2500); });
+    else { void navigator.clipboard?.writeText(text); setToast('Comprovante copiado'); window.setTimeout(() => setToast(null), 3000); }
   }
   function toggleReminders() {
-    if (!remindersOn) {
-      if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission();
-      setRemindersOn(true); setToast('Lembretes ativados');
-    } else { setRemindersOn(false); setToast('Lembretes desativados'); }
+    if (!remindersOn) { if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission(); setRemindersOn(true); setToast('Lembretes ativados'); }
+    else { setRemindersOn(false); setToast('Lembretes desativados'); }
     window.setTimeout(() => setToast(null), 2500);
   }
 
@@ -479,6 +471,29 @@ export default function EmployeeAppPage() {
               <strong className="emp-big">{emp?.scheduleStart || '--:--'} às {emp?.scheduleEnd || '--:--'}</strong>
               <p className="emp-muted">Jornada prevista · {emp?.workDays || 'dias não informados'}</p>
             </div>
+
+            {missingPunchHint && !quickForgotDone ? (
+              <div className="emp-alert-miss">
+                <div className="emp-alert-miss-head">
+                  <span className="emp-alert-miss-icon" aria-hidden>⚠️</span>
+                  <div>
+                    <strong>Possível ponto não marcado</strong>
+                    <p>{missingPunchHint.message}</p>
+                  </div>
+                </div>
+                <button type="button" className="emp-btn primary" disabled={quickForgotLoading} onClick={() => void quickForgot(missingPunchHint.type)}>
+                  {quickForgotLoading ? 'Enviando…' : `Avisar ADM — esqueci a ${missingPunchHint.label.toLowerCase()}`}
+                </button>
+                <button type="button" className="emp-link" onClick={() => { setTab('absences'); setRequestKind('ESQUECI_PONTO'); }}>Detalhar em Avisos</button>
+              </div>
+            ) : null}
+            {quickForgotDone ? (
+              <div className="emp-alert-miss ok">
+                <strong>Aviso enviado à administração</strong>
+                <p>A ADM já pode ver no painel de Solicitações.</p>
+              </div>
+            ) : null}
+
             {lastPhoto ? (
               <div className="emp-card"><span className="emp-label">Última foto registrada hoje</span><img src={lastPhoto} alt="Foto da marcação" className="emp-punch-photo" /></div>
             ) : null}
@@ -715,11 +730,7 @@ export default function EmployeeAppPage() {
             <div className="emp-receipt-section">
               <span className="emp-receipt-section-title">Marcações de hoje</span>
               {todayPunches.length ? (
-                <ul className="emp-receipt-list">
-                  {todayPunches.map((p) => (
-                    <li key={p.id}><span>{timeFmt.format(new Date(p.timestamp))}</span><strong>{TYPE_LABEL[p.type] || p.type}</strong></li>
-                  ))}
-                </ul>
+                <ul className="emp-receipt-list">{todayPunches.map((p) => (<li key={p.id}><span>{timeFmt.format(new Date(p.timestamp))}</span><strong>{TYPE_LABEL[p.type] || p.type}</strong></li>))}</ul>
               ) : <p className="emp-muted">Nenhuma marcação registrada ainda.</p>}
             </div>
             <p className="emp-receipt-footer">Acreditando na Vida · App do Colaborador</p>
