@@ -1,0 +1,11 @@
+import fs from 'fs';
+import zlib from 'zlib';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const b64Path = path.join(root, 'app/app/employee-shell.b64');
+const outPath = path.join(root, 'app/app/employee-shell.tsx');
+const b64 = fs.readFileSync(b64Path, 'utf8').trim();
+const buf = zlib.gunzipSync(Buffer.from(b64, 'base64'));
+fs.writeFileSync(outPath, buf);
+console.log('expanded employee-shell.tsx', buf.length, 'bytes');
