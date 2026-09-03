@@ -86,3 +86,32 @@
   .ov-cal-pill{font-size:.62rem}
   .ov-cal-cell{min-height:64px;padding:.3rem .25rem}
 }
+
+/* Fila única + alerta saída + camadas calendário */
+.overview-ops{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.9fr);gap:1rem;align-items:start}
+.overview-inbox .section-heading,.overview-exit-watch .section-heading{align-items:flex-start}
+.ov-inbox-list,.ov-watch-list{list-style:none;margin:0;padding:0;display:grid;gap:.55rem}
+.ov-inbox-item,.ov-watch-list li{
+  display:flex;justify-content:space-between;gap:.75rem;align-items:center;
+  padding:.65rem .75rem;border-radius:12px;border:1px solid #e3ebe4;background:#f7faf7
+}
+.ov-inbox-item strong,.ov-watch-list b{display:block;font-size:.9rem;color:#143d1f}
+.ov-inbox-item .small-muted,.ov-watch-list small{display:block;margin-top:.15rem}
+.ov-inbox-item small{display:block;margin-top:.2rem;color:#6b7c70;font-size:.72rem}
+.ov-inbox-actions{display:flex;gap:.35rem;flex-shrink:0}
+.ov-inbox-request{border-left:3px solid #c9a227}
+.ov-inbox-issue{border-left:3px solid #c45c5c}
+.ov-inbox-empty{margin:.5rem 0 0}
+.ov-watch-block{margin-top:.85rem}
+.ov-watch-block:first-of-type{margin-top:.35rem}
+.ov-watch-label{display:block;margin-bottom:.45rem;font-size:.82rem;color:#1e5c2f}
+.ov-wa-btn{white-space:nowrap;text-decoration:none}
+.ov-cal-layers{display:flex;flex-wrap:wrap;gap:.85rem;margin:0 0 .75rem;font-size:.82rem;font-weight:700;color:#143d1f}
+.ov-cal-layers label{display:inline-flex;align-items:center;gap:.35rem;cursor:pointer}
+.ov-cal-pill-atestado{background:#f8d7da!important;color:#7a1c24!important}
+.ov-cal-pill-ausencia{background:#fff3cd!important;color:#6b4f00!important}
+.ov-cal-cell.has-cert{background:#fdf2f2}
+.ov-cal-cell.has-abs{background:#fffbeb}
+@media(max-width:900px){
+  .overview-ops{grid-template-columns:1fr}
+}
