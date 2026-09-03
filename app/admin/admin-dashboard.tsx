@@ -15,6 +15,7 @@ import CertificateConflictsPanel from './certificate-conflicts-panel';
 import EmployeesPanel from './employees-panel';
 import IntegrityCenter from './integrity-center';
 import './overview-layout.css';
+import OverviewCalendar from './overview-calendar';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -141,6 +142,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
           <HealthCard />
         </aside>
       </div>
+      <OverviewCalendar />
       <div className="overview-analytics"><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
     </section> : null}
 
