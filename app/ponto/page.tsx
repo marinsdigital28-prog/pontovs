@@ -17,6 +17,7 @@ export default function Page() {
   const streamRef = React.useRef<MediaStream | null>(null);
   const autoLookupRef = React.useRef('');
   const pendingClientIdRef = React.useRef<string | null>(null);
+  const submittingRef = React.useRef(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [journeyClosed, setJourneyClosed] = useState(false);
 
@@ -42,8 +43,6 @@ export default function Page() {
 
   useEffect(() => {
     if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading) return;
-    // A câmera tenta abrir assim que a identificação termina. Se o navegador exigir
-    // gesto explícito ou negar a permissão, a tela mantém o botão manual como fallback.
     void handlePhotoSelection();
   }, [step, employee, cameraOpen, photo, confirmation, loading]);
 
@@ -141,6 +140,8 @@ export default function Page() {
 
   async function handlePunch(photoOverride?: string | null) {
     if (!employee) return;
+    if (submittingRef.current || loading) return;
+    submittingRef.current = true;
     const offlineMode = Boolean(employee.offline || employee.offlineFallback || !navigator.onLine);
     const location = await readCurrentLocation();
     const payload = {
@@ -157,6 +158,7 @@ export default function Page() {
       queueOfflinePunch({ ...payload, origin: 'OFFLINE', connectivity: 'OFFLINE' }, employee.offline || employee.offlineFallback
         ? 'Marcação salva no aparelho — será sincronizada assim que o banco voltar.'
         : 'Sem conexão — marcação protegida no aparelho e será sincronizada automaticamente');
+      submittingRef.current = false;
       return;
     }
     setLoading(true);
@@ -179,6 +181,11 @@ export default function Page() {
         type: json.type,
         timestamp: json.timestamp,
       });
+      if (json.duplicate) {
+        setStatusMsg('Marcação já registrada há pouco. Evitando duplicidade.');
+        window.setTimeout(() => resetForNextCollaborator(), 2200);
+        return;
+      }
       const receiptStatus = json.receiptEmail?.status;
       setStatusMsg(receiptStatus === 'sent'
         ? 'Ponto registrado. Comprovante enviado para seu email.'
@@ -220,6 +227,7 @@ export default function Page() {
       }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
       if (!confirmation) {
         setTimeout(() => setStatusMsg(null), 5000);
       }
@@ -237,8 +245,6 @@ export default function Page() {
       try {
         for (const p of pending) {
           const response = await fetch('/api/punch', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...p, origin: 'OFFLINE', connectivity: 'RETRYING' }) });
-          // Um 409 pode representar concorrência ou jornada encerrada; não confirma que esta
-          // marcação foi persistida. Mantemos o item para não perder a evidência local.
           if (!response.ok) remaining.push(p);
         }
         if (remaining.length > 0) localStorage.setItem('offlinePunches', JSON.stringify(remaining));
@@ -322,6 +328,7 @@ export default function Page() {
   }
 
   async function capturePhoto() {
+    if (submittingRef.current || loading) return;
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) {
       setStatusMsg('A câmera ainda está iniciando. Aguarde um instante.');
@@ -426,18 +433,16 @@ export default function Page() {
                 )}
               </>
             ) : (
-              <div className="summary confirmation-summary confirmation-minimal" role="status" aria-live="polite">
-                <div className="confirmation-animation" aria-hidden="true"><span className="confirmation-ball"><span className="confirmation-check">✓</span></span></div>
-                <div className="confirmation-title">{confirmation.type === 'PENDENTE' ? 'MARCAÇÃO SALVA OFFLINE' : 'MARCAÇÃO CONFIRMADA'}</div>
-                <div className="confirmation-name">{employee.name}</div>
-                <div className="confirmation-type">{confirmation.type === 'PENDENTE' ? 'Aguardando sincronização' : `Horário registrado · ${new Date(confirmation.timestamp).toLocaleTimeString()}`}</div>
-                {photo && <img src={photo} alt="Foto registrada" className="photo-confirmation-large" />}
+              <div className="summary confirmation-summary confirmation-summary-minimal">
+                <div className="confirmation-check">✓</div>
+                <div className="confirmation-title">Ponto registrado</div>
+                <div className="confirmation-type">{confirmation.type}</div>
+                <div className="confirmation-time">{new Date(confirmation.timestamp).toLocaleTimeString()}</div>
               </div>
             )}
-            {statusMsg && !confirmation && <div className="status-msg minimal-status">{statusMsg}</div>}
+            {statusMsg && <div className="status-msg">{statusMsg}</div>}
           </div>
         )}
-
         </section>
       </div>
     </main>
