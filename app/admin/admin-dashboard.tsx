@@ -16,6 +16,8 @@ import EmployeesPanel from './employees-panel';
 import IntegrityCenter from './integrity-center';
 import './overview-layout.css';
 import OverviewCalendar from './overview-calendar';
+import OverviewInbox from './overview-inbox';
+import OverviewExitWatch from './overview-exit-watch';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -54,6 +56,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const loadAudit = useCallback(async () => { const response = await fetch('/api/admin/audit', { cache: 'no-store' }); if (response.ok) setAudit(await response.json()); }, []);
   const loadPresence = useCallback(async () => { const response = await fetch('/api/admin/presence', { cache: 'no-store' }); if (response.ok) { const data = await response.json(); setPresence(Array.isArray(data.employees) ? data.employees : []); setPresenceUpdatedAt(new Date()); } }, []);
   useEffect(() => { void loadIssues(); }, [loadIssues]);
+  useEffect(() => { void loadEmployees(); }, [loadEmployees]);
   useEffect(() => { void autoApplySchedulePatterns(); }, [autoApplySchedulePatterns]);
   useEffect(() => { if (tab === 'security') void loadAudit(); }, [tab, loadAudit]);
   useEffect(() => { if (tab !== 'overview') return; void loadPresence(); const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void loadPresence(); }, 10000); return () => window.clearInterval(timer); }, [tab, loadPresence]);
@@ -94,6 +97,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
             <button className="primary-btn admin-action" onClick={() => setTab('punches')}>Ver marcações</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Abrir folha</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('employees')}>Equipe</button>
+            <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Espelho mensal</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('integrity')}>Central de Integridade</button>
           </div>
         </div>
@@ -141,6 +145,10 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
           </div>
           <HealthCard />
         </aside>
+      </div>
+      <div className="overview-ops">
+        <OverviewInbox onOpenRequests={() => setTab('requests')} onOpenIssues={() => setTab('issues')} />
+        <OverviewExitWatch presence={presence} employees={employees} />
       </div>
       <OverviewCalendar />
       <div className="overview-analytics"><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
