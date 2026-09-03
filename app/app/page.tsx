@@ -19,9 +19,8 @@ type EmployeeData = {
     profile?: EmpProfile | null; active?: boolean; unitName?: string | null;
   };
   punches: Punch[];
-  summary?: { workedMinutes?: number; plannedMinutes?: number; lateMinutes?: number };
 };
-type RequestItem = { id: string; type: string; status: string; startDate: string; endDate: string; reason: string; details?: string | null; createdAt: string };
+type RequestItem = { id: string; type: string; status: string; startDate: string; endDate: string; reason: string; details?: string | null; reviewNote?: string | null; createdAt: string };
 
 const TYPE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída' };
 const ABSENCE_REASONS = [
@@ -80,6 +79,38 @@ export default function EmployeeAppPage() {
   const [showReceipt, setShowReceipt] = useState(false);
   const knownPunchIds = useRef<Set<string>>(new Set());
   const firstLoadDone = useRef(false);
+  const knownRequestStatus = useRef<Map<string, string>>(new Map());
+  const requestsReady = useRef(false);
+
+  function notifyPopup(title: string, body: string, tag?: string) {
+    setToast(`${title}: ${body}`);
+    window.setTimeout(() => setToast(null), 5000);
+    try { if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 80]); } catch {}
+    try {
+      if (typeof Notification !== 'undefined') {
+        if (Notification.permission === 'granted') {
+          new Notification(title, {
+            body,
+            icon: '/ponto-progredir-icon-circular.png',
+            badge: '/ponto-progredir-icon-circular.png',
+            tag: tag || `aviso-${Date.now()}`,
+            requireInteraction: true,
+          });
+        } else if (Notification.permission === 'default') {
+          void Notification.requestPermission().then((p) => {
+            if (p === 'granted') {
+              new Notification(title, {
+                body,
+                icon: '/ponto-progredir-icon-circular.png',
+                tag: tag || `aviso-${Date.now()}`,
+                requireInteraction: true,
+              });
+            }
+          });
+        }
+      }
+    } catch {}
+  }
 
   const loadHistory = useCallback(async () => {
     const res = await fetch('/api/employee/history', { cache: 'no-store' });
@@ -105,12 +136,32 @@ export default function EmployeeAppPage() {
     }
     knownPunchIds.current = new Set(punches.map((p) => p.id));
     firstLoadDone.current = true;
-    setData({ employee: json.employee, punches, summary: json.summary });
+    setData({ employee: json.employee, punches });
   }, []);
 
   const loadRequests = useCallback(async () => {
     const res = await fetch('/api/employee/requests', { cache: 'no-store' });
-    if (res.ok) { const json = await res.json(); setRequests(json.requests || []); }
+    if (!res.ok) return;
+    const json = await res.json();
+    const list: RequestItem[] = json.requests || [];
+    if (requestsReady.current) {
+      for (const r of list) {
+        const prev = knownRequestStatus.current.get(r.id);
+        if (prev && prev !== r.status && (r.status === 'APROVADO' || r.status === 'REJEITADO')) {
+          const tipo = r.type === 'AUSENCIA' ? 'Aviso de ausência'
+            : r.type === 'ESQUECI_PONTO' ? 'Ponto esquecido'
+            : r.type === 'AVISO_ATRASO' ? 'Aviso de atraso'
+            : r.type === 'TROCA_DIA' ? 'Troca de dia'
+            : 'Solicitação';
+          const decision = r.status === 'APROVADO' ? 'aprovada ✅' : 'rejeitada ❌';
+          const extra = r.reviewNote ? ` · ${r.reviewNote}` : '';
+          notifyPopup('Espaço Progredir', `${tipo} ${decision}${extra}`, `req-${r.id}-${r.status}`);
+        }
+      }
+    }
+    knownRequestStatus.current = new Map(list.map((r) => [r.id, r.status]));
+    requestsReady.current = true;
+    setRequests(list);
   }, []);
 
   useEffect(() => {
@@ -137,20 +188,12 @@ export default function EmployeeAppPage() {
       const delay = target.getTime() - now.getTime();
       if (delay < 0) return;
       const id = window.setTimeout(() => {
-        const msg = `Lembrete: ${label} em cerca de 10 minutos`;
-        setToast(msg);
-        try { if (navigator.vibrate) navigator.vibrate([60, 40, 60]); } catch {}
-        try {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('Ponto Progredir', { body: msg, icon: '/ponto-progredir-icon-circular.png' });
-          }
-        } catch {}
-        window.setTimeout(() => setToast(null), 6000);
+        notifyPopup('Lembrete de ponto', `${label} em cerca de 10 minutos`, `lembrete-${label}`);
       }, delay);
       timers.push(id);
     };
-    if (start) scheduleAt(start, 'horário de entrada');
-    if (end) scheduleAt(end, 'horário de saída');
+    if (start) scheduleAt(start, 'Horário de entrada');
+    if (end) scheduleAt(end, 'Horário de saída');
     return () => { timers.forEach((id) => window.clearTimeout(id)); };
   }, [remindersOn, sessionStatus, data?.employee?.scheduleStart, data?.employee?.scheduleEnd]);
 
@@ -179,7 +222,11 @@ export default function EmployeeAppPage() {
     e.preventDefault(); setLoading(true); setError('');
     const result = await signIn('credentials', { employeeNumber: padMat(matricula), redirect: false });
     if (result?.error) setError('Matrícula não encontrada ou inativa.');
-    else { await loadHistory(); await loadRequests(); }
+    else {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission();
+      await loadHistory(); await loadRequests();
+      notifyPopup('Ponto Progredir', 'Login realizado. Notificações de avisos ativadas.', 'login-ok');
+    }
     setLoading(false);
   }
 
@@ -255,8 +302,9 @@ export default function EmployeeAppPage() {
     else {
       const period = startDate === endDate ? shortDate.format(new Date(startDate + 'T12:00:00')) : `${shortDate.format(new Date(startDate + 'T12:00:00'))} até ${shortDate.format(new Date(endDate + 'T12:00:00'))}`;
       const timePart = startTime && endTime ? ` das ${startTime} às ${endTime}` : '';
-      setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de ausência*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${period}${timePart}\n📋 ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\n💬 ${reason}\n────────────────\nAguardando análise da ADM`);
+      setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de ausência*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${period}${timePart}\n📋 ${COVERAGE_LABEL[finalCoverage] || finalCoverage}\n💬 ${reason}`);
       setAbsenceMsg('Seu aviso de ausência foi registrado com sucesso.');
+      notifyPopup('Aviso de ausência', 'Solicitação enviada. A ADM vai analisar.', 'aviso-ausencia');
       (e.target as HTMLFormElement).reset();
       setReasonChoice(ABSENCE_REASONS[0]); setCoverage('DIA_INTEIRO');
       await loadRequests();
@@ -280,6 +328,7 @@ export default function EmployeeAppPage() {
     if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso.');
     else {
       setAbsenceMsg('Aviso de ponto esquecido registrado com sucesso.');
+      notifyPopup('Esqueci de marcar', 'Aviso enviado à administração.', 'aviso-esqueci');
       setWhatsappText(`🌿 *Espaço Progredir*\n*Esqueci de marcar o ponto*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${shortDate.format(new Date(day + 'T12:00:00'))}\n⏱️ ${TYPE_LABEL[forgotType] || forgotType} · ${approxTime || '—'}\n💬 ${reason}`);
       (e.target as HTMLFormElement).reset(); setForgotType('ENTRADA'); setForgotReason('Esqueci de bater no totem');
       await loadRequests();
@@ -302,6 +351,7 @@ export default function EmployeeAppPage() {
     if (!response.ok) setError(json.error || 'Não foi possível enviar a troca de dia.');
     else {
       setAbsenceMsg('Pedido de troca de dia registrado com sucesso.');
+      notifyPopup('Troca de dia', 'Pedido enviado. Aguarde a análise.', 'aviso-troca');
       setWhatsappText(`🌿 *Espaço Progredir*\n*Troca de dia*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 De ${shortDate.format(new Date(fromDay + 'T12:00:00'))} → ${shortDate.format(new Date(toDay + 'T12:00:00'))}\n💬 ${reason}`);
       (e.target as HTMLFormElement).reset();
       await loadRequests();
@@ -325,6 +375,7 @@ export default function EmployeeAppPage() {
     if (!response.ok) setError(json.error || 'Não foi possível enviar o aviso de atraso.');
     else {
       setAbsenceMsg('Aviso de atraso registrado com sucesso.');
+      notifyPopup('Aviso de atraso', 'A administração foi notificada.', 'aviso-atraso');
       setWhatsappText(`🌿 *Espaço Progredir*\n*Aviso de atraso*\n────────────────\n👤 ${data?.employee?.name || ''}\n🔢 Mat. ${data?.employee?.employeeNumber || ''}\n📅 ${shortDate.format(new Date(day + 'T12:00:00'))}\n⏱️ Chegada prevista: ${eta || '—'}\n💬 ${reason}`);
       (e.target as HTMLFormElement).reset();
       await loadRequests();
@@ -336,47 +387,31 @@ export default function EmployeeAppPage() {
     const emp = data?.employee;
     if (!emp) return '';
     return [
-      '🌿 ESPAÇO PROGREDIR',
-      'Ponto Progredir · Comprovante de ponto',
-      '────────────────────',
-      `👤 ${emp.name}`,
-      `🔢 Matrícula: ${emp.employeeNumber || '—'}`,
-      `📅 ${shortDate.format(new Date())}`,
-      `⏱️ Jornada: ${emp.scheduleStart || '--:--'} – ${emp.scheduleEnd || '--:--'}`,
-      '────────────────────',
-      'Marcações de hoje:',
+      '🌿 ESPAÇO PROGREDIR', 'Ponto Progredir · Comprovante de ponto', '────────────────────',
+      `👤 ${emp.name}`, `🔢 Matrícula: ${emp.employeeNumber || '—'}`, `📅 ${shortDate.format(new Date())}`,
+      `⏱️ Jornada: ${emp.scheduleStart || '--:--'} – ${emp.scheduleEnd || '--:--'}`, '────────────────────', 'Marcações de hoje:',
       ...(todayPunches.length ? todayPunches.map((p) => `✓ ${timeFmt.format(new Date(p.timestamp))}  ·  ${TYPE_LABEL[p.type] || p.type}`) : ['• Nenhuma marcação registrada ainda']),
-      '────────────────────',
-      'Acreditando na Vida',
-      'Documento gerado pelo App do Colaborador',
+      '────────────────────', 'Acreditando na Vida', 'Documento gerado pelo App do Colaborador',
     ].join('\n');
   }
 
   function openComprovante() { setShowReceipt(true); }
-
   function shareComprovante() {
     const text = buildReceiptText();
     if (!text) return;
     if (navigator.share) {
       void navigator.share({ title: 'Comprovante — Espaço Progredir', text }).catch(() => {
-        void navigator.clipboard?.writeText(text);
-        setToast('Comprovante copiado');
-        window.setTimeout(() => setToast(null), 2500);
+        void navigator.clipboard?.writeText(text); setToast('Comprovante copiado'); window.setTimeout(() => setToast(null), 2500);
       });
     } else {
-      void navigator.clipboard?.writeText(text);
-      setToast('Comprovante copiado');
-      window.setTimeout(() => setToast(null), 3000);
+      void navigator.clipboard?.writeText(text); setToast('Comprovante copiado'); window.setTimeout(() => setToast(null), 3000);
     }
   }
-
   function toggleReminders() {
     if (!remindersOn) {
       if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission();
       setRemindersOn(true); setToast('Lembretes ativados');
-    } else {
-      setRemindersOn(false); setToast('Lembretes desativados');
-    }
+    } else { setRemindersOn(false); setToast('Lembretes desativados'); }
     window.setTimeout(() => setToast(null), 2500);
   }
 
@@ -400,28 +435,22 @@ export default function EmployeeAppPage() {
 
   const emp = data?.employee;
   const showInstallHint = isStandalone === false && !dismissInstall;
-
   const certBlock = absenceMsg ? (
     <div className="emp-cert">
       <div className="emp-cert-head">
         <div className="emp-logo-wrap sm" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
-        <div>
-          <span className="emp-receipt-brand">Espaço Progredir</span>
-          <strong>Solicitação registrada</strong>
-        </div>
+        <div><span className="emp-receipt-brand">Espaço Progredir</span><strong>Solicitação registrada</strong></div>
       </div>
       <div className="emp-receipt-goldline" />
       <p className="emp-cert-msg">{absenceMsg}</p>
       <p className="emp-receipt-footer">Aguardando análise da administração</p>
-      {whatsappText ? (
-        <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">Enviar pelo WhatsApp</a>
-      ) : null}
+      {whatsappText ? <a className="emp-btn primary emp-wa-btn" href={`https://wa.me/?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer">Enviar pelo WhatsApp</a> : null}
     </div>
   ) : null;
 
   return (
     <main className="emp-app">
-      {toast ? <div className="emp-toast" role="status"><strong>Aviso</strong><span>{toast}</span></div> : null}
+      {toast ? <div className="emp-toast emp-toast-popup" role="status"><strong>🔔 Notificação</strong><span>{toast}</span></div> : null}
       {showInstallHint ? (
         <div className="emp-install-banner">
           <div><strong>Dica:</strong> instale o app na tela inicial para acesso mais rápido.</div>
@@ -451,16 +480,10 @@ export default function EmployeeAppPage() {
               <p className="emp-muted">Jornada prevista · {emp?.workDays || 'dias não informados'}</p>
             </div>
             {lastPhoto ? (
-              <div className="emp-card emp-photo-card">
-                <span className="emp-label">Última foto registrada hoje</span>
-                <img src={lastPhoto} alt="Foto da marcação" className="emp-punch-photo" />
-              </div>
+              <div className="emp-card"><span className="emp-label">Última foto registrada hoje</span><img src={lastPhoto} alt="Foto da marcação" className="emp-punch-photo" /></div>
             ) : null}
             <div className="emp-card">
-              <div className="emp-card-head">
-                <h2>Marcações de hoje</h2>
-                <button type="button" className="emp-link" onClick={() => void loadHistory()}>Atualizar</button>
-              </div>
+              <div className="emp-card-head"><h2>Marcações de hoje</h2><button type="button" className="emp-link" onClick={() => void loadHistory()}>Atualizar</button></div>
               {!todayPunches.length ? <p className="emp-muted">Nenhuma marcação registrada hoje ainda.</p> : (
                 <ul className="emp-timeline">
                   {todayPunches.map((p) => (
@@ -487,10 +510,6 @@ export default function EmployeeAppPage() {
               <span className="emp-label">Sua jornada cadastrada</span>
               <strong className="emp-big">{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong>
               <p className="emp-muted">{emp?.workDays || 'Dias não informados'}</p>
-            </div>
-            <div className="emp-grid-2">
-              <div className="emp-card compact"><span className="emp-label">Batidas hoje</span><strong className="emp-big">{todayPunches.length}</strong></div>
-              <div className="emp-card compact"><span className="emp-label">Status</span><strong className="emp-status ok">{todayPunches.length ? 'Em andamento' : 'Aguardando'}</strong></div>
             </div>
           </section>
         )}
@@ -636,7 +655,6 @@ export default function EmployeeAppPage() {
               <p>Matrícula {emp?.employeeNumber || '—'}</p>
               <p>{emp?.jobTitle || emp?.profile?.jobTitleFromPdf || 'Cargo não informado'}</p>
             </div>
-
             <div className="emp-card">
               <h2>Dados cadastrais</h2>
               <div className="emp-row"><span>CPF</span><strong>{emp?.cpf || '—'}</strong></div>
@@ -650,13 +668,11 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Unidade</span><strong>{emp?.unitName || '—'}</strong></div>
               <div className="emp-row"><span>Status</span><strong className="emp-status ok">{emp?.active === false ? 'Inativo' : 'Ativo'}</strong></div>
             </div>
-
             <div className="emp-card">
               <h2>Contato</h2>
               <div className="emp-row"><span>Telefone</span><strong>{emp?.profile?.phone || '—'}</strong></div>
               <div className="emp-row"><span>E-mail</span><strong>{emp?.profile?.personalEmail || '—'}</strong></div>
             </div>
-
             <div className="emp-card">
               <h2>Endereço</h2>
               <div className="emp-row"><span>Logradouro</span><strong>{[emp?.profile?.address, emp?.profile?.number ? `nº ${emp.profile.number}` : null, emp?.profile?.complement].filter(Boolean).join(', ') || '—'}</strong></div>
@@ -664,21 +680,11 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Cidade/UF</span><strong>{emp?.profile?.city ? `${emp.profile.city}${emp.profile.uf ? `/${emp.profile.uf}` : ''}` : '—'}</strong></div>
               <div className="emp-row"><span>CEP</span><strong>{emp?.profile?.cep || '—'}</strong></div>
             </div>
-
             <div className="emp-card">
               <h2>Jornada</h2>
               <div className="emp-row"><span>Horário padrão</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
               <div className="emp-row"><span>Dias</span><strong>{emp?.workDays || '—'}</strong></div>
-              {emp?.scheduleByDay && Object.keys(emp.scheduleByDay).length ? (
-                Object.entries(emp.scheduleByDay).map(([day, sch]) => (
-                  <div className="emp-row" key={day}>
-                    <span>{day}</span>
-                    <strong>{sch?.start || '--:--'}–{sch?.end || '--:--'}{sch?.mode ? ` · ${sch.mode}` : ''}</strong>
-                  </div>
-                ))
-              ) : null}
             </div>
-
             <div className="emp-card">
               <h2>Documentos trabalhistas</h2>
               <div className="emp-row"><span>CTPS</span><strong>{emp?.profile?.ctps || '—'}</strong></div>
@@ -686,7 +692,6 @@ export default function EmployeeAppPage() {
               <div className="emp-row"><span>Mãe</span><strong>{emp?.profile?.motherName || '—'}</strong></div>
               <div className="emp-row"><span>Pai</span><strong>{emp?.profile?.fatherName || '—'}</strong></div>
             </div>
-
             <p className="emp-muted" style={{ textAlign: 'center' }}>Os dados vêm do cadastro administrativo. Em caso de divergência, fale com a ADM.</p>
             <button type="button" className="emp-btn danger" onClick={() => void signOut({ callbackUrl: '/app' })}>Sair</button>
           </section>
@@ -697,13 +702,8 @@ export default function EmployeeAppPage() {
         <div className="emp-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setShowReceipt(false)}>
           <div className="emp-receipt" onClick={(e) => e.stopPropagation()}>
             <div className="emp-receipt-top">
-              <div className="emp-logo-wrap sm" aria-hidden>
-                <img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" />
-              </div>
-              <div>
-                <span className="emp-receipt-brand">Espaço Progredir</span>
-                <strong>Comprovante de ponto</strong>
-              </div>
+              <div className="emp-logo-wrap sm" aria-hidden><img src="/ponto-progredir-icon-circular.png" alt="" className="emp-logo-img" /></div>
+              <div><span className="emp-receipt-brand">Espaço Progredir</span><strong>Comprovante de ponto</strong></div>
             </div>
             <div className="emp-receipt-goldline" />
             <div className="emp-receipt-body">
@@ -717,15 +717,10 @@ export default function EmployeeAppPage() {
               {todayPunches.length ? (
                 <ul className="emp-receipt-list">
                   {todayPunches.map((p) => (
-                    <li key={p.id}>
-                      <span>{timeFmt.format(new Date(p.timestamp))}</span>
-                      <strong>{TYPE_LABEL[p.type] || p.type}</strong>
-                    </li>
+                    <li key={p.id}><span>{timeFmt.format(new Date(p.timestamp))}</span><strong>{TYPE_LABEL[p.type] || p.type}</strong></li>
                   ))}
                 </ul>
-              ) : (
-                <p className="emp-muted">Nenhuma marcação registrada ainda.</p>
-              )}
+              ) : <p className="emp-muted">Nenhuma marcação registrada ainda.</p>}
             </div>
             <p className="emp-receipt-footer">Acreditando na Vida · App do Colaborador</p>
             <div className="emp-receipt-actions">
