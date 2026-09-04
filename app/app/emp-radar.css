@@ -47,3 +47,11 @@
 .emp-tl-body{display:grid;gap:.2rem}
 .emp-tl-body strong{font-size:1rem;color:#143d1f}
 .emp-tl-body .emp-time{font-variant-numeric:tabular-nums;font-weight:800;color:#1e5c2f}
+
+.emp-offday{
+  border-radius:18px;padding:1rem 1.05rem;display:grid;gap:.35rem;
+  border:2px solid #c9a227;background:linear-gradient(165deg,#fffbeb 0%,#fff 70%);
+  box-shadow:0 6px 18px rgba(201,162,39,.12)
+}
+.emp-offday strong{display:block;font-size:1.15rem;color:#143d1f;line-height:1.25}
+.emp-offday p{margin:0;font-size:.88rem;color:#6b7c70;line-height:1.35}
