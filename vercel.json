@@ -1,5 +1,5 @@
 {
   "framework": "nextjs",
-  "buildCommand": "node .v0/inject-built-with-v0.mjs && prisma generate && prisma db push --skip-generate && next build",
+  "buildCommand": "node .v0/inject-built-with-v0.mjs && node scripts/patch-timesheet-pdf-borders.mjs && node scripts/patch-timesheet-signature-api.mjs && node scripts/patch-folha-preclose.mjs && node scripts/patch-folha-live-ui.mjs && node scripts/patch-absence-calendar-dashboard.mjs && node scripts/patch-absence-filter.mjs && node scripts/patch-absence-calendar-css-import.mjs && node scripts/patch-requests-calendar.mjs && node scripts/patch-folha-signature.mjs && node scripts/expand-employee-shell.mjs && node scripts/expand-folga.mjs && prisma generate && prisma db push --skip-generate && next build",
   "installCommand": "npm install"
 }
