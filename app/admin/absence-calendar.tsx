@@ -91,7 +91,7 @@ export default function AbsenceCalendar({ requests, certificates }: { requests: 
 
   const items = useMemo<CalendarItem[]>(() => {
     const requestItems = requests
-      .filter((item) => item.type === 'AUSENCIA')
+      .filter((item) => ['AUSENCIA','PASSEIO','EVENTO_EXTERNO'].includes(item.type))
       .map((item) => ({
         id: `request-${item.id}`,
         source: 'SOLICITAÇÃO' as const,

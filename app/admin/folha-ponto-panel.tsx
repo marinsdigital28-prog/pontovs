@@ -7,6 +7,7 @@ import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForD
 import { filterPunchesOutsideCertificates } from '@/lib/certificate-conflicts';
 import { brazilDateKey } from '@/lib/brazil-time';
 import './folha-ponto.css';
+import './folha-preclose.css';
 
 type Employee = {
   id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null;
@@ -19,7 +20,7 @@ type RecordItem = {
 type DayRow = {
   date: string; weekday: string; punches: RecordItem[]; worked: number | null; expected: number | null;
   justified: number | null; missing: number | null; surplus: number | null; balance: number | null;
-  absent: boolean; late: boolean; certificate: boolean; schedule: string;
+  absent: boolean; late: boolean; certificate: boolean; incomplete: boolean; schedule: string;
 };
 type CertificateItem = {
   userId: string; type?: string; startDate: string; endDate: string;
@@ -157,10 +158,17 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
         : opsAbono
           ? `${schedule} · ${opsAbono.reason}`
           : schedule;
+    const types = new Set(dayPunches.map((p) => p.type));
+    const incomplete = Boolean(
+      configuredWorkday
+      && !covered
+      && dayPunches.length > 0
+      && (!types.has('ENTRADA') || !types.has('SAIDA')),
+    );
     return {
       date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, justified, missing, surplus, balance,
       absent: configuredWorkday && !dayPunches.length && !covered, late: configuredWorkday && late && !covered,
-      certificate: covered, schedule: scheduleLabel,
+      certificate: covered, incomplete, schedule: scheduleLabel,
     };
   });
 }
@@ -201,7 +209,12 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         }));
       }
       setCertificates(Array.isArray(certificateData.certificates) ? certificateData.certificates : []);
-      setRequests(Array.isArray(requestData.requests) ? requestData.requests : []);
+      setRequests((Array.isArray(requestData.requests) ? requestData.requests : []).map((r) => ({
+        ...r,
+        employeeId: r.employeeId || r.employee?.id || '',
+        startDate: typeof r.startDate === 'string' ? r.startDate : String(r.startDate || '').slice(0, 10),
+        endDate: typeof r.endDate === 'string' ? r.endDate : String(r.endDate || '').slice(0, 10),
+      })).filter((r) => r.employeeId));
       if (sigRes.ok && sigData.signatureData) setSignatureData(sigData.signatureData);
     } catch {
       setError('Falha ao carregar a folha.');
@@ -210,6 +223,11 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   }, [month]);
 
   useEffect(() => { void load(); }, [load]);
+  // folha-live-poll: atualiza sozinho quando batidas entram
+  useEffect(() => {
+    const id = window.setInterval(() => { void load(); }, 25000);
+    return () => window.clearInterval(id);
+  }, [load]);
 
   const visibleEmployees = useMemo(() => {
     if (!employeeId || employeeId === allEmployeesValue) return employees;
@@ -220,6 +238,41 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     () => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month, certificates, requests)])),
     [month, records, certificates, requests, visibleEmployees],
   );
+
+  const preCloseAudit = useMemo(() => {
+    const bounds = monthBounds(month);
+    const noSchedule: string[] = [];
+    const faltas: Array<{ name: string; days: string[] }> = [];
+    const incompletos: Array<{ name: string; days: string[] }> = [];
+    let totalFaltas = 0;
+    let totalIncompletos = 0;
+    let totalAtrasos = 0;
+    for (const emp of visibleEmployees) {
+      if (!emp.scheduleStart || !emp.scheduleEnd) noSchedule.push((emp.employeeNumber || '—') + ' · ' + emp.name);
+      const rows = dayRowsByEmployee.get(emp.id) || [];
+      const fDays = rows.filter((r) => r.absent).map((r) => r.date.slice(8));
+      const iDays = rows.filter((r) => r.incomplete).map((r) => r.date.slice(8));
+      totalFaltas += fDays.length;
+      totalIncompletos += iDays.length;
+      totalAtrasos += rows.filter((r) => r.late).length;
+      if (fDays.length) faltas.push({ name: emp.name, days: fDays });
+      if (iDays.length) incompletos.push({ name: emp.name, days: iDays });
+    }
+    const pendingRequests = requests.filter((r) => {
+      if (r.status !== 'PENDENTE') return false;
+      const start = String(r.startDate).slice(0, 10);
+      const end = String(r.endDate).slice(0, 10);
+      return start <= bounds.to && end >= bounds.from;
+    });
+    const pendingCerts = certificates.filter((c) => {
+      if (c.status !== 'PENDENTE') return false;
+      const start = String(c.startDate).slice(0, 10);
+      const end = String(c.endDate).slice(0, 10);
+      return start <= bounds.to && end >= bounds.from;
+    });
+    const blockers = noSchedule.length + pendingRequests.length + pendingCerts.length + totalIncompletos;
+    return { noSchedule, faltas, incompletos, totalFaltas, totalIncompletos, totalAtrasos, pendingRequests, pendingCerts, blockers, ready: blockers === 0 };
+  }, [visibleEmployees, dayRowsByEmployee, requests, certificates, month]);
 
   async function downloadPdfBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
@@ -255,6 +308,13 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   }
 
   async function signAllPdfs() {
+    if (preCloseAudit.blockers > 0) {
+      const ok = window.confirm('Pré-fechamento: ainda há ' + preCloseAudit.blockers + ' pendência(s) (escala, incompletos, solicitações ou atestados).\n\nGerar PDF de todos mesmo assim?');
+      if (!ok) return;
+    }
+    return signAllPdfsInner();
+  }
+  async function signAllPdfsInner() {
     setSigning(true);
     setError('');
     setBatchProgress(`Gerando PDF de ${employees.length} colaboradores...`);
@@ -320,6 +380,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         <strong>{monthLabel(month).toUpperCase()}</strong>
         <span>Período: <b>{bounds.from}</b> → <b>{bounds.to}</b> · {bounds.lastDay} dias · {visibleEmployees.length} folha(s)</span>
         {batchProgress ? <span className="folha-batch-progress">{batchProgress}</span> : null}
+        <span className="folha-live-dot" title="Atualiza sozinho a cada 25s">Ao vivo</span>
       </div>
 
       {error ? <p className="status-msg">{error}</p> : null}
@@ -355,19 +416,21 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                     const isFolga = row.schedule.startsWith('Folga');
                     const situation = row.certificate || (row.justified && row.justified > 0)
                       ? (row.punches.length ? 'ABONO + PONTO' : 'ABONO/ATESTADO')
-                      : row.absent ? 'FALTA' : row.late ? 'ATRASO' : isFolga ? 'FOLGA' : '';
+                      : row.absent ? 'FALTA'
+                      : row.incomplete ? 'INCOMPLETO'
+                      : row.late ? 'ATRASO'
+                      : isFolga ? 'FOLGA'
+                      : row.punches.length ? 'OK' : '';
                     return (
-                      <tr key={row.date} className={[isFolga ? 'folha-row-folga' : '', row.absent ? 'folha-row-falta' : '', row.certificate ? 'folha-row-abono' : ''].filter(Boolean).join(' ')}>
+                      <tr key={row.date} className={[isFolga ? 'folha-row-folga' : '', row.absent ? 'folha-row-falta' : '', row.incomplete ? 'folha-row-incompleto' : '', row.certificate ? 'folha-row-abono' : ''].filter(Boolean).join(' ')}>
                         <td className="folha-col-date"><b>{row.date.slice(8)}</b><span>{row.weekday}</span></td>
                         <td className="folha-col-scale">{row.schedule}</td>
                         <td className="folha-col-marks">{row.punches.length ? row.punches.map((punch) => (
                           <span key={punch.id} className="folha-mark">{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}</span>
                         )) : '—'}</td>
                         <td>{formatMinutes(row.worked)}</td>
-                        <td>{formatMinutes(row.justified)}</td>
                         <td>{formatMinutes(row.expected)}</td>
-                        <td>{formatMinutes(row.missing)}</td>
-                        <td>{formatMinutes(row.surplus)}</td>
+                        <td>{formatMinutes(row.justified)}</td>
                         <td className={row.balance !== null && row.balance < 0 ? 'folha-neg' : row.balance !== null && row.balance > 0 ? 'folha-pos' : ''}>{formatMinutes(row.balance)}</td>
                         <td className="folha-col-sit">{situation}</td>
                       </tr>

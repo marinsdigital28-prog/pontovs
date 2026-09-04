@@ -18,6 +18,7 @@ import './overview-layout.css';
 import OverviewCalendar from './overview-calendar';
 import OverviewInbox from './overview-inbox';
 import OverviewExitWatch from './overview-exit-watch';
+import AbsenceCalendarLive from './absence-calendar-live';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -150,6 +151,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         <OverviewInbox onOpenRequests={() => setTab('requests')} onOpenIssues={() => setTab('issues')} />
         <OverviewExitWatch presence={presence} employees={employees} />
       </div>
+      <AbsenceCalendarLive />
       <OverviewCalendar />
       <div className="overview-analytics"><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
     </section> : null}

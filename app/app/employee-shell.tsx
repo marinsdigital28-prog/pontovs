@@ -228,7 +228,41 @@ export default function EmployeeAppPage() {
     }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }, [data, todayKey]);
 
+
+  const workDayInfo = useMemo(() => {
+    const DAY_CODES = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'] as const;
+    const wdLabel = new Intl.DateTimeFormat('en-US', { timeZone: APP_TZ, weekday: 'short' }).format(new Date());
+    const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const weekday = map[wdLabel] ?? new Date().getDay();
+    const dayCode = DAY_CODES[weekday];
+    const workDaysRaw = String(data?.employee?.workDays || '').toUpperCase().replace(/Á/g, 'A');
+    const byDay = data?.employee?.scheduleByDay as Record<string, unknown> | null | undefined;
+    let hasOverride = false;
+    if (byDay && typeof byDay === 'object') {
+      const key = Object.keys(byDay).find((k) => String(k).toUpperCase().replace(/Á/g, 'A') === dayCode);
+      if (key) hasOverride = true;
+    }
+    let worksToday = true;
+    if (hasOverride) worksToday = true;
+    else if (workDaysRaw) {
+      if (workDaysRaw.trim().startsWith('[')) {
+        try {
+          const arr = JSON.parse(String(data?.employee?.workDays || '[]')) as string[];
+          worksToday = arr.map((x) => String(x).toUpperCase().replace(/Á/g, 'A')).includes(dayCode);
+        } catch { worksToday = workDaysRaw.includes(dayCode); }
+      } else worksToday = workDaysRaw.includes(dayCode);
+    } else worksToday = weekday >= 1 && weekday <= 5;
+    return {
+      worksToday,
+      dayCode,
+      message: worksToday ? null : ((weekday === 0 || weekday === 6)
+        ? 'Hoje é sua folga. Sem expediente.'
+        : 'Hoje não tem expediente na sua escala.'),
+    };
+  }, [data?.employee?.workDays, data?.employee?.scheduleByDay]);
+
   const missingPunchHint = useMemo(() => {
+    if (workDayInfo && !workDayInfo.worksToday) return null as null | { type: string; label: string; message: string };
     const start = data?.employee?.scheduleStart;
     const end = data?.employee?.scheduleEnd;
     if (!start && !end) return null as null | { type: string; label: string; message: string };
@@ -271,6 +305,9 @@ export default function EmployeeAppPage() {
     let nextExpected: string | null = null;
     let delayMin: number | null = null;
     let tone = 'neutral';
+    if (workDayInfo && workDayInfo.worksToday === false) {
+      return { title: 'Folga · sem expediente', detail: workDayInfo.message || 'Hoje não há expediente na sua escala.', nextExpected: null, delayMin: null, tone: 'neutral', typesCount: todayPunches.length, isOff: true };
+    }
     if (types.has('SAIDA') && types.has('ENTRADA')) {
       title = 'Jornada completa';
       detail = 'Entrada e saída registradas hoje.';
@@ -561,6 +598,13 @@ export default function EmployeeAppPage() {
               <p className="emp-muted">Jornada prevista · {emp?.workDays || 'dias não informados'}</p>
             </div>
 
+            {!workDayInfo.worksToday ? (
+              <div className="emp-offday">
+                <span className="emp-radar-eyebrow">ESCALA</span>
+                <strong>{workDayInfo.message}</strong>
+                <p>Se precisar avisar a ADM, use o SOS abaixo.</p>
+              </div>
+            ) : null}
             <div className={`emp-radar tone-${journeyRadar.tone}`}>
               <div className="emp-radar-top">
                 <span className="emp-radar-eyebrow">RADAR DA JORNADA</span>
