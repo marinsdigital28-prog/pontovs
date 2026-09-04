@@ -35,13 +35,13 @@ describe('navegação da folha de ponto', () => {
     expect(punch).toContain('ponto-input-panel');
     expect(punch).toContain('Digite seu número de matrícula');
     expect(punch).toContain('Marcar ponto');
-    expect(punch).toContain('MARCAÇÃO CONFIRMADA');
+    expect(punch).toContain('Ponto registrado');
   });
 
   it('exibe a confirmação animada e protege a marcação offline', () => {
-    expect(punch).toContain('MARCAÇÃO CONFIRMADA');
-    expect(punch).toContain('MARCAÇÃO SALVA OFFLINE');
-    expect(punch).toContain('confirmation-ball');
+    expect(punch).toContain('Ponto registrado');
+    expect(punch).toContain('Marcação salva no aparelho');
+    expect(punch).toContain('confirmation-check');
     expect(punch).toContain('Sem conexão — marcação protegida no aparelho');
     expect(punch).toContain('DATABASE_QUOTA_EXCEEDED');
     expect(punch).toContain('if (!response.ok) remaining.push(p);');
@@ -50,7 +50,7 @@ describe('navegação da folha de ponto', () => {
   it('tenta abrir a câmera automaticamente ao entrar na etapa de marcação', () => {
     expect(punch).toContain("if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading) return;");
     expect(punch).toContain('void handlePhotoSelection();');
-    expect(punch).toContain('a tela mantém o botão manual como fallback');
+    expect(punch).toContain('Abrir câmera');
   });
 
   it('configura a folha individual para preencher a área útil A4 na impressão', () => {
@@ -86,9 +86,10 @@ describe('navegação da folha de ponto', () => {
     expect(timesheetPdfRoute).toContain('createSignedTimesheetPdfBatch');
     expect(timesheetPdfRoute).toContain('createSignedTimesheetPdf');
     expect(signedTimesheetPdf).toContain('A4 paisagem');
-    expect(signedTimesheetPdf).toContain("'H.Trab', 'H.Just', 'H.Prev', 'H.Falt', 'H.Exc', 'Saldo', 'Desc.', 'Justificativa'");
-    expect(signedTimesheetPdf).toContain('ASSINADO DIGITALMENTE - ESPACO PROGREDIR');
+    expect(signedTimesheetPdf).toContain("'Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Just.', 'Saldo', 'Situação'");
+    expect(signedTimesheetPdf).toContain('Assinado digitalmente');
+    expect(signedTimesheetPdf).toContain('Espaço Progredir');
     expect(signedTimesheetPdf).toContain('Certificado A1');
-    expect(signedTimesheetPdf).toContain('const footerReserve = 96');
+    expect(signedTimesheetPdf).toContain('const footerReserve = 78');
   });
 });

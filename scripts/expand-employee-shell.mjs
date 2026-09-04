@@ -61,8 +61,8 @@ if (!t.includes('journeyRadar')) {
     const endMin = toMin(end);
     let title = 'Sem jornada cadastrada';
     let detail = 'Peça à ADM para conferir seu horário.';
-    let nextExpected = null;
-    let delayMin = null;
+    let nextExpected: string | null = null;
+    let delayMin: number | null = null;
     let tone = 'neutral';
     if (types.has('SAIDA') && types.has('ENTRADA')) {
       title = 'Jornada completa';
