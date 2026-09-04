@@ -115,3 +115,8 @@
 @media(max-width:900px){
   .overview-ops{grid-template-columns:1fr}
 }
+
+/* Calendário de ausências (componente ao vivo) */
+.absence-calendar-live-wrap{margin:1rem 0 1.25rem}
+.absence-calendar-live-bar{display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem;flex-wrap:wrap}
+.absence-calendar-live-bar .status-msg{margin:0}
