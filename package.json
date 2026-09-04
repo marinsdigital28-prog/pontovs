@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/patch-folha-preclose.mjs && node scripts/expand-employee-shell.mjs && node scripts/expand-folga.mjs && prisma generate && prisma db push --skip-generate && next build",
+    "build": "node scripts/patch-timesheet-pdf-borders.mjs && node scripts/patch-folha-preclose.mjs && node scripts/expand-employee-shell.mjs && node scripts/expand-folga.mjs && prisma generate && prisma db push --skip-generate && next build",
     "db:push": "prisma db push",
     "start": "next start",
     "prisma:studio": "prisma studio",
