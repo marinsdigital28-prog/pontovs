@@ -1,0 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const a = path.join(root, 'app/admin/folha-ponto.css.b64.a');
+const b = path.join(root, 'app/admin/folha-ponto.css.b64.b');
+const out = path.join(root, 'app/admin/folha-ponto.css');
+const b64 = fs.readFileSync(a, 'utf8').trim() + fs.readFileSync(b, 'utf8').trim();
+fs.writeFileSync(out, Buffer.from(b64, 'base64'));
+console.log('restored folha-ponto.css', fs.statSync(out).size);
