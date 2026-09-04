@@ -11,7 +11,7 @@ function manager(session: any) { return Boolean(session?.user?.id && ['ADMIN', '
 export async function GET() {
   const session = await getServerSession(authOptions as any) as any;
   if (!manager(session)) return NextResponse.json({ error: 'Acesso administrativo necessário.' }, { status: 401 });
-  const requests = await prisma.employeeRequest.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 500, select: { id: true, type: true, status: true, startDate: true, endDate: true, reason: true, details: true, medicalSpecialty: true, classification: true, returnExpected: true, documentName: true, documentMime: true, reviewNote: true, reviewedAt: true, createdAt: true, employee: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } }, reviewer: { select: { name: true } } } });
+  const requests = await prisma.employeeRequest.findMany({ orderBy: [{ status: 'asc' }, { createdAt: 'desc' }], take: 500, select: { id: true, employeeId: true, type: true, status: true, startDate: true, endDate: true, reason: true, details: true, medicalSpecialty: true, classification: true, returnExpected: true, documentName: true, documentMime: true, reviewNote: true, reviewedAt: true, createdAt: true, employee: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } }, reviewer: { select: { name: true } } } });
   return NextResponse.json({ requests });
 }
 
