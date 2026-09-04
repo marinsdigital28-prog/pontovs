@@ -30,7 +30,53 @@
 .folha-hint { margin-top: 1rem; font-size: 1rem; color: var(--muted, #8a9a90); }
 .folha-batch-progress { font-size: 0.9rem; color: #ffe7a0; }
 
-/* Impressão: A4 paisagem, 1 folha, bordas, nitidez */
+.signature-area {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-top: 1.25rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #c9d6cd;
+  align-items: flex-end;
+}
+.signature-block { flex: 1; max-width: 320px; text-align: center; }
+.institution-signature {
+  display: block;
+  max-width: 220px;
+  max-height: 64px;
+  margin: 0 auto 6px;
+  object-fit: contain;
+}
+.signature-certificate-block {
+  display: grid;
+  gap: 2px;
+  margin: 0 auto 6px;
+  padding: 6px 10px;
+  border: 1px solid #3d9b63;
+  border-radius: 6px;
+  background: #f2fff5;
+  color: #1d5f38;
+  text-align: left;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  max-width: 280px;
+}
+.signature-certificate-block strong { font-size: 0.8rem; }
+.signature-line {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid #56665d;
+  font-size: 0.8rem;
+  color: #233c31;
+}
+.signature-caption { display: block; margin-top: 4px; color: #56665d; font-size: 0.75rem; }
+.signature-spacer { height: 48px; }
+.signature-missing {
+  display: grid; place-items: center; min-height: 48px; margin: 0 auto 6px;
+  max-width: 280px; padding: 8px; border: 1px dashed #c9a227; border-radius: 8px;
+  color: #8a6d12; font-size: 0.78rem; background: #fffbeb;
+}
+
 @media print {
   @page { size: A4 landscape; margin: 8mm; }
   html, body {
@@ -60,45 +106,22 @@
     background: #fff !important;
   }
   .folha-block:last-of-type { page-break-after: auto; }
-  .folha-competence-banner {
-    margin: 0 0 2mm; padding: 1.5mm 2.5mm; border-radius: 0;
-    background: #eef5f1 !important; color: #000 !important;
-    border: 1.5px solid #0b5c42 !important;
+  .signature-area {
+    display: flex !important;
+    visibility: visible !important;
+    margin-top: 3mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
-  .folha-table-scroll {
-    overflow: visible !important;
-    border: 1.5px solid #143d1f !important;
-    border-radius: 0 !important;
-    background: #fff !important;
+  .signature-area, .signature-area * { visibility: visible !important; }
+  .institution-signature { max-height: 14mm !important; }
+  .signature-certificate-block {
+    border: 0.6pt solid #3d9b63 !important;
+    background: #f2fff5 !important;
+    font-size: 7pt !important;
   }
-  .folha-table {
-    min-width: 0 !important;
-    width: 100% !important;
-    font-size: 9pt !important;
-    line-height: 1.2 !important;
-  }
-  .folha-table thead th {
-    background: #0b5c42 !important;
-    color: #fff !important;
-    font-size: 8pt !important;
-    padding: 2mm 1.5mm !important;
-    border: 0.6pt solid #0a4a36 !important;
-  }
-  .folha-table tbody td {
-    padding: 1.2mm 1.2mm !important;
-    font-size: 8.5pt !important;
-    border: 0.5pt solid #7a8f82 !important;
-  }
-  .folha-table tfoot td {
-    background: #0b5c42 !important;
-    color: #fff !important;
-    font-size: 8.5pt !important;
-    border: 0.6pt solid #0a4a36 !important;
-  }
-  .folha-mark {
-    border: 0.5pt solid #7a8f82 !important;
-    background: #eef5f1 !important;
-    font-size: 8pt !important;
-    padding: 0.5mm 1mm !important;
-  }
+  .signature-line { font-size: 8pt !important; }
+  .folha-table { min-width: 0 !important; width: 100% !important; font-size: 9pt !important; }
+  .folha-table thead th { background: #0b5c42 !important; color: #fff !important; font-size: 8pt !important; }
+  .folha-table tbody td { padding: 1.2mm !important; font-size: 8.5pt !important; border: 0.5pt solid #7a8f82 !important; }
 }
