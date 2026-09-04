@@ -1,0 +1,53 @@
+/* Pré-fechamento + incompleto */
+.folha-preclose {
+  margin: 0.75rem 0 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid #d5e0d8;
+  background: #f7faf7;
+}
+.folha-preclose.warn {
+  border-color: #e0c56a;
+  background: linear-gradient(180deg, #fff8e8, #fff);
+}
+.folha-preclose.ok {
+  border-color: #b8dcc2;
+  background: linear-gradient(180deg, #eef7f0, #fff);
+}
+.folha-preclose-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.folha-preclose-head strong {
+  color: #143d1f;
+  font-size: 0.98rem;
+}
+.folha-preclose-head span {
+  color: #5b6c60;
+  font-size: 0.85rem;
+}
+.folha-preclose-list {
+  margin: 0.65rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+  color: #1a2e22;
+  font-size: 0.88rem;
+}
+.folha-preclose-ok {
+  margin: 0.5rem 0 0;
+  color: #1e5c2f;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.folha-row-incompleto td {
+  background: #fff6e8;
+}
+.folha-row-incompleto .folha-col-sit {
+  color: #9a6b00;
+  font-weight: 800;
+}
+@media print {
+  .folha-preclose { display: none !important; }
+}
