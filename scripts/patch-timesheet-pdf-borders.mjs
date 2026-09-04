@@ -24,8 +24,11 @@ function get(url) {
   });
 }
 
-// Restaura o layout original da folha (sem alterações visuais)
-const BASE = 'https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/e59d028cf28e5421d8dfab60dc36839bf912b1f3/lib/signed-timesheet-pdf.ts';
-const t = await get(BASE);
-fs.writeFileSync(outPath, t);
-console.log('timesheet pdf restored to original layout', t.length);
+// Após o commit do layout melhorado, este script mantém o arquivo se já tiver o marcador;
+// senão baixa a versão commitada da main.
+let t = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
+if (!(t.includes('Banco de Horas') && t.includes('Concordo com as marcações'))) {
+  t = await get('https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/main/lib/signed-timesheet-pdf.ts');
+  fs.writeFileSync(outPath, t);
+}
+console.log('timesheet pdf layout apponte-improved', t.includes('Banco de Horas'), t.length);
