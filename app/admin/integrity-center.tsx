@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import AbsenceCalendar from './absence-calendar';
 
 type Issue = {
   id: string;
@@ -19,6 +20,8 @@ type RequestItem = {
   startDate: string;
   endDate: string;
   reason: string;
+  details?: string | null;
+  classification?: string | null;
   createdAt: string;
   employee: { name: string; employeeNumber: string | null };
 };
@@ -180,6 +183,8 @@ export default function IntegrityCenter() {
           <span>Não foram identificadas inconsistências abertas, solicitações ou atestados pendentes relevantes.</span>
         </div>
       ) : null}
+
+      <AbsenceCalendar requests={requests} certificates={certificates} />
 
       <div className="integrity-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         <div className="card" style={{ padding: 16 }}>
