@@ -39,17 +39,34 @@ export async function GET(request: Request) {
     ]);
     const employeeIdsWithPunch = new Set(punches.map((punch) => punch.userId));
     const employeeIds = employees.map((employee) => employee.id);
+    const withoutPunch = employeeIds.filter((id) => !employeeIdsWithPunch.has(id)).length;
+    // Registros: informativo (folga/atestado no mês inteiro não deve bloquear fechamento)
+    const recordsOk = true;
+    const blockersOk = openInconsistencies === 0 && adjustedWithoutReason === 0 && pendingRequests === 0 && pendingCertificates === 0 && chainValid;
     const checks = [
-      { id: 'employees-records', label: 'Todos os funcionários possuem registros do período', ok: employeeIds.length === 0 || employeeIds.every((id) => employeeIdsWithPunch.has(id)) },
-      { id: 'inconsistencies', label: 'Inconsistências foram analisadas', ok: openInconsistencies === 0 },
-      { id: 'justifications', label: 'Ajustes possuem justificativa quando necessária', ok: adjustedWithoutReason === 0 },
-      { id: 'audit', label: 'Alterações administrativas foram registradas', ok: chainValid },
-      { id: 'exceptions', label: 'Atestados e ausências foram analisados', ok: pendingRequests === 0 && pendingCertificates === 0 },
-      { id: 'hours', label: 'Horas trabalhadas foram calculadas', ok: true },
-      { id: 'missing-hours', label: 'Horas faltantes foram identificadas', ok: true },
-      { id: 'ready', label: 'O período está pronto para conferência', ok: openInconsistencies === 0 && adjustedWithoutReason === 0 && pendingRequests === 0 && pendingCertificates === 0 && chainValid },
+      { id: 'employees-records', label: withoutPunch === 0 ? 'Todos os ativos têm ao menos 1 batida no período' : `${withoutPunch} ativo(s) sem nenhuma batida no período (revise escala/atestado/ausência)`, ok: recordsOk, warn: withoutPunch > 0 },
+      { id: 'inconsistencies', label: openInconsistencies === 0 ? 'Sem inconsistências abertas' : `${openInconsistencies} inconsistência(s) em aberto`, ok: openInconsistencies === 0 },
+      { id: 'justifications', label: adjustedWithoutReason === 0 ? 'Ajustes manuais com justificativa' : `${adjustedWithoutReason} ajuste(s) sem justificativa`, ok: adjustedWithoutReason === 0 },
+      { id: 'audit', label: chainValid ? 'Cadeia de auditoria íntegra' : 'Cadeia de auditoria com falha', ok: chainValid },
+      { id: 'exceptions', label: pendingRequests === 0 && pendingCertificates === 0 ? 'Sem atestados/ausências pendentes no período' : `${pendingRequests} solicitação(ões) e ${pendingCertificates} atestado(s) pendente(s)`, ok: pendingRequests === 0 && pendingCertificates === 0 },
+      { id: 'ready', label: blockersOk ? 'Competência pronta para fechar' : 'Ainda há pendências bloqueantes', ok: blockersOk },
     ];
-    return NextResponse.json({ period, closed: status.closed, latestEvent: status.latest, checks, ready: checks.every((check) => check.ok), totals: { employees: employees.length, employeesWithPunch: employeeIdsWithPunch.size, openInconsistencies, pendingRequests, pendingCertificates, adjustedWithoutReason } });
+    return NextResponse.json({
+      period,
+      closed: status.closed,
+      latestEvent: status.latest,
+      checks,
+      ready: blockersOk,
+      totals: {
+        employees: employees.length,
+        employeesWithPunch: employeeIdsWithPunch.size,
+        employeesWithoutPunch: withoutPunch,
+        openInconsistencies,
+        pendingRequests,
+        pendingCertificates,
+        adjustedWithoutReason,
+      },
+    });
   } catch (error) {
     console.error('period closure status failed', error);
     return NextResponse.json({ error: 'Não foi possível calcular o checklist de fechamento.' }, { status: 503 });
