@@ -120,3 +120,30 @@
 .absence-calendar-live-wrap{margin:1rem 0 1.25rem}
 .absence-calendar-live-bar{display:flex;align-items:center;gap:.75rem;margin-bottom:.65rem;flex-wrap:wrap}
 .absence-calendar-live-bar .status-msg{margin:0}
+
+/* Overview calendar — alinhado às cores Espaço Progredir */
+.overview-calendar{
+  border-radius:20px!important;
+  border:1px solid rgba(11,92,66,.12)!important;
+  background:
+    radial-gradient(ellipse 70% 45% at 0% 0%, rgba(201,162,39,.12), transparent 55%),
+    linear-gradient(168deg,#fff 0%,#f6fbf8 100%)!important;
+  box-shadow:0 14px 36px rgba(8,53,40,.07)!important;
+  position:relative;
+  overflow:hidden;
+}
+.overview-calendar::before{
+  content:"";
+  display:block;
+  height:4px;
+  margin:-1.15rem -1.25rem 1rem;
+  background:linear-gradient(90deg,#083528,#0b5c42,#c9a227,#0b5c42,#083528);
+}
+.ov-cal-title{
+  background:linear-gradient(115deg,#083528 0%,#1e5c2f 60%,#c9a227 140%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  font-weight:800!important;
+}
+.ov-cal-cell.today{outline-color:#c9a227!important}
+.ov-cal-cell.has{background:#eef7f0!important;border-color:#c9e2d0!important}
+.ov-cal-pill{background:#d8efe3!important;color:#0b5c42!important}
