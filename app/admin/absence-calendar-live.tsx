@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import './absence-calendar.css';
 import AbsenceCalendar from './absence-calendar';
 
 type Req = {
@@ -27,7 +28,6 @@ type Cert = {
   user: { name: string; employeeNumber: string | null };
 };
 
-/** Carrega solicitações + atestados e renderiza o calendário de ausências. */
 export default function AbsenceCalendarLive() {
   const [requests, setRequests] = useState<Req[]>([]);
   const [certificates, setCertificates] = useState<Cert[]>([]);
@@ -104,7 +104,7 @@ export default function AbsenceCalendarLive() {
         </button>
         {error ? <span className="status-msg">{error}</span> : null}
       </div>
-      <AbsenceCalendar requests={requests} certificates={certificates} />
+      <AbsenceCalendar requests={requests} certificates={certificates} onChanged={() => void load()} />
     </div>
   );
 }
