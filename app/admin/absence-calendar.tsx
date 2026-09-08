@@ -83,7 +83,8 @@ function dateRange(start: Date, end: Date) {
   return count === 1 ? dayFormatter.format(start) : `${dayFormatter.format(start)} – ${dayFormatter.format(end)}`;
 }
 
-export default function AbsenceCalendar({ requests, certificates }: { requests: CalendarRequest[]; certificates: CalendarCertificate[] }) {
+export default function AbsenceCalendar({ requests, certificates, onChanged }: { requests: CalendarRequest[]; certificates: CalendarCertificate[]; onChanged?: () => void }) {
+  void onChanged;
   const now = new Date();
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [filter, setFilter] = useState<'TODOS' | 'PENDENTE' | 'APROVADO'>('TODOS');
@@ -234,4 +235,3 @@ export default function AbsenceCalendar({ requests, certificates }: { requests: 
 function dateFormatter(date: Date) {
   return new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, dateStyle: 'full' }).format(date);
 }
-
