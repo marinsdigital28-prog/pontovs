@@ -1,312 +1,599 @@
-/* Calendário de ausências — visual premium Espaço Progredir */
-.absence-calendar-card{
-  position:relative;
-  margin-top:1.25rem;
-  padding:1.5rem 1.6rem 1.45rem;
-  border-radius:22px;
-  border:1px solid rgba(30,92,47,.12);
+/* =========================================================
+   Calendário de Ausências — Espaço Progredir
+   Verde institucional #0b5c42 / #1e5c2f · Dourado #c9a227 / #d4af37
+   ========================================================= */
+
+.absence-calendar-card {
+  --ep-green: #0b5c42;
+  --ep-green-deep: #083528;
+  --ep-green-mid: #1e5c2f;
+  --ep-green-soft: #e8f5ef;
+  --ep-gold: #c9a227;
+  --ep-gold-bright: #d4af37;
+  --ep-gold-soft: #fbf6e6;
+  --ep-ink: #12281f;
+  --ep-muted: #5a7164;
+
+  position: relative;
+  margin-top: 1.35rem;
+  padding: 0;
+  border-radius: 24px;
+  border: 1px solid rgba(11, 92, 66, 0.14);
   background:
-    radial-gradient(1200px 280px at 8% -10%, rgba(201,162,39,.18), transparent 55%),
-    radial-gradient(900px 240px at 100% 0%, rgba(30,92,47,.1), transparent 50%),
-    linear-gradient(165deg, #ffffff 0%, #f5fbf7 48%, #eef7f1 100%);
+    radial-gradient(ellipse 80% 50% at 0% 0%, rgba(201, 162, 39, 0.16), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(11, 92, 66, 0.12), transparent 50%),
+    linear-gradient(168deg, #ffffff 0%, #f6fbf8 42%, #eef6f1 100%);
   box-shadow:
-    0 1px 0 rgba(255,255,255,.9) inset,
-    0 18px 40px rgba(12,55,36,.08),
-    0 4px 12px rgba(12,55,36,.04);
-  overflow:hidden;
-}
-.absence-calendar-card::before{
-  content:'';
-  position:absolute; left:0; top:0; right:0; height:4px;
-  background:linear-gradient(90deg, #0b5c42 0%, #c9a227 50%, #0b5c42 100%);
-}
-.absence-calendar-heading{
-  display:flex; align-items:flex-start; justify-content:space-between;
-  gap:1.25rem; flex-wrap:wrap; margin-bottom:1.15rem;
-}
-.absence-calendar-heading .eyebrow{
-  letter-spacing:.14em; font-size:.7rem; font-weight:800;
-  color:#c9a227; text-transform:uppercase;
-}
-.absence-calendar-heading h3{
-  margin:.2rem 0 .35rem;
-  font-size:1.45rem; font-weight:800; letter-spacing:-.02em;
-  color:#0a3d2a;
-  background:linear-gradient(120deg, #0a3d2a 0%, #1e5c2f 60%, #c9a227 140%);
-  -webkit-background-clip:text; background-clip:text;
-  -webkit-text-fill-color:transparent;
-}
-.absence-calendar-heading p{
-  max-width:34rem; margin:0;
-  color:#5a7164; font-size:.9rem; line-height:1.45;
-}
-.absence-calendar-summary{
-  display:flex; gap:.55rem; flex-wrap:wrap; justify-content:flex-end;
-}
-.absence-calendar-summary span{
-  display:inline-flex; align-items:center; gap:.4rem;
-  padding:.55rem .9rem; border-radius:999px;
-  background:rgba(11,92,66,.07);
-  border:1px solid rgba(11,92,66,.12);
-  color:#2d5a44; font-size:.78rem; font-weight:600;
-  backdrop-filter:blur(6px);
-}
-.absence-calendar-summary span strong{
-  font-size:1.05rem; font-weight:800; color:#0b5c42;
-}
-.absence-calendar-summary .is-pending{
-  background:rgba(201,162,39,.12);
-  border-color:rgba(201,162,39,.28);
-  color:#7a5c10;
-}
-.absence-calendar-summary .is-pending strong{ color:#9a7200; }
-
-.absence-calendar-toolbar{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:.85rem; flex-wrap:wrap;
-  margin-bottom:1rem; padding:.75rem 0;
-  border-top:1px solid rgba(11,92,66,.08);
-  border-bottom:1px solid rgba(11,92,66,.08);
-}
-.absence-calendar-month-nav{
-  display:flex; align-items:center; gap:.5rem;
-  color:#0b5c42; text-transform:capitalize;
-}
-.absence-calendar-month-nav strong{
-  min-width:11.5rem; text-align:center;
-  font-size:1.05rem; font-weight:800; letter-spacing:-.01em;
-}
-.absence-calendar-month-nav .ghost-btn{
-  width:2.4rem; height:2.4rem; padding:0;
-  border-radius:12px; font-size:1.15rem; font-weight:700;
-  border:1px solid rgba(11,92,66,.15);
-  background:#fff; color:#0b5c42;
-  transition:background .15s, border-color .15s, transform .15s;
-}
-.absence-calendar-month-nav .ghost-btn:hover{
-  background:#e8f5ee; border-color:#0b5c42; transform:translateY(-1px);
-}
-.absence-calendar-filters{
-  display:flex; gap:.25rem; padding:.3rem;
-  border-radius:999px;
-  background:rgba(11,92,66,.06);
-  border:1px solid rgba(11,92,66,.08);
-}
-.absence-calendar-filters button{
-  border:0; border-radius:999px;
-  padding:.55rem 1rem;
-  background:transparent; color:#4a6758;
-  font-size:.78rem; font-weight:700; cursor:pointer;
-  transition:all .18s ease;
-}
-.absence-calendar-filters button.active{
-  background:linear-gradient(135deg, #0b5c42, #147a55);
-  color:#fff;
-  box-shadow:0 6px 16px rgba(11,92,66,.28);
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 20px 48px rgba(8, 53, 40, 0.09),
+    0 6px 16px rgba(8, 53, 40, 0.04);
+  overflow: hidden;
 }
 
-.absence-calendar-legend{
-  display:flex; gap:1rem; flex-wrap:wrap;
-  margin:0 0 .9rem;
-  color:#5c7165; font-size:.72rem; font-weight:600;
-}
-.absence-calendar-legend span{ display:inline-flex; align-items:center; gap:.4rem; }
-.calendar-dot{
-  display:inline-block; width:10px; height:10px;
-  border-radius:50%; flex:0 0 auto;
-}
-.calendar-dot.approved{
-  background:linear-gradient(135deg,#16a34a,#0b5c42);
-  box-shadow:0 0 0 3px rgba(22,163,74,.15);
-}
-.calendar-dot.pending{
-  background:linear-gradient(135deg,#e0a623,#c9a227);
-  box-shadow:0 0 0 3px rgba(201,162,39,.18);
-}
-.calendar-dot.rejected{
-  background:linear-gradient(135deg,#e07070,#c45c5c);
-  box-shadow:0 0 0 3px rgba(196,92,92,.15);
-}
-.calendar-dot.partial{
-  background:linear-gradient(135deg,#7b93e0,#5576c7);
-  box-shadow:0 0 0 3px rgba(85,118,199,.14);
+.absence-calendar-card::before {
+  content: "";
+  display: block;
+  height: 5px;
+  background: linear-gradient(
+    90deg,
+    var(--ep-green-deep) 0%,
+    var(--ep-green) 22%,
+    var(--ep-gold) 50%,
+    var(--ep-green) 78%,
+    var(--ep-green-deep) 100%
+  );
 }
 
-.absence-calendar-grid{
-  display:grid;
-  grid-template-columns:repeat(7, minmax(0,1fr));
-  gap:.55rem;
-}
-.absence-calendar-weekday{
-  padding:.4rem .25rem; text-align:center;
-  color:#6b8576; font-size:.68rem; font-weight:800;
-  letter-spacing:.1em; text-transform:uppercase;
-}
-.absence-calendar-day{
-  position:relative;
-  min-height:6.25rem;
-  padding:.65rem .55rem .55rem;
-  border:1px solid rgba(11,92,66,.1);
-  border-radius:14px;
-  background:#fff;
-  text-align:left; cursor:pointer;
-  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
-  box-shadow:0 1px 2px rgba(12,55,36,.03);
-}
-.absence-calendar-day:hover{
-  transform:translateY(-2px);
-  border-color:rgba(11,92,66,.28);
-  box-shadow:0 10px 22px rgba(12,55,36,.1);
-  background:#fbfefc;
-}
-.absence-calendar-day.outside{
-  background:rgba(247,250,248,.7);
-  opacity:.5;
-  box-shadow:none;
-}
-.absence-calendar-day.today{
-  border-color:rgba(201,162,39,.55);
-  background:linear-gradient(160deg, #fffdf6 0%, #fff 70%);
-  box-shadow:0 0 0 1px rgba(201,162,39,.2), 0 8px 18px rgba(201,162,39,.08);
-}
-.absence-calendar-day.selected{
-  border-color:#0b5c42;
-  background:linear-gradient(165deg, #eef8f2 0%, #f7fcf9 100%);
-  box-shadow:0 0 0 2px rgba(11,92,66,.18), 0 12px 24px rgba(11,92,66,.1);
-}
-.absence-calendar-day-number{
-  display:block; margin-bottom:.4rem;
-  color:#1e3d2e; font-size:.82rem; font-weight:800;
-}
-.absence-calendar-day.today .absence-calendar-day-number{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:1.65rem; height:1.65rem;
-  margin:-.15rem 0 .3rem -.1rem;
-  border-radius:50%;
-  background:linear-gradient(135deg, #d4af37, #c9a227);
-  color:#fff;
-  box-shadow:0 4px 10px rgba(201,162,39,.35);
-  font-size:.75rem;
-}
-.absence-calendar-events{ display:flex; flex-direction:column; gap:.28rem; }
-.absence-calendar-event{
-  display:flex; align-items:center; gap:.35rem;
-  min-width:0; padding:.28rem .45rem;
-  border-radius:7px;
-  color:#0f4a34;
-  background:linear-gradient(90deg, #e4f5ec, #f0faf4);
-  border:1px solid rgba(11,92,66,.1);
-  font-size:.68rem; font-weight:700; line-height:1.2;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.absence-calendar-event.pending{
-  background:linear-gradient(90deg, #fff6d9, #fffbeb);
-  border-color:rgba(201,162,39,.25);
-  color:#8a6508;
-}
-.absence-calendar-event.rejected{
-  background:linear-gradient(90deg, #fdeceb, #fff5f4);
-  border-color:rgba(196,92,92,.2);
-  color:#9a3d3d;
-}
-.absence-calendar-event.partial{
-  background:linear-gradient(90deg, #eef1ff, #f6f7ff);
-  border-color:rgba(85,118,199,.2);
-  color:#3d568f;
-}
-.absence-calendar-event i{
-  width:5px; height:5px; border-radius:50%;
-  background:currentColor; flex:0 0 auto;
-}
-.absence-calendar-more{
-  padding-left:.35rem;
-  color:#5a7a68; font-size:.65rem; font-weight:800;
+.absence-calendar-card > .absence-calendar-heading,
+.absence-calendar-card > .absence-calendar-toolbar,
+.absence-calendar-card > .absence-calendar-legend,
+.absence-calendar-card > .absence-calendar-grid,
+.absence-calendar-card > .absence-calendar-detail {
+  margin-left: 1.5rem;
+  margin-right: 1.5rem;
 }
 
-.absence-calendar-detail{
-  margin-top:1.15rem;
-  padding:1.15rem 1.2rem;
-  border-radius:16px;
-  border:1px solid rgba(11,92,66,.1);
-  background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(244,251,247,.9));
-  box-shadow:0 4px 16px rgba(12,55,36,.04);
+.absence-calendar-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  margin-top: 1.35rem;
+  margin-bottom: 1.1rem;
 }
-.absence-calendar-detail-heading{
-  display:flex; align-items:flex-start; justify-content:space-between;
-  gap:.85rem; margin-bottom:.85rem;
+
+.absence-calendar-heading .eyebrow {
+  display: inline-block;
+  letter-spacing: 0.16em;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: var(--ep-gold);
+  text-transform: uppercase;
 }
-.absence-calendar-detail-heading .eyebrow{
-  letter-spacing:.12em; font-size:.65rem; font-weight:800;
-  color:#c9a227;
+
+.absence-calendar-heading h3 {
+  margin: 0.25rem 0 0.4rem;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  background: linear-gradient(115deg, var(--ep-green-deep) 0%, var(--ep-green-mid) 55%, var(--ep-gold) 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
-.absence-calendar-detail-heading h4{
-  margin:.25rem 0 0;
-  color:#0a3d2a; font-size:1.05rem; font-weight:800;
-  text-transform:capitalize;
+
+.absence-calendar-heading p {
+  max-width: 36rem;
+  margin: 0;
+  color: var(--ep-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
-.absence-calendar-detail-list{ display:flex; flex-direction:column; gap:.55rem; }
-.absence-calendar-detail-row{
-  display:flex; align-items:flex-start; gap:.75rem;
-  padding:.85rem .95rem;
-  border-radius:12px;
-  background:#fff;
-  border:1px solid rgba(11,92,66,.1);
-  box-shadow:0 2px 8px rgba(12,55,36,.03);
-  transition:border-color .15s, box-shadow .15s;
+
+.absence-calendar-summary {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
-.absence-calendar-detail-row:hover{
-  border-color:rgba(11,92,66,.22);
-  box-shadow:0 6px 16px rgba(12,55,36,.07);
+
+.absence-calendar-summary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 1rem;
+  border-radius: 999px;
+  background: rgba(11, 92, 66, 0.07);
+  border: 1px solid rgba(11, 92, 66, 0.14);
+  color: #2d5a44;
+  font-size: 0.78rem;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(11, 92, 66, 0.04);
 }
-.absence-calendar-detail-row > .calendar-dot{ margin-top:.4rem; }
-.absence-calendar-detail-main{
-  display:flex; flex:1; min-width:0; flex-direction:column; gap:.15rem;
+
+.absence-calendar-summary span strong {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--ep-green);
 }
-.absence-calendar-detail-main strong{
-  color:#143d1f; font-size:.9rem; font-weight:800;
+
+.absence-calendar-summary .is-pending {
+  background: rgba(201, 162, 39, 0.14);
+  border-color: rgba(201, 162, 39, 0.32);
+  color: #7a5c10;
 }
+
+.absence-calendar-summary .is-pending strong {
+  color: #9a7200;
+}
+
+.absence-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.95rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid rgba(11, 92, 66, 0.09);
+  border-bottom: 1px solid rgba(11, 92, 66, 0.09);
+}
+
+.absence-calendar-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ep-green);
+  text-transform: capitalize;
+}
+
+.absence-calendar-month-nav strong {
+  min-width: 12rem;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--ep-ink);
+}
+
+.absence-calendar-month-nav .ghost-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 14px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  border: 1px solid rgba(11, 92, 66, 0.16);
+  background: #fff;
+  color: var(--ep-green);
+  transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+
+.absence-calendar-month-nav .ghost-btn:hover {
+  background: var(--ep-green-soft);
+  border-color: var(--ep-green);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(11, 92, 66, 0.12);
+}
+
+.absence-calendar-filters {
+  display: flex;
+  gap: 0.28rem;
+  padding: 0.32rem;
+  border-radius: 999px;
+  background: rgba(11, 92, 66, 0.06);
+  border: 1px solid rgba(11, 92, 66, 0.1);
+}
+
+.absence-calendar-filters button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 1.05rem;
+  background: transparent;
+  color: #4a6758;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.absence-calendar-filters button.active {
+  background: linear-gradient(135deg, var(--ep-green-deep), var(--ep-green));
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(11, 92, 66, 0.32);
+}
+
+.absence-calendar-legend {
+  display: flex;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+  color: var(--ep-muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.absence-calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.calendar-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.calendar-dot.approved {
+  background: linear-gradient(135deg, #22c55e, var(--ep-green));
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.16);
+}
+
+.calendar-dot.pending {
+  background: linear-gradient(135deg, var(--ep-gold-bright), var(--ep-gold));
+  box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.2);
+}
+
+.calendar-dot.rejected {
+  background: linear-gradient(135deg, #f07171, #c45c5c);
+  box-shadow: 0 0 0 3px rgba(196, 92, 92, 0.16);
+}
+
+.calendar-dot.partial {
+  background: linear-gradient(135deg, #8aa0e8, #5576c7);
+  box-shadow: 0 0 0 3px rgba(85, 118, 199, 0.14);
+}
+
+.absence-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.absence-calendar-weekday {
+  padding: 0.45rem 0.2rem;
+  text-align: center;
+  color: var(--ep-green);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.absence-calendar-day {
+  position: relative;
+  min-height: 6.5rem;
+  padding: 0.7rem 0.55rem 0.55rem;
+  border: 1px solid rgba(11, 92, 66, 0.1);
+  border-radius: 16px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  box-shadow: 0 1px 3px rgba(8, 53, 40, 0.04);
+}
+
+.absence-calendar-day:hover {
+  transform: translateY(-2px);
+  border-color: rgba(11, 92, 66, 0.3);
+  box-shadow: 0 12px 26px rgba(8, 53, 40, 0.11);
+  background: #fbfffd;
+}
+
+.absence-calendar-day.outside {
+  background: rgba(247, 250, 248, 0.65);
+  opacity: 0.48;
+  box-shadow: none;
+}
+
+.absence-calendar-day.today {
+  border-color: rgba(201, 162, 39, 0.55);
+  background: linear-gradient(165deg, #fffdf5 0%, #ffffff 65%);
+  box-shadow:
+    0 0 0 1px rgba(201, 162, 39, 0.22),
+    0 10px 22px rgba(201, 162, 39, 0.1);
+}
+
+.absence-calendar-day.selected {
+  border-color: var(--ep-green);
+  background: linear-gradient(165deg, #e9f6ef 0%, #f5fbf8 100%);
+  box-shadow:
+    0 0 0 2px rgba(11, 92, 66, 0.2),
+    0 14px 28px rgba(11, 92, 66, 0.12);
+}
+
+.absence-calendar-day-number {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--ep-ink);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.absence-calendar-day.today .absence-calendar-day-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: -0.1rem 0 0.35rem -0.05rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ep-gold-bright), var(--ep-gold));
+  color: #fff;
+  box-shadow: 0 5px 12px rgba(201, 162, 39, 0.4);
+  font-size: 0.78rem;
+}
+
+.absence-calendar-events {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.absence-calendar-event {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.3rem 0.48rem;
+  border-radius: 8px;
+  color: #0f4a34;
+  background: linear-gradient(90deg, #e2f4eb, #f1faf5);
+  border: 1px solid rgba(11, 92, 66, 0.12);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.absence-calendar-event.pending {
+  background: linear-gradient(90deg, #fff5d6, #fffbeb);
+  border-color: rgba(201, 162, 39, 0.28);
+  color: #8a6508;
+}
+
+.absence-calendar-event.rejected {
+  background: linear-gradient(90deg, #fdeceb, #fff5f4);
+  border-color: rgba(196, 92, 92, 0.22);
+  color: #9a3d3d;
+}
+
+.absence-calendar-event.partial {
+  background: linear-gradient(90deg, #eef1ff, #f6f7ff);
+  border-color: rgba(85, 118, 199, 0.22);
+  color: #3d568f;
+}
+
+.absence-calendar-event i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.absence-calendar-more {
+  padding-left: 0.35rem;
+  color: #5a7a68;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.absence-calendar-detail {
+  margin-top: 1.2rem !important;
+  margin-bottom: 1.45rem !important;
+  padding: 1.2rem 1.25rem;
+  border-radius: 18px;
+  border: 1px solid rgba(11, 92, 66, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 248, 243, 0.92));
+  box-shadow: 0 6px 20px rgba(8, 53, 40, 0.05);
+}
+
+.absence-calendar-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.9rem;
+}
+
+.absence-calendar-detail-heading .eyebrow {
+  letter-spacing: 0.14em;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--ep-gold);
+}
+
+.absence-calendar-detail-heading h4 {
+  margin: 0.25rem 0 0;
+  color: var(--ep-green-deep);
+  font-size: 1.08rem;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.absence-calendar-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.absence-calendar-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(11, 92, 66, 0.1);
+  box-shadow: 0 2px 10px rgba(8, 53, 40, 0.03);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.absence-calendar-detail-row:hover {
+  border-color: rgba(11, 92, 66, 0.24);
+  box-shadow: 0 8px 18px rgba(8, 53, 40, 0.08);
+}
+
+.absence-calendar-detail-row > .calendar-dot {
+  margin-top: 0.4rem;
+}
+
+.absence-calendar-detail-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.absence-calendar-detail-main strong {
+  color: var(--ep-ink);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
 .absence-calendar-detail-main span,
-.absence-calendar-detail-main small{
-  color:#5a7164; font-size:.75rem; line-height:1.4;
-}
-.absence-calendar-detail-row .status-pill{
-  flex:0 0 auto;
-  font-size:.68rem; font-weight:800;
-  padding:.3rem .65rem; border-radius:999px;
-}
-.absence-calendar-detail-row .status-pill.approved{
-  background:#e4f5ec; color:#0b5c42;
-}
-.absence-calendar-detail-row .status-pill.pending{
-  background:#fff6d9; color:#8a6508;
-}
-.absence-calendar-detail-row .status-pill.rejected{
-  background:#fdeceb; color:#9a3d3d;
+.absence-calendar-detail-main small {
+  color: var(--ep-muted);
+  font-size: 0.76rem;
+  line-height: 1.4;
 }
 
-.absence-calendar-live-wrap{ margin:1rem 0 1.35rem; }
-.absence-calendar-live-bar{
-  display:flex; align-items:center; gap:.75rem;
-  margin-bottom:.7rem; flex-wrap:wrap;
+.absence-calendar-detail-row .status-pill {
+  flex: 0 0 auto;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.32rem 0.7rem;
+  border-radius: 999px;
 }
-.absence-calendar-live-bar .status-msg{ margin:0; }
 
-@media (max-width:760px){
-  .absence-calendar-card{ padding:1.1rem 1rem 1.15rem; border-radius:18px; }
-  .absence-calendar-heading{ display:block; }
-  .absence-calendar-summary{ justify-content:flex-start; margin-top:.85rem; }
-  .absence-calendar-toolbar{ flex-direction:column; align-items:stretch; }
-  .absence-calendar-month-nav{ justify-content:space-between; }
-  .absence-calendar-month-nav strong{ min-width:0; flex:1; }
-  .absence-calendar-filters{ justify-content:space-between; }
-  .absence-calendar-filters button{ flex:1; text-align:center; padding:.5rem .4rem; }
-  .absence-calendar-grid{ gap:.35rem; }
-  .absence-calendar-day{ min-height:4.75rem; padding:.45rem .35rem; border-radius:10px; }
-  .absence-calendar-day-number{ font-size:.72rem; }
-  .absence-calendar-event{ padding:.2rem .3rem; font-size:.6rem; }
-  .absence-calendar-event i{ display:none; }
-  .absence-calendar-legend{ gap:.65rem; font-size:.65rem; }
-  .absence-calendar-detail{ padding:.9rem; }
-  .absence-calendar-detail-row{ flex-wrap:wrap; }
-  .absence-calendar-detail-row .status-pill{ margin-left:1.15rem; }
+.absence-calendar-detail-row .status-pill.approved {
+  background: var(--ep-green-soft);
+  color: var(--ep-green);
+}
+
+.absence-calendar-detail-row .status-pill.pending {
+  background: var(--ep-gold-soft);
+  color: #8a6508;
+}
+
+.absence-calendar-detail-row .status-pill.rejected {
+  background: #fdeceb;
+  color: #9a3d3d;
+}
+
+.absence-calendar-live-wrap {
+  margin: 1rem 0 1.4rem;
+}
+
+.absence-calendar-live-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.absence-calendar-live-bar .status-msg {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .absence-calendar-card > .absence-calendar-heading,
+  .absence-calendar-card > .absence-calendar-toolbar,
+  .absence-calendar-card > .absence-calendar-legend,
+  .absence-calendar-card > .absence-calendar-grid,
+  .absence-calendar-card > .absence-calendar-detail {
+    margin-left: 1rem;
+    margin-right: 1rem;
+  }
+
+  .absence-calendar-heading {
+    display: block;
+    margin-top: 1.1rem;
+  }
+
+  .absence-calendar-heading h3 {
+    font-size: 1.3rem;
+  }
+
+  .absence-calendar-summary {
+    justify-content: flex-start;
+    margin-top: 0.85rem;
+  }
+
+  .absence-calendar-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .absence-calendar-month-nav {
+    justify-content: space-between;
+  }
+
+  .absence-calendar-month-nav strong {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .absence-calendar-filters {
+    justify-content: space-between;
+  }
+
+  .absence-calendar-filters button {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem 0.35rem;
+  }
+
+  .absence-calendar-grid {
+    gap: 0.32rem;
+  }
+
+  .absence-calendar-day {
+    min-height: 4.8rem;
+    padding: 0.4rem 0.3rem;
+    border-radius: 11px;
+  }
+
+  .absence-calendar-day-number {
+    font-size: 0.72rem;
+  }
+
+  .absence-calendar-event {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.58rem;
+  }
+
+  .absence-calendar-event i {
+    display: none;
+  }
+
+  .absence-calendar-legend {
+    gap: 0.65rem;
+    font-size: 0.65rem;
+  }
+
+  .absence-calendar-detail {
+    padding: 0.9rem;
+  }
+
+  .absence-calendar-detail-row {
+    flex-wrap: wrap;
+  }
+
+  .absence-calendar-detail-row .status-pill {
+    margin-left: 1.15rem;
+  }
 }
