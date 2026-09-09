@@ -43,6 +43,7 @@ runNode('.v0/inject-built-with-v0.mjs', { optional: true });
 
 // 2) patches de UI / PDF / calendário / jornada
 const patches = [
+  'scripts/patch-folha-visual.mjs',
   'scripts/patch-timesheet-pdf-borders.mjs',
   'scripts/patch-timesheet-signature-api.mjs',
   'scripts/patch-folha-preclose.mjs',
