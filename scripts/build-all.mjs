@@ -56,6 +56,7 @@ const patches = [
   'scripts/patch-folha-signature.mjs',
   'scripts/expand-employee-shell.mjs',
   'scripts/expand-folga.mjs',
+  'scripts/patch-ponto-perf.mjs',
 ];
 
 for (const p of patches) {
