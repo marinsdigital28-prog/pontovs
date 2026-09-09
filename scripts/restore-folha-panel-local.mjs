@@ -1,0 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const dir = path.join(root, 'scripts/folha-panel-b64');
+const parts = fs.readdirSync(dir).filter(f => f.startsWith('part-')).sort();
+const b64 = parts.map(f => fs.readFileSync(path.join(dir, f), 'utf8').trim()).join('');
+const out = path.join(root, 'app/admin/folha-ponto-panel.tsx');
+fs.writeFileSync(out, Buffer.from(b64, 'base64').toString('utf8'));
+console.log('folha-ponto-panel restored', fs.statSync(out).size);
