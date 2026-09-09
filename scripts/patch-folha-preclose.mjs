@@ -1,36 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import https from 'https';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const panelPath = path.join(root, 'app/admin/folha-ponto-panel.tsx');
 
-function get(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        get(res.headers.location).then(resolve, reject);
-        return;
-      }
-      if (res.statusCode !== 200) {
-        reject(new Error('HTTP ' + res.statusCode));
-        return;
-      }
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-    }).on('error', reject);
-  });
-}
-
-const BASE = 'https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/main/app/admin/folha-ponto-panel.tsx';
-let t;
-try {
-  t = await get(BASE);
-} catch (e) {
-  console.warn('download failed, using local panel', e.message);
-  t = fs.readFileSync(panelPath, 'utf8');
+// NUNCA baixar de main: o remoto pode estar PLACEHOLDER e sobrescrever o painel restaurado no build.
+let t = fs.readFileSync(panelPath, 'utf8');
+if (!t.includes('export default function FolhaPontoPanel') || t.trim() === 'PLACEHOLDER') {
+  console.log('folha-preclose: painel ainda invalido, skip (patch-folha-visual deve ter restaurado antes)');
+  process.exit(0);
 }
 
 if (!t.includes("import './folha-preclose.css'")) {
@@ -54,14 +33,10 @@ if (!t.includes('const incomplete = Boolean')) {
 if (!t.includes('preCloseAudit')) {
   t = t.replace(
     `  const dayRowsByEmployee = useMemo(\n    () => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month, certificates, requests)])),\n    [month, records, certificates, requests, visibleEmployees],\n  );\n\n  async function downloadPdfBlob`,
-    `  const dayRowsByEmployee = useMemo(\n    () => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month, certificates, requests)])),\n    [month, records, certificates, requests, visibleEmployees],\n  );\n\n  const preCloseAudit = useMemo(() => {\n    const bounds = monthBounds(month);\n    const noSchedule: string[] = [];
-    const faltas: Array<{ name: string; days: string[] }> = [];
-    const incompletos: Array<{ name: string; days: string[] }> = [];
-    let totalFaltas = 0;\n    let totalIncompletos = 0;\n    let totalAtrasos = 0;\n    for (const emp of visibleEmployees) {\n      if (!emp.scheduleStart || !emp.scheduleEnd) noSchedule.push((emp.employeeNumber || '—') + ' · ' + emp.name);\n      const rows = dayRowsByEmployee.get(emp.id) || [];\n      const fDays = rows.filter((r) => r.absent).map((r) => r.date.slice(8));\n      const iDays = rows.filter((r) => r.incomplete).map((r) => r.date.slice(8));\n      totalFaltas += fDays.length;\n      totalIncompletos += iDays.length;\n      totalAtrasos += rows.filter((r) => r.late).length;\n      if (fDays.length) faltas.push({ name: emp.name, days: fDays });\n      if (iDays.length) incompletos.push({ name: emp.name, days: iDays });\n    }\n    const pendingRequests = requests.filter((r) => {\n      if (r.status !== 'PENDENTE') return false;\n      const start = String(r.startDate).slice(0, 10);\n      const end = String(r.endDate).slice(0, 10);\n      return start <= bounds.to && end >= bounds.from;\n    });\n    const pendingCerts = certificates.filter((c) => {\n      if (c.status !== 'PENDENTE') return false;\n      const start = String(c.startDate).slice(0, 10);\n      const end = String(c.endDate).slice(0, 10);\n      return start <= bounds.to && end >= bounds.from;\n    });\n    const blockers = noSchedule.length + pendingRequests.length + pendingCerts.length + totalIncompletos;\n    return { noSchedule, faltas, incompletos, totalFaltas, totalIncompletos, totalAtrasos, pendingRequests, pendingCerts, blockers, ready: blockers === 0 };\n  }, [visibleEmployees, dayRowsByEmployee, requests, certificates, month]);\n\n  async function downloadPdfBlob`,
+    `  const dayRowsByEmployee = useMemo(\n    () => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month, certificates, requests)])),\n    [month, records, certificates, requests, visibleEmployees],\n  );\n\n  const preCloseAudit = useMemo(() => {\n    const bounds = monthBounds(month);\n    const noSchedule: string[] = [];\n    const faltas: Array<{ name: string; days: string[] }> = [];\n    const incompletos: Array<{ name: string; days: string[] }> = [];\n    let totalFaltas = 0;\n    let totalIncompletos = 0;\n    let totalAtrasos = 0;\n    for (const emp of visibleEmployees) {\n      if (!emp.scheduleStart || !emp.scheduleEnd) noSchedule.push((emp.employeeNumber || '—') + ' · ' + emp.name);\n      const rows = dayRowsByEmployee.get(emp.id) || [];\n      const fDays = rows.filter((r) => r.absent).map((r) => r.date.slice(8));\n      const iDays = rows.filter((r) => r.incomplete).map((r) => r.date.slice(8));\n      totalFaltas += fDays.length;\n      totalIncompletos += iDays.length;\n      totalAtrasos += rows.filter((r) => r.late).length;\n      if (fDays.length) faltas.push({ name: emp.name, days: fDays });\n      if (iDays.length) incompletos.push({ name: emp.name, days: iDays });\n    }\n    const pendingRequests = requests.filter((r) => {\n      if (r.status !== 'PENDENTE') return false;\n      const start = String(r.startDate).slice(0, 10);\n      const end = String(r.endDate).slice(0, 10);\n      return start <= bounds.to && end >= bounds.from;\n    });\n    const pendingCerts = certificates.filter((c) => {\n      if (c.status !== 'PENDENTE') return false;\n      const start = String(c.startDate).slice(0, 10);\n      const end = String(c.endDate).slice(0, 10);\n      return start <= bounds.to && end >= bounds.from;\n    });\n    const blockers = noSchedule.length + pendingRequests.length + pendingCerts.length + totalIncompletos;\n    return { noSchedule, faltas, incompletos, totalFaltas, totalIncompletos, totalAtrasos, pendingRequests, pendingCerts, blockers, ready: blockers === 0 };\n  }, [visibleEmployees, dayRowsByEmployee, requests, certificates, month]);\n\n  async function downloadPdfBlob`,
   );
 }
 
-// Keep the generated panel type-safe even when the remote source already contains preCloseAudit.
 t = t.replaceAll('const noSchedule = [];', 'const noSchedule: string[] = []');
 t = t.replaceAll('const faltas = [];', 'const faltas: Array<{ name: string; days: string[] }> = []');
 t = t.replaceAll('const incompletos = [];', 'const incompletos: Array<{ name: string; days: string[] }> = []');
