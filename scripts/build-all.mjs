@@ -41,8 +41,9 @@ function runNode(rel, opts) {
 // 1) inject v0 (opcional)
 runNode('.v0/inject-built-with-v0.mjs', { optional: true });
 
-// 2) patches — folha visual no INICIO e no FIM (restaura PLACEHOLDER e revalida)
+// 2) restaura assets da folha se PLACEHOLDER + visual polish
 const patches = [
+  'scripts/patch-restore-folha-assets.mjs',
   'scripts/patch-folha-visual.mjs',
   'scripts/patch-timesheet-pdf-borders.mjs',
   'scripts/patch-timesheet-signature-api.mjs',
@@ -58,8 +59,8 @@ const patches = [
   'scripts/expand-employee-shell.mjs',
   'scripts/expand-folga.mjs',
   'scripts/patch-ponto-perf.mjs',
-  // garante painel valido depois de todos os patches que tocam o arquivo
   'scripts/patch-folha-visual.mjs',
+  'scripts/patch-restore-folha-assets.mjs',
 ];
 
 for (const p of patches) {
