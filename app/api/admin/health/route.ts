@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { Prisma } from '@prisma/client';
 import { authOptions } from '../../../../lib/auth';
 import prisma from '../../../../lib/prisma';
 
@@ -120,7 +119,6 @@ export async function GET() {
       const monthPhotoBytes = Number(monthRow?.photo_bytes || 0);
 
       const projectedPhotoBytes = Math.round((monthPhotoBytes / daysElapsed) * daysInMonth);
-      // Espaço além das fotos do mês = banco atual - fotos do mês + projeção de fotos do mês
       const projectedTotalBytes = Math.max(0, databaseBytes - monthPhotoBytes + projectedPhotoBytes);
       const usedPercent = storageLimitBytes > 0 ? Math.min(100, (databaseBytes / storageLimitBytes) * 100) : 0;
       const projectedPercent =
