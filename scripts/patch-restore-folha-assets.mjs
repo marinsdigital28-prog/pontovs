@@ -12,23 +12,12 @@ async function fetchText(url) {
 
 const GOOD_PANEL = '7e7b290decae4398c6c7d9b8ef42bb23e65fd501';
 const GOOD_PDF = 'e4f876610e0ccb6404a99ba0b2436068284e64b9';
-const GOOD_CSS = '604b759a28cd1956ca0b680de2848b709e51aaef';
+/** CSS com impressão compacta (1 página A4 paisagem por colaborador) */
+const GOOD_CSS = '7287c694d1a011acc2dd3c9a5b7abf0604b2647b';
 
 const panelPath = path.join(root, 'app/admin/folha-ponto-panel.tsx');
 const pdfPath = path.join(root, 'lib/signed-timesheet-pdf.ts');
 const cssPath = path.join(root, 'app/admin/folha-ponto.css');
-
-const PRINT_HARDEN = `
-/* print-harden-v2 */
-@media print {
-  @page { size: A4 landscape; margin: 6mm; }
-  .folha-ponto-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
-  .no-print, .admin-tabs, nav, button.ghost-btn, button.primary-btn { display: none !important; }
-  .folha-table thead { display: table-header-group !important; }
-  .folha-block { break-inside: avoid-page; page-break-inside: avoid; }
-  .signature-area { break-inside: avoid; page-break-inside: avoid; }
-}
-`;
 
 let panel = fs.existsSync(panelPath) ? fs.readFileSync(panelPath, 'utf8') : '';
 if (!panel.includes('export default function FolhaPontoPanel') || panel.trim().startsWith('PLACEHOLDER')) {
@@ -71,13 +60,20 @@ if (!pdf.includes('createSignedTimesheetPdf') || pdf.trim().startsWith('PLACEHOL
 }
 
 let css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
-if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER')) {
-  console.log('restoring css from', GOOD_CSS);
-  css = await fetchText(`https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_CSS}/app/admin/folha-ponto.css`);
+const hasCompactPrint =
+  css.includes('fim das 69 páginas') ||
+  (css.includes('page-break-inside: auto') && css.includes('table-layout: fixed') && css.includes('@media print'));
+
+if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER') || !hasCompactPrint) {
+  console.log('restoring compact print CSS from', GOOD_CSS);
+  try {
+    css = await fetchText(
+      `https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_CSS}/app/admin/folha-ponto.css`,
+    );
+  } catch (e) {
+    console.warn('raw CSS fetch failed, keeping local', e?.message || e);
+  }
 }
-if (!css.includes('print-harden-v2')) {
-  css = `${css.trim()}\n${PRINT_HARDEN}\n`;
-  console.log('print CSS hardened');
-}
+
 fs.writeFileSync(cssPath, css);
-console.log('css final', css.length);
+console.log('css final', css.length, hasCompactPrint ? '(já compacta)' : '(restaurada)');
