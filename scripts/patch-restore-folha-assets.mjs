@@ -12,8 +12,8 @@ async function fetchText(url) {
 
 const GOOD_PANEL = '7e7b290decae4398c6c7d9b8ef42bb23e65fd501';
 const GOOD_PDF = 'e4f876610e0ccb6404a99ba0b2436068284e64b9';
-/** CSS com impressão compacta (1 página A4 paisagem por colaborador) */
-const GOOD_CSS = '7287c694d1a011acc2dd3c9a5b7abf0604b2647b';
+/** CSS impressão legível (letra ~8.5pt, menos branco) */
+const GOOD_CSS = 'c91be42332d762209f678d78a485601ed63cb781';
 
 const panelPath = path.join(root, 'app/admin/folha-ponto-panel.tsx');
 const pdfPath = path.join(root, 'lib/signed-timesheet-pdf.ts');
@@ -60,12 +60,12 @@ if (!pdf.includes('createSignedTimesheetPdf') || pdf.trim().startsWith('PLACEHOL
 }
 
 let css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
-const hasCompactPrint =
-  css.includes('fim das 69 páginas') ||
-  (css.includes('page-break-inside: auto') && css.includes('table-layout: fixed') && css.includes('@media print'));
+const hasReadablePrint =
+  css.includes('letra maior') ||
+  (css.includes('font-size: 8.5pt') && css.includes('@media print') && css.includes('page-break-after: always'));
 
-if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER') || !hasCompactPrint) {
-  console.log('restoring compact print CSS from', GOOD_CSS);
+if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER') || !hasReadablePrint) {
+  console.log('restoring readable print CSS from', GOOD_CSS);
   try {
     css = await fetchText(
       `https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_CSS}/app/admin/folha-ponto.css`,
@@ -76,4 +76,4 @@ if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER') || !ha
 }
 
 fs.writeFileSync(cssPath, css);
-console.log('css final', css.length, hasCompactPrint ? '(já compacta)' : '(restaurada)');
+console.log('css final', css.length, hasReadablePrint ? '(já legível)' : '(restaurada)');
