@@ -61,8 +61,9 @@ const patches = [
   'scripts/patch-ponto-perf.mjs',
   'scripts/patch-folha-visual.mjs',
   'scripts/patch-restore-folha-assets.mjs',
-  // por último: cabeçalho completo na impressão (não sobrescrever depois)
   'scripts/patch-folha-print-header.mjs',
+  // tolerância de atraso por último (após restore do painel)
+  'scripts/patch-late-tolerance.mjs',
 ];
 
 for (const p of patches) {
