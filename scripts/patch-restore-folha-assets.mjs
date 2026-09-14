@@ -18,6 +18,18 @@ const panelPath = path.join(root, 'app/admin/folha-ponto-panel.tsx');
 const pdfPath = path.join(root, 'lib/signed-timesheet-pdf.ts');
 const cssPath = path.join(root, 'app/admin/folha-ponto.css');
 
+const PRINT_HARDEN = `
+/* print-harden-v2 */
+@media print {
+  @page { size: A4 landscape; margin: 6mm; }
+  .folha-ponto-root { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; }
+  .no-print, .admin-tabs, nav, button.ghost-btn, button.primary-btn { display: none !important; }
+  .folha-table thead { display: table-header-group !important; }
+  .folha-block { break-inside: avoid-page; page-break-inside: avoid; }
+  .signature-area { break-inside: avoid; page-break-inside: avoid; }
+}
+`;
+
 let panel = fs.existsSync(panelPath) ? fs.readFileSync(panelPath, 'utf8') : '';
 if (!panel.includes('export default function FolhaPontoPanel') || panel.trim().startsWith('PLACEHOLDER')) {
   console.log('restoring panel from', GOOD_PANEL);
@@ -62,8 +74,10 @@ let css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
 if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER')) {
   console.log('restoring css from', GOOD_CSS);
   css = await fetchText(`https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_CSS}/app/admin/folha-ponto.css`);
-  fs.writeFileSync(cssPath, css);
-  console.log('css restored', css.length);
-} else {
-  console.log('css ok', css.length);
 }
+if (!css.includes('print-harden-v2')) {
+  css = `${css.trim()}\n${PRINT_HARDEN}\n`;
+  console.log('print CSS hardened');
+}
+fs.writeFileSync(cssPath, css);
+console.log('css final', css.length);
