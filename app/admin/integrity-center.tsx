@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AbsenceCalendar from './absence-calendar';
+import BackupPanel from './backup-panel';
 
 type Issue = {
   id: string;
@@ -184,6 +185,8 @@ export default function IntegrityCenter() {
         </div>
       ) : null}
 
+      <BackupPanel />
+
       <AbsenceCalendar requests={requests} certificates={certificates} />
 
       <div className="integrity-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
@@ -302,8 +305,7 @@ export default function IntegrityCenter() {
             <span className="eyebrow">FECHAMENTO MENSAL</span>
             <h3 style={{ margin: '4px 0' }}>Período {currentMonth} — Em aberto</h3>
             <p className="small-muted">
-              O fechamento formal ainda não foi executado. Nenhum dado será arquivado ou removido automaticamente.
-              Quando a contabilidade e a gestão concluírem a conferência, o status poderá ser alterado para “Fechado”.
+              Faça o <strong>backup do mês</strong> acima antes de fechar a folha. O fechamento formal ainda não arquiva nem apaga dados automaticamente.
             </p>
           </div>
         </div>
