@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../../../../lib/auth';
-import prisma from '../../../../../lib/prisma';
-import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../../lib/security-controls';
+import { authOptions } from '@/lib/auth';
+import prisma from '@/lib/prisma';
+import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
