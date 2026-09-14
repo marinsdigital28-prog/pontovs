@@ -142,36 +142,252 @@
 .folha-preclose-head span { font-size: 0.82rem; opacity: 0.9; }
 .folha-preclose-list { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.86rem; line-height: 1.45; }
 .folha-preclose-ok { margin: 0.25rem 0 0; font-size: 0.88rem; opacity: 0.95; }
+
+/* ============================================================
+   IMPRESSÃO — 1 colaborador ≈ 1 página A4 paisagem
+   (corrige o bug das ~69 páginas no Chrome)
+   ============================================================ */
 @media print {
-  @page { size: A4 landscape; margin: 7mm; }
-  html, body { background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body * { visibility: hidden; }
-  .folha-ponto-root, .folha-ponto-root * { visibility: visible; }
-  .folha-ponto-root { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; background: #fff !important; }
-  .section-heading .row-actions, .folha-toolbar, .ghost-btn, .primary-btn, .eyebrow, nav, .admin-tabs, button, .folha-preclose, .folha-hint, .folha-live-dot, .folha-batch-progress { display: none !important; }
-  .folha-competence-banner { margin: 0 0 2mm; padding: 1.5mm 2.5mm; border-radius: 0; background: #eee !important; color: #000 !important; box-shadow: none; border: 1px solid #ccc; }
-  .folha-competence-banner::after { display: none; }
-  .folha-competence-banner strong, .folha-competence-banner span, .folha-competence-banner b { color: #000 !important; font-size: 8pt; }
-  .folha-block { border: 1.5px solid #143d1f !important; border-radius: 0 !important; padding: 3mm !important; margin: 0 !important; page-break-after: always; page-break-inside: avoid; box-shadow: none !important; background: #fff !important; }
-  .folha-block:last-of-type { page-break-after: auto; }
-  .folha-block > .section-heading { border-bottom: 1px solid #333; padding-bottom: 1mm; margin-bottom: 1.5mm; }
-  .folha-block > .section-heading h3 { color: #000 !important; font-size: 10pt; }
-  .folha-block > .section-heading .small-muted { color: #333 !important; font-size: 7pt; }
-  .folha-table-scroll { overflow: visible !important; border: 1px solid #333; border-radius: 0; background: #fff; box-shadow: none; }
-  .folha-table { min-width: 0 !important; width: 100% !important; font-size: 8.5pt !important; table-layout: fixed; }
-  .folha-table thead th { position: static; background: #0b5c42 !important; color: #fff !important; font-size: 7.5pt !important; padding: 1mm !important; border-bottom: 1.5pt solid #c9a227; }
-  .folha-table tbody td { padding: 0.9mm 1mm !important; font-size: 8pt !important; border-bottom: 0.35pt solid #c9d6cd !important; color: #000 !important; background: #fff !important; }
-  .folha-table tbody tr:nth-child(even) td { background: #f3f6f4 !important; }
-  .folha-col-date b { color: #000 !important; font-size: 8.5pt; }
-  .folha-col-date span { color: #333 !important; font-size: 6.5pt; }
-  .folha-mark { padding: 0.3mm 0.8mm; font-size: 7pt; margin: 0 1mm 0 0; background: #e8e8e8 !important; border: none; color: #000 !important; }
-  .folha-sit { padding: 0.25mm 1.2mm; font-size: 6.5pt; border: 1px solid #888; background: transparent !important; color: #000 !important; box-shadow: none; }
-  .signature-area { display: flex !important; visibility: visible !important; margin-top: 3mm; padding-top: 2mm; border-top: 1px solid #999; break-inside: avoid; justify-content: space-between; gap: 8mm; }
-  .signature-area, .signature-area * { visibility: visible !important; }
-  .signature-block { max-width: 45%; }
-  .institution-signature { max-height: 16mm; }
-  .signature-certificate-block { background: #f2fff5 !important; color: #1d5f38 !important; border-color: #3d9b63 !important; }
-  .signature-certificate-block strong { color: #1d5f38 !important; }
-  .signature-line, .signature-caption { color: #000 !important; border-top-color: #333; }
-  .signature-spacer { border-bottom-color: #666; height: 12mm; }
+  @page {
+    size: A4 landscape;
+    margin: 5mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Esconde o resto do admin (sem visibility:hidden, que gerava páginas fantasma) */
+  body > * { display: none !important; }
+  body > .admin-shell,
+  body > main,
+  body > div {
+    display: block !important;
+  }
+
+  .admin-tabs,
+  nav,
+  header,
+  footer,
+  .no-print,
+  .folha-toolbar,
+  .folha-print-actions,
+  .folha-live-dot,
+  .folha-batch-progress,
+  .folha-preclose,
+  .folha-hint,
+  .eyebrow,
+  button,
+  .ghost-btn,
+  .primary-btn,
+  .status-msg,
+  .admin-toast,
+  .row-actions.no-print {
+    display: none !important;
+  }
+
+  /* Só a folha importa */
+  .folha-ponto-root,
+  .timesheet-panel {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: #000 !important;
+    overflow: visible !important;
+  }
+
+  .folha-competence-banner {
+    display: flex !important;
+    margin: 0 0 2mm !important;
+    padding: 1mm 2mm !important;
+    border-radius: 0 !important;
+    background: #e8f0eb !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    border: 0.5pt solid #0b5c42 !important;
+  }
+  .folha-competence-banner::after { display: none !important; }
+  .folha-competence-banner strong,
+  .folha-competence-banner span,
+  .folha-competence-banner b {
+    color: #000 !important;
+    font-size: 7.5pt !important;
+  }
+
+  /* Um bloco = um colaborador ≈ uma folha */
+  .folha-block,
+  .timesheet-employee-block {
+    display: block !important;
+    position: static !important;
+    margin: 0 0 0 0 !important;
+    padding: 1.5mm !important;
+    border: 1pt solid #143d1f !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    color: #000 !important;
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: auto; /* NÃO usar avoid — era a causa das páginas vazias */
+    break-inside: auto;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+  .folha-block:last-of-type,
+  .timesheet-employee-block:last-of-type {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .folha-block > .section-heading {
+    display: flex !important;
+    margin: 0 0 1.2mm !important;
+    padding: 0 0 0.8mm !important;
+    border-bottom: 0.8pt solid #0b5c42 !important;
+    color: #000 !important;
+  }
+  .folha-block > .section-heading h3 {
+    color: #000 !important;
+    font-size: 9.5pt !important;
+    margin: 0 !important;
+  }
+  .folha-block > .section-heading .small-muted {
+    color: #333 !important;
+    font-size: 7pt !important;
+    margin: 0 !important;
+  }
+
+  .folha-table-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    border: 0.6pt solid #333 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .folha-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 6.8pt !important;
+    line-height: 1.15 !important;
+  }
+
+  .folha-table thead {
+    display: table-header-group !important;
+  }
+  .folha-table thead th {
+    position: static !important;
+    background: #0b5c42 !important;
+    color: #fff !important;
+    font-size: 6.2pt !important;
+    padding: 0.6mm 0.8mm !important;
+    border: 0.3pt solid #0a4a35 !important;
+    border-bottom: 1pt solid #c9a227 !important;
+    white-space: nowrap !important;
+  }
+
+  .folha-table tbody td {
+    padding: 0.35mm 0.7mm !important;
+    font-size: 6.5pt !important;
+    line-height: 1.12 !important;
+    border: 0.25pt solid #c5d0c9 !important;
+    color: #000 !important;
+    background: #fff !important;
+    vertical-align: middle !important;
+  }
+  .folha-table tbody tr:nth-child(even) td {
+    background: #f2f6f3 !important;
+  }
+  .folha-row-falta td { background: #fdeceb !important; }
+  .folha-row-incompleto td { background: #fff6e8 !important; }
+  .folha-row-abono td { background: #e8f6ee !important; }
+  .folha-row-folga td { color: #555 !important; }
+
+  /* Data em uma linha só (economiza altura) */
+  .folha-col-date b,
+  .folha-col-date span {
+    display: inline !important;
+    font-size: 6.5pt !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+  }
+  .folha-col-date span::before { content: ' '; }
+
+  .folha-col-scale {
+    font-size: 6pt !important;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .folha-mark {
+    display: inline !important;
+    padding: 0 !important;
+    margin: 0 1mm 0 0 !important;
+    background: transparent !important;
+    border: none !important;
+    color: #000 !important;
+    font-size: 6.2pt !important;
+    border-radius: 0 !important;
+  }
+
+  .folha-sit {
+    padding: 0 0.8mm !important;
+    font-size: 5.8pt !important;
+    border: 0.4pt solid #666 !important;
+    background: transparent !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    border-radius: 2px !important;
+  }
+
+  /* Assinatura compacta */
+  .signature-area {
+    display: flex !important;
+    margin-top: 1.5mm !important;
+    padding-top: 1mm !important;
+    border-top: 0.6pt solid #999 !important;
+    gap: 6mm !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .signature-block { max-width: 48% !important; min-width: 0 !important; }
+  .signature-spacer {
+    height: 7mm !important;
+    max-width: 160px !important;
+    margin-bottom: 0.5mm !important;
+    border-bottom: 0.6pt solid #333 !important;
+  }
+  .signature-line,
+  .signature-caption {
+    color: #000 !important;
+    font-size: 6.5pt !important;
+    border-top-color: #333 !important;
+  }
+  .institution-signature { max-height: 10mm !important; }
+  .signature-certificate-block {
+    padding: 0.8mm 1.5mm !important;
+    font-size: 6pt !important;
+    background: #f2fff5 !important;
+    color: #1d5f38 !important;
+    border-color: #3d9b63 !important;
+    max-width: 100% !important;
+  }
+  .signature-certificate-block strong { color: #1d5f38 !important; font-size: 6.5pt !important; }
 }
