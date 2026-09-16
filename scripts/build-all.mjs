@@ -41,9 +41,10 @@ function runNode(rel, opts) {
 // 1) inject v0 (opcional)
 runNode('.v0/inject-built-with-v0.mjs', { optional: true });
 
-// 2) restaura assets da folha se PLACEHOLDER + visual polish
+// 2) restaura assets + patches
 const patches = [
   'scripts/patch-restore-certificates-route.mjs',
+  'scripts/patch-certificates-panel-payload.mjs',
   'scripts/patch-restore-folha-assets.mjs',
   'scripts/patch-folha-visual.mjs',
   'scripts/patch-timesheet-pdf-borders.mjs',
@@ -63,7 +64,6 @@ const patches = [
   'scripts/patch-folha-visual.mjs',
   'scripts/patch-restore-folha-assets.mjs',
   'scripts/patch-folha-print-header.mjs',
-  // tolerância de atraso por último (após restore do painel)
   'scripts/patch-late-tolerance.mjs',
 ];
 
