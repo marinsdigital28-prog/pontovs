@@ -43,6 +43,7 @@ runNode('.v0/inject-built-with-v0.mjs', { optional: true });
 
 // 2) restaura assets da folha se PLACEHOLDER + visual polish
 const patches = [
+  'scripts/patch-restore-certificates-route.mjs',
   'scripts/patch-restore-folha-assets.mjs',
   'scripts/patch-folha-visual.mjs',
   'scripts/patch-timesheet-pdf-borders.mjs',
