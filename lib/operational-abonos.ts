@@ -44,12 +44,22 @@ export function getOperationalAbono(
 ): OperationalAbono | null {
   const mat = String(employeeNumber || '').replace(/\D/g, '');
 
-  // Kaio — jovem aprendiz: curso na última sexta de cada mês
-  if (mat === MAT_KAIO && isLastFridayOfMonth(dateKey)) {
-    return {
-      kind: 'FULL_DAY',
-      reason: 'Curso jovem aprendiz (última sexta do mês)',
-    };
+  // Kaio — jovem aprendiz: curso toda terça + última sexta do mês
+  if (mat === MAT_KAIO) {
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const weekday = new Date(y, m - 1, d, 12, 0, 0).getDay(); // 2 = terça
+    if (weekday === 2) {
+      return {
+        kind: 'FULL_DAY',
+        reason: 'Curso jovem aprendiz (terça-feira)',
+      };
+    }
+    if (isLastFridayOfMonth(dateKey)) {
+      return {
+        kind: 'FULL_DAY',
+        reason: 'Curso jovem aprendiz (última sexta do mês)',
+      };
+    }
   }
 
   // Ana Maria — trabalho externo Mesa Brasil 25/08/2026
