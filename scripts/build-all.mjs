@@ -65,6 +65,8 @@ const patches = [
   'scripts/patch-restore-folha-assets.mjs',
   'scripts/patch-folha-print-header.mjs',
   'scripts/patch-late-tolerance.mjs',
+  // jornada por matrícula (Eduardo 0028 quarta meio exp.)
+  'scripts/patch-folha-day-schedule-mat.mjs',
 ];
 
 for (const p of patches) {
