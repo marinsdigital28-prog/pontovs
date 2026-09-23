@@ -24,11 +24,11 @@ export type TimesheetCertificate = {
 };
 export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; status: string; reason: string };
 
-/** A4 paisagem — visual limpo e profissional */
+/** A4 paisagem — visual limpo, denso e profissional */
 const PAGE_W = 841.89;
 const PAGE_H = 595.28;
-const MX = 22;
-const MY = 16;
+const MX = 18;
+const MY = 14;
 
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const weekdayLabels = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -90,35 +90,47 @@ async function buildTimesheetDocument({
   const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const dark = rgb(0.12, 0.14, 0.16);
-  const muted = rgb(0.45, 0.48, 0.5);
-  const soft = rgb(0.88, 0.9, 0.91);
-  const green = rgb(0.06, 0.35, 0.26);
-  const altRow = rgb(0.965, 0.975, 0.97);
+
+  const dark = rgb(0.1, 0.12, 0.14);
+  const muted = rgb(0.4, 0.43, 0.45);
+  const soft = rgb(0.86, 0.88, 0.89);
+  const green = rgb(0.043, 0.36, 0.26);
+  const greenSoft = rgb(0.93, 0.97, 0.95);
+  const altRow = rgb(0.96, 0.975, 0.97);
+  const gold = rgb(0.79, 0.64, 0.15);
   const right = PAGE_W - MX;
 
-  page.drawText('ESPAÇO PROGREDIR', { x: MX, y: PAGE_H - MY - 4, size: 11, font: bold, color: green });
-  page.drawText('Relatório de ponto', { x: MX, y: PAGE_H - MY - 16, size: 8, font: regular, color: muted });
-  page.drawText(`01/${String(monthNumber).padStart(2, '0')}/${year} – ${String(lastDay).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year}`, { x: right - 175, y: PAGE_H - MY - 4, size: 8, font: bold, color: dark });
-  page.drawText(`Emitido em ${emitted}`, { x: right - 175, y: PAGE_H - MY - 16, size: 7, font: regular, color: muted });
-  page.drawRectangle({ x: MX, y: PAGE_H - MY - 22, width: right - MX, height: 1.2, color: green });
+  // ——— Cabeçalho institucional ———
+  page.drawText('ESPAÇO PROGREDIR', { x: MX, y: PAGE_H - MY - 3, size: 11.5, font: bold, color: green });
+  page.drawText('Folha de Ponto · Documento oficial', { x: MX, y: PAGE_H - MY - 15, size: 7.5, font: regular, color: muted });
+  page.drawText(
+    `01/${String(monthNumber).padStart(2, '0')}/${year} – ${String(lastDay).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year}`,
+    { x: right - 168, y: PAGE_H - MY - 3, size: 8.5, font: bold, color: dark },
+  );
+  page.drawText(`Emitido em ${emitted}`, { x: right - 168, y: PAGE_H - MY - 15, size: 7, font: regular, color: muted });
 
+  // Linha dourada sob o cabeçalho
+  page.drawRectangle({ x: MX, y: PAGE_H - MY - 20, width: right - MX, height: 1.6, color: green });
+  page.drawRectangle({ x: MX, y: PAGE_H - MY - 22.2, width: right - MX, height: 0.9, color: gold });
+
+  // ——— Dados do colaborador ———
   const infoY = PAGE_H - MY - 36;
   const jornada =
     employee.scheduleStart && employee.scheduleEnd
       ? `${employee.scheduleStart.slice(0, 5)}–${employee.scheduleEnd.slice(0, 5)}`
       : '—';
 
-  page.drawText(employee.name, { x: MX, y: infoY, size: 10, font: bold, color: dark, maxWidth: 280 });
+  page.drawText(employee.name, { x: MX, y: infoY, size: 10.5, font: bold, color: dark, maxWidth: 300 });
   page.drawText(
     `Mat. ${employee.employeeNumber || '—'}  ·  CPF ${employee.cpf || '—'}  ·  ${employee.jobTitle || 'Colaborador'}`,
-    { x: MX, y: infoY - 12, size: 7, font: regular, color: muted, maxWidth: 420 },
+    { x: MX, y: infoY - 12, size: 7.2, font: regular, color: muted, maxWidth: 440 },
   );
   page.drawText(
-    `${employee.department || 'Administrativo'}  ·  Jornada ${jornada}  ·  CNPJ 05.553.848/0001-61`,
+    `${employee.unit || employee.department || 'Unidade'}  ·  Jornada ${jornada}  ·  CNPJ 05.553.848/0001-61`,
     { x: MX, y: infoY - 23, size: 7, font: regular, color: muted },
   );
 
+  // ——— Tabela ———
   const workDays = employee.workDays ? parseWorkDays(employee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
   const scheduleStart = minutesFromClock(employee.scheduleStart);
   const scheduleEnd = minutesFromClock(employee.scheduleEnd);
@@ -126,19 +138,25 @@ async function buildTimesheetDocument({
   const lunch = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
-  const cols = [MX, 72, 155, 400, 455, 510, 565, 620, right];
+  // Colunas mais equilibradas
+  const cols = [MX, 68, 148, 390, 448, 506, 564, 622, right];
   const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Just.', 'Saldo', 'Situação'];
-  const tableTop = infoY - 36;
-  const footerReserve = 78;
-  const headerH = 14;
+  const tableTop = infoY - 34;
+  const footerReserve = 72;
+  const headerH = 13.5;
   const available = tableTop - footerReserve - headerH;
-  const rowH = Math.min(14, available / lastDay);
-  const fs = rowH >= 13 ? 7 : rowH >= 11.5 ? 6.5 : 6;
+  const rowH = Math.min(13.8, available / lastDay);
+  const fs = rowH >= 12.5 ? 7 : rowH >= 11 ? 6.4 : 5.9;
 
+  // Cabeçalho da tabela
   page.drawRectangle({ x: MX, y: tableTop - headerH, width: right - MX, height: headerH, color: green });
   headers.forEach((h, i) => {
     page.drawText(h, {
-      x: cols[i] + 3, y: tableTop - 10, size: 6.5, font: bold, color: rgb(1, 1, 1),
+      x: cols[i] + 2.5,
+      y: tableTop - 9.5,
+      size: 6.3,
+      font: bold,
+      color: rgb(1, 1, 1),
       maxWidth: cols[i + 1] - cols[i] - 4,
     });
   });
@@ -206,13 +224,13 @@ async function buildTimesheetDocument({
     const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
     if (balance !== null) totalBalance += balance;
 
-    const y = tableTop - headerH - rowH * (index + 1) + 3.5;
+    const y = tableTop - headerH - rowH * (index + 1) + 3.2;
     if (index % 2 === 1) {
-      page.drawRectangle({ x: MX, y: y - 3, width: right - MX, height: rowH, color: altRow });
+      page.drawRectangle({ x: MX, y: y - 2.8, width: right - MX, height: rowH, color: altRow });
     }
 
     const marks = dayPunches.length
-      ? dayPunches.map((p) => `${formatTime(p.timestamp)}${shortType(p.type)}`).join(' ')
+      ? dayPunches.map((p) => `${formatTime(p.timestamp)}${shortType(p.type)}`).join('  ')
       : '';
     let justificativa = '';
     if (cert) justificativa = 'Atestado';
@@ -237,33 +255,50 @@ async function buildTimesheetDocument({
       justificativa || (!scheduled ? 'Folga' : dayPunches.length ? 'OK' : ''),
     ];
     values.forEach((value, i) => {
-      const maxLen = i === 2 ? 48 : i === 1 ? 14 : i === 7 ? 12 : 10;
+      const maxLen = i === 2 ? 52 : i === 1 ? 14 : i === 7 ? 11 : 10;
       page.drawText(String(value).slice(0, maxLen), {
-        x: cols[i] + 3, y, size: i === 2 ? Math.max(5.5, fs - 0.5) : fs, font: regular, color: dark,
-        maxWidth: cols[i + 1] - cols[i] - 5,
+        x: cols[i] + 2.5,
+        y,
+        size: i === 2 ? Math.max(5.4, fs - 0.5) : fs,
+        font: regular,
+        color: dark,
+        maxWidth: cols[i + 1] - cols[i] - 4,
       });
     });
   }
 
   const tableBottom = tableTop - headerH - lastDay * rowH;
-  page.drawLine({ start: { x: MX, y: tableBottom }, end: { x: right, y: tableBottom }, thickness: 0.5, color: soft });
+  page.drawLine({ start: { x: MX, y: tableBottom }, end: { x: right, y: tableBottom }, thickness: 0.6, color: soft });
   page.drawLine({ start: { x: MX, y: tableTop }, end: { x: MX, y: tableBottom }, thickness: 0.4, color: soft });
   page.drawLine({ start: { x: right, y: tableTop }, end: { x: right, y: tableBottom }, thickness: 0.4, color: soft });
 
-  const sumY = tableBottom - 16;
-  page.drawText(`Trabalhado ${formatMinutes(totalWorked)}`, { x: MX, y: sumY, size: 7.5, font: regular, color: dark });
-  page.drawText(`Previsto ${formatMinutes(totalExpected)}`, { x: MX + 120, y: sumY, size: 7.5, font: regular, color: dark });
-  page.drawText(`Justificado ${formatMinutes(totalJustified)}`, { x: MX + 230, y: sumY, size: 7.5, font: regular, color: dark });
-  page.drawText(`Saldo ${formatSignedMinutes(totalBalance)}`, { x: MX + 360, y: sumY, size: 8, font: bold, color: green });
-  page.drawText(`Faltas ${absences}  ·  Atrasos ${lateCount}`, { x: MX + 470, y: sumY, size: 7.5, font: regular, color: muted });
+  // ——— Barra de totais ———
+  const sumY = tableBottom - 14;
+  page.drawRectangle({ x: MX, y: sumY - 4, width: right - MX, height: 16, color: greenSoft });
+  page.drawText(`Trabalhado  ${formatMinutes(totalWorked)}`, { x: MX + 4, y: sumY, size: 7.3, font: regular, color: dark });
+  page.drawText(`Previsto  ${formatMinutes(totalExpected)}`, { x: MX + 118, y: sumY, size: 7.3, font: regular, color: dark });
+  page.drawText(`Justificado  ${formatMinutes(totalJustified)}`, { x: MX + 228, y: sumY, size: 7.3, font: regular, color: dark });
+  page.drawText(`Saldo  ${formatSignedMinutes(totalBalance)}`, { x: MX + 350, y: sumY, size: 7.8, font: bold, color: green });
+  page.drawText(`Faltas ${absences}  ·  Atrasos ${lateCount}`, { x: MX + 460, y: sumY, size: 7.2, font: regular, color: muted });
 
-  page.drawLine({ start: { x: right - 200, y: 36 }, end: { x: right - 20, y: 36 }, thickness: 0.5, color: soft });
-  page.drawText('Assinatura do colaborador', { x: right - 175, y: 26, size: 6.5, font: regular, color: muted });
-  page.drawText(employee.name, { x: right - 200, y: 16, size: 6, font: regular, color: muted, maxWidth: 175 });
+  // ——— Assinaturas ———
+  // Instituição (esquerda)
+  page.drawRectangle({
+    x: MX,
+    y: 10,
+    width: 230,
+    height: 28,
+    borderColor: green,
+    borderWidth: 0.9,
+    color: greenSoft,
+  });
+  page.drawText('Assinado digitalmente', { x: MX + 8, y: 26, size: 7.2, font: bold, color: green });
+  page.drawText('Espaço Progredir · Certificado A1', { x: MX + 8, y: 15, size: 6.2, font: regular, color: muted });
 
-  page.drawRectangle({ x: MX, y: 12, width: 220, height: 26, borderColor: green, borderWidth: 0.8 });
-  page.drawText('Assinado digitalmente', { x: MX + 8, y: 26, size: 7, font: bold, color: green });
-  page.drawText('Espaço Progredir · Certificado A1', { x: MX + 8, y: 16, size: 6, font: regular, color: muted });
+  // Colaborador (direita)
+  page.drawLine({ start: { x: right - 210, y: 32 }, end: { x: right - 12, y: 32 }, thickness: 0.55, color: soft });
+  page.drawText('Assinatura do colaborador', { x: right - 185, y: 22, size: 6.5, font: regular, color: muted });
+  page.drawText(employee.name, { x: right - 210, y: 12, size: 6.2, font: regular, color: muted, maxWidth: 195 });
 
   return { pdfDoc, page };
 }
@@ -284,7 +319,7 @@ export async function createSignedTimesheetPdf({
     pdfDoc, pdfPage: page,
     reason: 'Assinatura institucional da Folha de Ponto',
     contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ',
-    signatureLength: 20000, widgetRect: [MX, 10, MX + 220, 40],
+    signatureLength: 20000, widgetRect: [MX, 10, MX + 230, 38],
   });
   const pdfWithPlaceholder = Buffer.from(await pdfDoc.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
@@ -329,7 +364,7 @@ export async function createSignedTimesheetPdfBatch({
     pdfDoc: merged, pdfPage: lastPage,
     reason: 'Assinatura institucional da Folha de Ponto (lote)',
     contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ',
-    signatureLength: 20000, widgetRect: [MX, 10, MX + 220, 40],
+    signatureLength: 20000, widgetRect: [MX, 10, MX + 230, 38],
   });
   const pdfWithPlaceholder = Buffer.from(await merged.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
