@@ -102,7 +102,7 @@ async function buildTimesheetDocument({
 
   // ——— Cabeçalho institucional ———
   page.drawText('ESPAÇO PROGREDIR', { x: MX, y: PAGE_H - MY - 3, size: 11.5, font: bold, color: green });
-  page.drawText('Folha de Ponto · Documento oficial', { x: MX, y: PAGE_H - MY - 15, size: 7.5, font: regular, color: muted });
+  page.drawText('CNPJ 05.553.848/0001-61 · Unidade Espaço Progredir', { x: MX, y: PAGE_H - MY - 15, size: 7, font: regular, color: muted });
   page.drawText(
     `01/${String(monthNumber).padStart(2, '0')}/${year} – ${String(lastDay).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year}`,
     { x: right - 168, y: PAGE_H - MY - 3, size: 8.5, font: bold, color: dark },
@@ -110,11 +110,11 @@ async function buildTimesheetDocument({
   page.drawText(`Emitido em ${emitted}`, { x: right - 168, y: PAGE_H - MY - 15, size: 7, font: regular, color: muted });
 
   // Linha dourada sob o cabeçalho
-  page.drawRectangle({ x: MX, y: PAGE_H - MY - 20, width: right - MX, height: 1.6, color: green });
-  page.drawRectangle({ x: MX, y: PAGE_H - MY - 22.2, width: right - MX, height: 0.9, color: gold });
+  page.drawRectangle({ x: MX, y: PAGE_H - MY - 25, width: right - MX, height: 1.6, color: green });
+  page.drawRectangle({ x: MX, y: PAGE_H - MY - 27.2, width: right - MX, height: 0.9, color: gold });
 
   // ——— Dados do colaborador ———
-  const infoY = PAGE_H - MY - 36;
+  const infoY = PAGE_H - MY - 41;
   const jornada =
     employee.scheduleStart && employee.scheduleEnd
       ? `${employee.scheduleStart.slice(0, 5)}–${employee.scheduleEnd.slice(0, 5)}`
@@ -139,10 +139,10 @@ async function buildTimesheetDocument({
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
   // Colunas mais equilibradas
-  const cols = [MX, 68, 148, 390, 448, 506, 564, 622, right];
-  const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Just.', 'Saldo', 'Situação'];
+  const cols = [MX, 68, 148, 390, 448, 506, 564, 622, 680, 740, right];
+  const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Just.', 'Falt.', 'Exc.', 'Saldo', 'Situação'];
   const tableTop = infoY - 34;
-  const footerReserve = 72;
+  const footerReserve = 78;
   const headerH = 13.5;
   const available = tableTop - footerReserve - headerH;
   const rowH = Math.min(13.8, available / lastDay);
@@ -165,6 +165,8 @@ async function buildTimesheetDocument({
   let totalExpected = 0;
   let totalBalance = 0;
   let totalJustified = 0;
+  let totalMissing = 0;
+  let totalSurplus = 0;
   let absences = 0;
   let lateCount = 0;
 
@@ -223,6 +225,8 @@ async function buildTimesheetDocument({
 
     const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
     if (balance !== null) totalBalance += balance;
+    if (balance !== null && balance < 0) totalMissing += Math.abs(balance);
+    if (balance !== null && balance > 0) totalSurplus += balance;
 
     const y = tableTop - headerH - rowH * (index + 1) + 3.2;
     if (index % 2 === 1) {
@@ -251,11 +255,13 @@ async function buildTimesheetDocument({
       formatMinutes(creditedWorked),
       formatMinutes(expected),
       justified > 0 ? formatMinutes(justified) : '—',
+      formatMinutes(balance !== null ? Math.max(0, -balance) : null),
+      formatMinutes(balance !== null ? Math.max(0, balance) : null),
       formatSignedMinutes(balance),
       justificativa || (!scheduled ? 'Folga' : dayPunches.length ? 'OK' : ''),
     ];
     values.forEach((value, i) => {
-      const maxLen = i === 2 ? 52 : i === 1 ? 14 : i === 7 ? 11 : 10;
+      const maxLen = i === 2 ? 52 : i === 1 ? 14 : i === 9 ? 11 : 10;
       page.drawText(String(value).slice(0, maxLen), {
         x: cols[i] + 2.5,
         y,
@@ -272,14 +278,18 @@ async function buildTimesheetDocument({
   page.drawLine({ start: { x: MX, y: tableTop }, end: { x: MX, y: tableBottom }, thickness: 0.4, color: soft });
   page.drawLine({ start: { x: right, y: tableTop }, end: { x: right, y: tableBottom }, thickness: 0.4, color: soft });
 
-  // ——— Barra de totais ———
+  // ——— Totalização alinhada às colunas ———
   const sumY = tableBottom - 14;
   page.drawRectangle({ x: MX, y: sumY - 4, width: right - MX, height: 16, color: greenSoft });
-  page.drawText(`Trabalhado  ${formatMinutes(totalWorked)}`, { x: MX + 4, y: sumY, size: 7.3, font: regular, color: dark });
-  page.drawText(`Previsto  ${formatMinutes(totalExpected)}`, { x: MX + 118, y: sumY, size: 7.3, font: regular, color: dark });
-  page.drawText(`Justificado  ${formatMinutes(totalJustified)}`, { x: MX + 228, y: sumY, size: 7.3, font: regular, color: dark });
-  page.drawText(`Saldo  ${formatSignedMinutes(totalBalance)}`, { x: MX + 350, y: sumY, size: 7.8, font: bold, color: green });
-  page.drawText(`Faltas ${absences}  ·  Atrasos ${lateCount}`, { x: MX + 460, y: sumY, size: 7.2, font: regular, color: muted });
+  page.drawText('TOTAL DO MÊS', { x: MX + 4, y: sumY, size: 6.5, font: bold, color: green });
+  page.drawText(formatMinutes(totalWorked), { x: cols[3] + 3, y: sumY, size: 7.1, font: bold, color: dark });
+  page.drawText(formatMinutes(totalExpected), { x: cols[4] + 3, y: sumY, size: 7.1, font: bold, color: dark });
+  page.drawText(formatMinutes(totalJustified), { x: cols[5] + 3, y: sumY, size: 7.1, font: bold, color: dark });
+  page.drawText(formatMinutes(totalMissing), { x: cols[6] + 3, y: sumY, size: 7.1, font: bold, color: dark });
+  page.drawText(formatMinutes(totalSurplus), { x: cols[7] + 3, y: sumY, size: 7.1, font: bold, color: dark });
+  page.drawText(formatSignedMinutes(totalBalance), { x: cols[8] + 3, y: sumY, size: 7.1, font: bold, color: green });
+  page.drawText('FECHADO', { x: cols[9] + 3, y: sumY, size: 6.5, font: bold, color: green });
+  page.drawText(`Saldo = trabalhado + justificado − previsto  ·  Faltas ${absences}  ·  Atrasos ${lateCount}`, { x: MX, y: sumY - 10, size: 5.7, font: regular, color: muted });
 
   // ——— Assinaturas ———
   // Instituição (esquerda)

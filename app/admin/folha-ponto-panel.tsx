@@ -126,12 +126,12 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     );
     const dayPunches = rawDayPunches.filter((p) => allowedIds.has(p.id));
     const weekday = new Date(`${date}T12:00:00-03:00`).getDay();
-    const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday);
+    const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
     const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, weekdayCodes[weekday]);
     const worked = calculateWorked(dayPunches);
     const firstPunch = dayPunches[0];
     const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
-    const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 5);
+    const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 15);
     const dayStart = daySchedule ? minutesFromClock(daySchedule.start) : scheduleStart;
     const dayEnd = daySchedule ? minutesFromClock(daySchedule.end) : scheduleEnd;
     const span = dayStart !== null && dayEnd !== null ? Math.max(0, dayEnd - dayStart) : null;
@@ -405,35 +405,69 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       {visibleEmployees.map((employee) => {
         const rows = dayRowsByEmployee.get(employee.id) || [];
         const isFolga = (row: DayRow) => row.schedule.startsWith('Folga');
+        const totals = rows.reduce((acc, row) => ({
+          worked: acc.worked + (row.worked ?? 0),
+          expected: acc.expected + (row.expected ?? 0),
+          justified: acc.justified + (row.justified ?? 0),
+          missing: acc.missing + (row.missing ?? 0),
+          surplus: acc.surplus + (row.surplus ?? 0),
+          balance: acc.balance + (row.balance ?? 0),
+          absences: acc.absences + (row.absent ? 1 : 0),
+        }), { worked: 0, expected: 0, justified: 0, missing: 0, surplus: 0, balance: 0, absences: 0 });
         return (
           <div key={employee.id} className="folha-block timesheet-employee-block">
             <div className="section-heading folha-emp-heading">
               <div className="folha-print-header">
-                <div className="folha-print-org">Espaço Progredir · Folha de Ponto</div>
-                <h3>{employee.employeeNumber ? `${employee.employeeNumber} · ` : ''}{employee.name}</h3>
-                <div className="folha-print-meta">
-                  <span>Cargo: <b>{employee.jobTitle || '—'}</b></span>
-                  <span>CPF: <b>{employee.cpf || '—'}</b></span>
-                  <span>Competência: <b>{monthLabel(month)}</b></span>
+                <div className="folha-print-head-main">
+                  <div className="folha-print-org">ESPAÇO PROGREDIR</div>
+                  <span>CNPJ 05.553.848/0001-61 · Unidade Espaço Progredir</span>
+                </div>
+                <div className="folha-print-head-title">
+                  <h3>FOLHA DE PONTO</h3>
+                  <span>DOCUMENTO OFICIAL · A4 HORIZONTAL</span>
+                </div>
+                <div className="folha-print-head-period">
+                  <strong>COMPETÊNCIA {month.replace('-', '/')}</strong>
+                  <span>Emitido em {new Date().toLocaleDateString('pt-BR')}</span>
+                </div>
+                <div className="folha-print-employee">
+                  <b>{employee.employeeNumber ? `${employee.employeeNumber} · ` : ''}{employee.name}</b>
+                  <div className="folha-print-meta">
+                    <span>Cargo: <b>{employee.jobTitle || '—'}</b></span>
+                    <span>CPF: <b>{employee.cpf || '—'}</b></span>
+                    <span>Competência: <b>{monthLabel(month)}</b></span>
+                  </div>
                 </div>
               </div>
               <p className="small-muted no-print">{employee.jobTitle || 'Sem cargo'} · {employee.cpf || 'Sem CPF'}</p>
             </div>
 
             <div className="folha-table-scroll">
-              <table className="folha-table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
+                <table className="folha-table">
+                <colgroup>
+                  <col className="folha-colgroup-date" />
+                  <col className="folha-colgroup-scale" />
+                  <col className="folha-colgroup-marks" />
+                  <col className="folha-colgroup-hour" />
+                  <col className="folha-colgroup-hour" />
+                  <col className="folha-colgroup-hour" />
+                  <col className="folha-colgroup-hour" />
+                  <col className="folha-colgroup-hour" />
+                  <col className="folha-colgroup-hour" />
+                  <col className="folha-colgroup-status" />
+                </colgroup>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
                     <th>Escala</th>
                     <th>Marcações</th>
-                    <th>Trabalhado</th>
-                    <th>Esperado</th>
-                    <th>Justificado</th>
-                    <th>Falta</th>
-                    <th>Extra</th>
-                    <th>Saldo</th>
-                    <th>Situação</th>
+                    <th>Trab.</th>
+                    <th>Prev.</th>
+                    <th>Just.</th>
+                      <th>Falt.</th>
+                      <th>Exc.</th>
+                      <th>Saldo</th>
+                      <th>Situação</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -485,13 +519,27 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <th colSpan={3}>TOTAL DO MÊS</th>
+                    <td>{formatMinutes(totals.worked)}</td>
+                    <td>{formatMinutes(totals.expected)}</td>
+                    <td>{formatMinutes(totals.justified)}</td>
+                    <td>{formatMinutes(totals.missing)}</td>
+                    <td>{formatMinutes(totals.surplus)}</td>
+                    <td className={totals.balance < 0 ? 'folha-neg' : totals.balance > 0 ? 'folha-pos' : ''}>{formatMinutes(totals.balance)}</td>
+                    <td>FECHADO</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
+
+            <p className="folha-memory"><b>Memória de cálculo:</b> saldo = trabalhado + justificado − previsto · faltas = dias úteis sem registro · excedente = horas acima do previsto · valores em HH:MM.</p>
 
             <div className="signature-area">
               <div className="signature-block">
                 {signatureData ? (
-                  <div className="signature-certificate-block">
+                  <div className="signature-certificate-block institution-signature" aria-label="Assinatura digital do Espaço Progredir">
                     <strong>Assinado digitalmente</strong>
                     <span>Certificado A1 · Espaço Progredir</span>
                   </div>

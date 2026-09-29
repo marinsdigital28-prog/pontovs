@@ -219,6 +219,35 @@
 .folha-table tbody tr:nth-child(even) td { background: var(--folha-alt); }
 .folha-table tbody tr:hover td { background: #e1efe7; }
 
+.folha-colgroup-date { width: 7%; }
+.folha-colgroup-scale { width: 10%; }
+.folha-colgroup-marks { width: 28%; }
+.folha-colgroup-hour { width: 7.5%; }
+.folha-colgroup-status { width: 10%; }
+
+.folha-table tfoot th,
+.folha-table tfoot td {
+  padding: 8px 10px;
+  background: #e2f0e8;
+  border-top: 2px solid var(--folha-green);
+  color: #0b5c42;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.folha-table tfoot th { text-align: left; letter-spacing: 0.02em; }
+
+.folha-memory {
+  margin: 0.45rem 0 0;
+  color: #6a7c72;
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.folha-memory b { color: var(--folha-green); }
+
 .folha-col-date {
   white-space: nowrap;
   min-width: 58px;
@@ -425,14 +454,17 @@
   .timesheet-employee-block {
     display: block !important;
     margin: 0 !important;
-    padding: 2mm 2.5mm 1.5mm !important;
+    box-sizing: border-box !important;
+    height: 197mm !important;
+    max-height: 197mm !important;
+    padding: 2.2mm 2.5mm 1.5mm !important;
     border: 1.2pt solid #0b5c42 !important;
     border-radius: 0 !important;
     background: #fff !important;
     box-shadow: none !important;
     color: #111 !important;
-    page-break-after: always;
-    break-after: page;
+    page-break-after: always !important;
+    break-after: page !important;
     page-break-inside: avoid;
     break-inside: avoid;
     overflow: visible !important;
@@ -441,8 +473,8 @@
 
   .folha-block:last-of-type,
   .timesheet-employee-block:last-of-type {
-    page-break-after: auto;
-    break-after: auto;
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   .folha-emp-heading,
@@ -453,7 +485,54 @@
     border-bottom: 1.2pt solid #0b5c42 !important;
   }
 
-  .folha-print-header { display: block !important; }
+  .folha-print-header {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 4mm;
+    align-items: start;
+    padding-bottom: 1.2mm !important;
+  }
+
+  .folha-print-head-main { grid-column: 1; text-align: left; }
+  .folha-print-head-title { grid-column: 2; text-align: center; }
+  .folha-print-head-period { grid-column: 3; text-align: right; }
+
+  .folha-print-head-main > span,
+  .folha-print-head-title > span,
+  .folha-print-head-period > span {
+    display: block;
+    color: #555 !important;
+    font-size: 6.2pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .folha-print-head-title h3 {
+    margin: 0 !important;
+    font-size: 10.5pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .folha-print-head-period strong {
+    display: block;
+    color: #111 !important;
+    font-size: 8pt !important;
+    line-height: 1.05 !important;
+  }
+
+  .folha-print-employee {
+    grid-column: 1 / -1;
+    margin-top: 1.2mm;
+    padding-top: 1.2mm;
+    border-top: 0.7pt solid #0b5c42;
+  }
+
+  .folha-print-employee > b {
+    display: block;
+    color: #111 !important;
+    font-size: 9.5pt !important;
+    line-height: 1.1 !important;
+  }
 
   .folha-print-org {
     display: block !important;
@@ -462,13 +541,13 @@
     letter-spacing: 0.05em !important;
     text-transform: uppercase !important;
     color: #0b5c42 !important;
-    margin-bottom: 0.6mm !important;
+    margin-bottom: 0.35mm !important;
   }
 
   .folha-print-header h3,
   .folha-block > .section-heading h3 {
     color: #111 !important;
-    font-size: 12.5pt !important;
+    font-size: 10.5pt !important;
     font-weight: 800 !important;
     margin: 0 0 0.8mm !important;
     line-height: 1.15 !important;
@@ -481,7 +560,7 @@
     gap: 0.8mm 4.5mm !important;
     margin: 0 !important;
     color: #222 !important;
-    font-size: 9pt !important;
+    font-size: 6.6pt !important;
     font-weight: 500 !important;
     line-height: 1.25 !important;
   }
@@ -506,8 +585,8 @@
     width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 9.5pt !important;
-    line-height: 1.2 !important;
+    font-size: 6.5pt !important;
+    line-height: 1.05 !important;
   }
 
   .folha-table thead { display: table-header-group !important; }
@@ -516,18 +595,19 @@
     position: static !important;
     background: #0b5c42 !important;
     color: #fff !important;
-    font-size: 8pt !important;
+    font-size: 6.3pt !important;
     font-weight: 800 !important;
-    padding: 1.2mm 1.1mm !important;
+    padding: 0.65mm 0.65mm !important;
     border: 0.25pt solid #094a36 !important;
     border-bottom: 1.1pt solid #c9a227 !important;
     white-space: nowrap !important;
   }
 
   .folha-table tbody td {
-    padding: 1.1mm 1.1mm !important;
-    font-size: 9.5pt !important;
-    line-height: 1.18 !important;
+    height: 4.15mm !important;
+    padding: 0.35mm 0.65mm !important;
+    font-size: 6.4pt !important;
+    line-height: 1 !important;
     border: 0.3pt solid #b0c0b6 !important;
     color: #111 !important;
     background: #fff !important;
@@ -543,7 +623,7 @@
   .folha-col-date b,
   .folha-col-date span {
     display: inline !important;
-    font-size: 9.5pt !important;
+    font-size: 6.4pt !important;
     color: #111 !important;
     font-weight: 700 !important;
   }
@@ -554,7 +634,7 @@
   }
 
   .folha-col-scale {
-    font-size: 8.5pt !important;
+    font-size: 6.1pt !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -567,13 +647,13 @@
     background: transparent !important;
     border: none !important;
     color: #111 !important;
-    font-size: 9pt !important;
+    font-size: 6.1pt !important;
     font-weight: 700 !important;
   }
 
   .folha-sit {
-    padding: 0.3mm 1.4mm !important;
-    font-size: 8pt !important;
+    padding: 0.2mm 0.7mm !important;
+    font-size: 5.8pt !important;
     border: 0.55pt solid #444 !important;
     background: #fff !important;
     color: #111 !important;
@@ -582,9 +662,24 @@
     font-weight: 800 !important;
   }
 
+  .folha-table tfoot th,
+  .folha-table tfoot td {
+    padding: 0.75mm 0.65mm !important;
+    font-size: 6.2pt !important;
+    line-height: 1 !important;
+    border-top: 0.8pt solid #0b5c42 !important;
+  }
+
+  .folha-memory {
+    margin: 0.9mm 0 0 !important;
+    font-size: 5.8pt !important;
+    line-height: 1.05 !important;
+    white-space: nowrap !important;
+  }
+
   .signature-area {
     display: flex !important;
-    margin-top: 2mm !important;
+    margin-top: 1.5mm !important;
     padding-top: 1.2mm !important;
     border-top: 0.8pt solid #333 !important;
     gap: 7mm !important;
@@ -602,7 +697,7 @@
   .signature-certificate-block {
     display: block !important;
     padding: 1mm 1.8mm !important;
-    font-size: 8pt !important;
+    font-size: 6.5pt !important;
     line-height: 1.2 !important;
     background: #eef8f1 !important;
     color: #0b5c42 !important;
@@ -614,7 +709,7 @@
 
   .signature-certificate-block strong {
     color: #0b5c42 !important;
-    font-size: 8.5pt !important;
+    font-size: 7pt !important;
   }
 
   .signature-spacer {
@@ -627,7 +722,7 @@
   .signature-line,
   .signature-caption {
     color: #111 !important;
-    font-size: 8.5pt !important;
+    font-size: 6.5pt !important;
     margin: 0 !important;
     padding-top: 0.4mm !important;
   }

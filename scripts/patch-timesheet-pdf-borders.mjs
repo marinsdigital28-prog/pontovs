@@ -27,7 +27,8 @@ function get(url) {
 // Após o commit do layout melhorado, este script mantém o arquivo se já tiver o marcador;
 // senão baixa a versão commitada da main.
 let t = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
-if (!(t.includes('Banco de Horas') && t.includes('Concordo com as marcações'))) {
+const hasApprovedTenColumnLayout = t.includes("'Falt.', 'Exc.', 'Saldo', 'Situação'") && t.includes('totalMissing');
+if (!hasApprovedTenColumnLayout && !(t.includes('Banco de Horas') && t.includes('Concordo com as marcações'))) {
   t = await get('https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/main/lib/signed-timesheet-pdf.ts');
   fs.writeFileSync(outPath, t);
 }
