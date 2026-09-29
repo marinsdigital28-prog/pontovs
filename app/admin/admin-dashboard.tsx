@@ -18,7 +18,9 @@ import './overview-layout.css';
 import OverviewCalendar from './overview-calendar';
 import OverviewInbox from './overview-inbox';
 import OverviewExitWatch from './overview-exit-watch';
+import ShiftsPanel from './shifts-panel';
 import AbsenceCalendarLive from './absence-calendar-live';
+import InconsistenciesPanel from './inconsistencies-panel';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -31,7 +33,6 @@ type Employee = {
   workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null;
   profile?: EmployeeProfile | null; active: boolean; _count?: { punches: number };
 };
-type Issue = { id: string; type: string; status: string; description: string | null; detectedAt: string; user: { name: string; employeeNumber: string | null }; punch: { id: string; type: string; timestamp: string } | null };
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
 type PresenceEmployee = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; status: 'PRESENTE' | 'NAO_MARCOU' | 'PENDENTE' | 'SAIU' | 'FOLGA'; scheduled: boolean; latestPunch: { id: string; type: string; timestamp: string; status: string; hasPhoto: boolean } | null };
 
@@ -42,7 +43,6 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<Employee | null>(null);
-  const [issues, setIssues] = useState<Issue[]>([]);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [scheduleApplying, setScheduleApplying] = useState(false);
@@ -53,10 +53,8 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
 
   const loadEmployees = useCallback(async () => { const response = await fetch('/api/admin/employees', { cache: 'no-store' }); if (response.ok) setEmployees((await response.json()).employees || []); }, []);
   const autoApplySchedulePatterns = useCallback(async () => { const response = await fetch('/api/admin/apply-schedule-patterns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'automatic' }) }); if (response.ok) { const data = await response.json().catch(() => ({})); if (data.updated) await loadEmployees(); } }, [loadEmployees]);
-  const loadIssues = useCallback(async () => { const response = await fetch('/api/admin/inconsistencies', { cache: 'no-store' }); if (response.ok) setIssues((await response.json()).inconsistencies || []); }, []);
   const loadAudit = useCallback(async () => { const response = await fetch('/api/admin/audit', { cache: 'no-store' }); if (response.ok) setAudit(await response.json()); }, []);
   const loadPresence = useCallback(async () => { const response = await fetch('/api/admin/presence', { cache: 'no-store' }); if (response.ok) { const data = await response.json(); setPresence(Array.isArray(data.employees) ? data.employees : []); setPresenceUpdatedAt(new Date()); } }, []);
-  useEffect(() => { void loadIssues(); }, [loadIssues]);
   useEffect(() => { void loadEmployees(); }, [loadEmployees]);
   useEffect(() => { void autoApplySchedulePatterns(); }, [autoApplySchedulePatterns]);
   useEffect(() => { if (tab === 'security') void loadAudit(); }, [tab, loadAudit]);
@@ -75,7 +73,6 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     setSaving(false);
   };
   const applySchedulePatterns = async () => { setScheduleApplying(true); setMessage(''); const response = await fetch('/api/admin/apply-schedule-patterns', { method: 'POST' }); const data = await response.json().catch(() => ({})); if (!response.ok) setMessage(data.error || 'Não foi possível aplicar os padrões.'); else { setMessage(`${data.updated || 0} jornadas atualizadas.`); await loadEmployees(); } setScheduleApplying(false); };
-  const resolveIssue = async (id: string) => { const response = await fetch('/api/admin/inconsistencies', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'RESOLVED' }) }); if (response.ok) { setMessage('Inconsistência resolvida.'); await loadIssues(); } };
 
   const statusLabel = (status: PresenceEmployee['status']) => {
     if (status === 'PRESENTE') return 'Presente';
@@ -159,35 +156,21 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     {tab === 'integrity' ? <IntegrityCenter /> : null}
     {tab === 'settings' ? <section className="admin-two-col"><CsvImporter /><PdfImporter /><SignatureSettings /></section> : null}
     {tab === 'employees' ? <EmployeesPanel employees={employees} onChanged={() => void loadEmployees()} /> : null}
-    {tab === 'shifts' ? <section className="admin-two-col">
-      <div className="card">
-        <div className="section-heading"><div><h2>{editing ? 'Editar jornada' : 'Nova jornada / colaborador'}</h2><p className="small-muted">Matrícula e horários de expediente. Dados cadastrais ficam em Colaboradores.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div>
+    {tab === 'shifts' ? <section className="admin-shifts-layout">
+      <ShiftsPanel
+        employees={employees}
+        scheduleApplying={scheduleApplying}
+        onApplyPatterns={() => void applySchedulePatterns()}
+        onEdit={(employee) => startEdit(employee)}
+      />
+      <div className="card shifts-form-card">
+        <div className="section-heading"><div><h2>{editing ? 'Editar jornada' : 'Nova jornada / colaborador'}</h2><p className="small-muted">Matrícula e horários de expediente.</p></div>{editing ? <button className="ghost-btn" onClick={resetForm}>Cancelar</button> : null}</div>
         <form onSubmit={saveEmployee} className="admin-form">
           {[['name', 'Nome completo'], ['employeeNumber', 'Matrícula'], ['cpf', 'CPF'], ['jobTitle', 'Cargo'], ['workDays', 'Dias trabalhados'], ['scheduleStart', 'Início da jornada'], ['scheduleEnd', 'Fim da jornada']].map(([key, label]) => (
             <label key={key} className="small-muted">{label}<input className="input" required={key === 'name' || key === 'employeeNumber'} value={form[key as keyof typeof form]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} /></label>
           ))}
           <button className="primary-btn" disabled={saving}>{saving ? 'Salvando...' : editing ? 'Salvar jornada' : 'Cadastrar'}</button>
         </form>
-      </div>
-      <div className="card">
-        <div className="section-heading"><div><h2>Turnos e jornada</h2><p className="small-muted">Expediente em uso no ponto.</p></div>
-          <div className="row-actions">
-            <button className="ghost-btn" onClick={() => void applySchedulePatterns()} disabled={scheduleApplying}>{scheduleApplying ? 'Aplicando...' : 'Aplicar padrões de agosto'}</button>
-            <button className="ghost-btn" onClick={() => setTab('employees')}>Ver fichas</button>
-          </div>
-        </div>
-        <div className="shift-table">
-          <div className="shift-header"><span>Colaborador</span><span>Dias</span><span>Jornada</span><span>Status</span><span>Ação</span></div>
-          {employees.map((employee) => (
-            <div className="shift-row" key={employee.id}>
-              <span><b>{employee.name}</b><small>{employee.employeeNumber || '—'}</small></span>
-              <span>{employee.workDays || 'Não definido'}</span>
-              <span>{employee.scheduleStart || '—'} às {employee.scheduleEnd || '—'}</span>
-              <span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span>
-              <button className="ghost-btn" onClick={() => startEdit(employee)}>Editar jornada</button>
-            </div>
-          ))}
-        </div>
       </div>
     </section> : null}
     {tab === 'punches' ? <PunchesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /> : null}
@@ -197,10 +180,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     {tab === 'notifications' ? <NotificationsPanel /> : null}
     {tab === 'certificates' ? <CertificatesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber, cpf }) => ({ id, name, employeeNumber, cpf }))} /> : null}
     {tab === 'issues' ? <section>
-      <section className="card">
-        <div className="section-heading"><div><h2>Inconsistências</h2><p className="small-muted">Pendências do gestor.</p></div><button className="ghost-btn" onClick={() => void loadIssues()}>Atualizar</button></div>
-        {!issues.length ? <p className="small-muted">Nenhuma inconsistência aberta.</p> : <div className="employee-list">{issues.map((issue) => <div className="employee-row" key={issue.id}><div><strong>{issue.user.name} · {issue.type}</strong><div className="small-muted">{issue.description || 'Sem descrição'} · {new Date(issue.detectedAt).toLocaleString('pt-BR')}</div></div><button className="primary-btn compact-btn" onClick={() => void resolveIssue(issue.id)}>Resolver</button></div>)}</div>}
-      </section>
+      <InconsistenciesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} onOpenPunches={() => setTab('punches')} />
       <CertificateConflictsPanel />
     </section> : null}
   </>;
