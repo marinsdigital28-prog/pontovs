@@ -52,9 +52,27 @@ export type SmartPunchSuggestion = {
 };
 
 /**
+ * Mantém só a 1ª ocorrência de cada tipo na ordem cronológica.
+ * Não existe motivo operacional para 2 entradas ou 2 intervalos no mesmo dia.
+ */
+export function dedupePunchesByType<T extends { type: string; timestamp: Date | string }>(punches: T[]): T[] {
+  const seen = new Set<string>();
+  const ordered = [...punches].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+  );
+  const result: T[] = [];
+  for (const punch of ordered) {
+    const key = String(punch.type || '').toUpperCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(punch);
+  }
+  return result;
+}
+
+/**
  * Decide o próximo tipo de ponto com base na sequência do dia e no horário atual.
- * A sequência continua sendo a base; o horário só “desvia” quando o contexto operacional é claro
- * (ex.: fim de expediente com intervalo sem retorno → sugere SAÍDA).
+ * Regra dura: cada tipo (ENTRADA, INTERVALO, RETORNO, SAIDA) só pode existir uma vez por dia.
  */
 export function resolveSmartPunchSuggestion(input: {
   punchesToday: TodayPunch[];
@@ -71,22 +89,33 @@ export function resolveSmartPunchSuggestion(input: {
   const afternoon = minutes >= 15 * 60; // 15:00
   const lunchWindow = minutes >= 11 * 60 + 30 && minutes < 14 * 60 + 30;
 
-  const sorted = [...input.punchesToday].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
-  const typesDone = sorted.map((punch) => punch.type);
-  const last = typesDone.length ? typesDone[typesDone.length - 1] : null;
-  const lastIndex = last ? order.indexOf(last as PunchType) : -1;
+  const unique = dedupePunchesByType(input.punchesToday);
+  const typesDone = unique.map((punch) => String(punch.type).toUpperCase());
+  const doneSet = new Set(typesDone);
 
-  let sequentialType: PunchType | null =
-    lastIndex >= 0 && lastIndex < order.length - 1
-      ? order[lastIndex + 1]
-      : lastIndex === order.length - 1
-        ? null
-        : order[0];
+  // Próximo na sequência = primeiro tipo da jornada que ainda não foi batido
+  let sequentialType: PunchType | null = null;
+  for (const type of order) {
+    if (!doneSet.has(type)) {
+      sequentialType = type;
+      break;
+    }
+  }
 
-  // Já fechou a jornada na sequência linear
-  if (sequentialType === null && lastIndex === order.length - 1) {
+  // Já fechou a jornada (todos os tipos esperados existem)
+  if (sequentialType === null) {
+    return {
+      sequentialType: null,
+      suggestedType: null,
+      allowedTypes: [],
+      reason: 'Jornada de hoje já foi encerrada.',
+      journeyClosed: true,
+      requiresConfirmationOutsideSuggestion: true,
+    };
+  }
+
+  // SAIDA já registrada encerra tudo
+  if (doneSet.has('SAIDA')) {
     return {
       sequentialType: null,
       suggestedType: null,
@@ -98,17 +127,17 @@ export function resolveSmartPunchSuggestion(input: {
   }
 
   let suggestedType: PunchType | null = sequentialType;
-  let reason = sequentialType
-    ? `Próximo na sequência: ${punchTypeLabel(sequentialType)}.`
-    : 'Nenhuma marcação pendente.';
+  let reason = `Próximo na sequência: ${punchTypeLabel(sequentialType)}.`;
+
+  const last = typesDone.length ? typesDone[typesDone.length - 1] : null;
 
   // FULL: intervalo aberto e já é fim de expediente → saída faz mais sentido que retorno fantasma
   if (
     mode === 'FULL' &&
     last === 'INTERVALO' &&
     (nearExit || afternoon) &&
-    !typesDone.includes('RETORNO') &&
-    !typesDone.includes('SAIDA')
+    !doneSet.has('RETORNO') &&
+    !doneSet.has('SAIDA')
   ) {
     suggestedType = 'SAIDA';
     reason = nearExit
@@ -119,8 +148,8 @@ export function resolveSmartPunchSuggestion(input: {
   // FULL: tem entrada, ainda não intervalo, e está na janela de almoço
   if (
     mode === 'FULL' &&
-    typesDone.includes('ENTRADA') &&
-    !typesDone.includes('INTERVALO') &&
+    doneSet.has('ENTRADA') &&
+    !doneSet.has('INTERVALO') &&
     lunchWindow &&
     sequentialType === 'INTERVALO'
   ) {
@@ -135,49 +164,40 @@ export function resolveSmartPunchSuggestion(input: {
   }
 
   // HALF: só entrada/saída; perto do fim sugere saída se já entrou
-  if (mode === 'HALF' && last === 'ENTRADA' && (nearExit || afternoon)) {
+  if (mode === 'HALF' && last === 'ENTRADA' && (nearExit || afternoon) && !doneSet.has('SAIDA')) {
     suggestedType = 'SAIDA';
     reason = 'Meio expediente: pelo horário, o mais provável é Saída.';
   }
 
-  // Opções: tipos da jornada que ainda fazem sentido operacionalmente.
-  // Sempre inclui a sugestão e o próximo sequencial; permite correção sem liberar caos total.
-  const allowed = new Set<PunchType>();
-  if (suggestedType) allowed.add(suggestedType);
-  if (sequentialType) allowed.add(sequentialType);
+  // NUNCA permite tipo já batido no dia — só o que ainda falta na jornada
+  const allowedTypes = order.filter((type) => !doneSet.has(type));
 
-  for (const type of order) {
-    // ainda não batido, ou repetição controlada só do próximo lógico
-    if (!typesDone.includes(type)) allowed.add(type);
+  // Se a sugestão por horário não estiver entre os permitidos, cai no sequencial
+  if (suggestedType && !allowedTypes.includes(suggestedType)) {
+    suggestedType = sequentialType;
+    reason = sequentialType
+      ? `Próximo na sequência: ${punchTypeLabel(sequentialType)}.`
+      : 'Nenhuma marcação pendente.';
   }
-
-  // Se já tem SAIDA, não oferece mais nada
-  if (typesDone.includes('SAIDA') || (mode === 'HALF' && last === 'SAIDA')) {
-    return {
-      sequentialType: null,
-      suggestedType: null,
-      allowedTypes: [],
-      reason: 'Jornada de hoje já foi encerrada.',
-      journeyClosed: true,
-      requiresConfirmationOutsideSuggestion: true,
-    };
-  }
-
-  // Garante ordem estável na UI
-  const allowedTypes = order.filter((type) => allowed.has(type));
 
   return {
     sequentialType,
     suggestedType,
-    allowedTypes: allowedTypes.length ? allowedTypes : sequentialType ? [sequentialType] : [],
+    allowedTypes,
     reason,
-    journeyClosed: !suggestedType && !sequentialType,
+    journeyClosed: allowedTypes.length === 0,
     requiresConfirmationOutsideSuggestion: true,
   };
 }
 
 export function isAllowedPunchType(type: string, allowed: PunchType[]) {
   return allowed.includes(type as PunchType);
+}
+
+/** True se o tipo já existe como marcação válida no conjunto do dia */
+export function hasPunchTypeToday(punchesToday: TodayPunch[], type: string) {
+  const target = String(type || '').toUpperCase();
+  return punchesToday.some((punch) => String(punch.type).toUpperCase() === target);
 }
 
 /** Converte ISO → valor datetime-local em America/Sao_Paulo */
