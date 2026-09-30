@@ -14,7 +14,7 @@ type Employee = {
   workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null;
 };
 type RecordItem = {
-  id: string; type: string; timestamp: string; status: string; origin: string;
+  id: string; type: string; timestamp: string; status: string; origin: string; hasPhoto?: boolean;
   user: { id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle: string | null };
 };
 type DayRow = {
@@ -435,7 +435,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         <div>
           <span className="eyebrow">CONFERÊNCIA MENSAL</span>
           <h2>Folha de ponto</h2>
-          <p className="small-muted">A4 horizontal · 1 página por colaborador · * = marcação ajustada no sistema</p>
+          <p className="small-muted">A4 horizontal · 1 página por colaborador · ● foto · * ajustada</p>
         </div>
         <div className="row-actions folha-print-actions">
           <input className="input folha-month-input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
@@ -619,7 +619,10 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                         <td className="folha-col-marks">
                           {row.punches.length
                             ? row.punches.map((p) => (
-                                <span key={p.id} className="folha-mark">{typeLabels[p.type] || p.type}{p.origin === 'ADJUSTED' ? '*' : ''} {formatTime(p.timestamp)}</span>
+                                <span key={p.id} className="folha-mark">
+                                  {p.hasPhoto ? <span className="folha-photo-dot" title="Registro com foto" aria-hidden /> : null}
+                                  <span className="folha-mark-text">{typeLabels[p.type] || p.type}{p.origin === 'ADJUSTED' ? '*' : ''} {formatTime(p.timestamp)}</span>
+                                </span>
                               ))
                             : '—'}
                         </td>
@@ -656,6 +659,10 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                 <span className="signature-caption">{employee.name}</span>
               </div>
             </div>
+            <p className="folha-legend">
+              <span className="folha-photo-dot" aria-hidden /> = marcação com registro de foto
+              {' · '}* = marcação ajustada no sistema
+            </p>
           </div>
         );
       })}
