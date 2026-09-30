@@ -356,11 +356,10 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     const bounds = monthBounds(month);
     const ok = window.confirm(
       'Corrigir o mês ' + month + ' de forma inteligente?\n\n' +
-      '• Cancela tipos duplicados (2× entrada, 2× intervalo, etc.)\n' +
-      '• Completa sequência FULL: Entrada → Intervalo → Retorno → Saída\n' +
-      '• Completa sequência HALF: Entrada → Saída\n' +
-      '• Marcações criadas aparecem com * na folha\n' +
-      '• Não inventa dia sem nenhuma batida; não força saída no dia de hoje\n\n' +
+      '• Cancela tipos duplicados no mesmo dia\n' +
+      '• Meio expediente: NÃO completa (só remove duplicata)\n' +
+      '• 1–2 batidas com poucas horas: trata como evento/parcial (não inventa)\n' +
+      '• Jornada integral (≥6h ou 3+ batidas): completa E/I/R/S com *\n\n' +
       'Não altera o app de marcação — só o que já está no sistema.'
     );
     if (!ok) return;
@@ -381,12 +380,14 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       }
       const s = data.summary || {};
       setFixMsg(
-        'Correção inteligente: ' +
+        'Correção: ' +
         (s.duplicatesRejected || 0) + ' duplicata(s); ' +
         (s.entradasCreated || 0) + ' E*; ' +
         (s.intervalosCreated || 0) + ' I*; ' +
         (s.retornosCreated || 0) + ' R*; ' +
-        (s.saidasCreated || 0) + ' S*.'
+        (s.saidasCreated || 0) + ' S*; ' +
+        (s.halfSkipped || 0) + ' meio exp. ignorado(s); ' +
+        (s.eventSkipped || 0) + ' evento/parcial.'
       );
       await load();
     } catch {
