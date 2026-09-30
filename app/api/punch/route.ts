@@ -9,7 +9,13 @@ import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../l
 import { isExitOverrideActive } from '../../../lib/exit-override';
 import { consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../lib/security-controls';
 import { sendPunchReceiptEmail } from '../../../lib/punch-receipt';
-import { isAllowedPunchType, resolveSmartPunchSuggestion, type PunchType } from '../../../lib/smart-punch-type';
+import {
+  hasPunchTypeToday,
+  isAllowedPunchType,
+  punchTypeLabel,
+  resolveSmartPunchSuggestion,
+  type PunchType,
+} from '../../../lib/smart-punch-type';
 
 export const dynamic = 'force-dynamic';
 const Input = z.object({
@@ -61,7 +67,7 @@ export async function POST(req: Request) {
         const punchesToday = await tx.punch.findMany({
           where: { userId: user.id, status: 'VALID', timestamp: { gte: start, lt: end } },
           orderBy: { timestamp: 'asc' },
-          select: { type: true, timestamp: true },
+          select: { id: true, type: true, timestamp: true },
         });
         const schedule = resolveDaySchedule(
           user.scheduleByDay,
@@ -84,6 +90,10 @@ export async function POST(req: Request) {
 
         let type: PunchType;
         if (isExitOverrideActive(now)) {
+          // Override de saída: só se ainda não tiver SAIDA no dia
+          if (hasPunchTypeToday(punchesToday, 'SAIDA')) {
+            throw new HttpError('Saída de hoje já foi registrada', 409);
+          }
           type = 'SAIDA';
         } else if (input.type) {
           if (!isAllowedPunchType(input.type, smart.allowedTypes)) {
@@ -97,13 +107,28 @@ export async function POST(req: Request) {
           type = (smart.suggestedType || smart.sequentialType)!;
         }
 
-        // Anti-duplicidade: evita clique duplo no totem
+        // Regra dura: cada tipo só uma vez por dia (não entra 2x, não vai almoço 2x, etc.)
+        if (hasPunchTypeToday(punchesToday, type)) {
+          const existingSame = punchesToday.find((p) => String(p.type).toUpperCase() === type);
+          if (existingSame) {
+            // Clique repetido / totem: devolve a batida já existente em vez de criar outra
+            const existing = await tx.punch.findFirst({
+              where: { id: existingSame.id },
+            });
+            if (existing) return { punch: existing, user, duplicate: true };
+          }
+          throw new HttpError(
+            `${punchTypeLabel(type)} de hoje já foi registrada. Não é possível bater o mesmo tipo duas vezes no mesmo dia.`,
+            409,
+          );
+        }
+
+        // Anti-duplicidade temporal: evita clique duplo no totem (qualquer tipo)
         const lastValid = punchesToday.length ? punchesToday[punchesToday.length - 1] : null;
         if (lastValid) {
           const lastTs = new Date(lastValid.timestamp).getTime();
           const deltaMs = now.getTime() - lastTs;
           const MIN_GAP_MS = 120_000; // 2 min entre qualquer batida
-          const SAME_TYPE_GAP_MS = 5 * 60_000; // 5 min se for o mesmo tipo
 
           if (deltaMs >= 0 && deltaMs < MIN_GAP_MS) {
             const existing = await tx.punch.findFirst({
@@ -111,19 +136,6 @@ export async function POST(req: Request) {
                 userId: user.id,
                 status: 'VALID',
                 timestamp: { gte: new Date(lastTs - 1000), lte: new Date(lastTs + 1000) },
-              },
-              orderBy: { timestamp: 'desc' },
-            });
-            if (existing) return { punch: existing, user, duplicate: true };
-          }
-
-          if (lastValid.type === type && deltaMs >= 0 && deltaMs < SAME_TYPE_GAP_MS) {
-            const existing = await tx.punch.findFirst({
-              where: {
-                userId: user.id,
-                type,
-                status: 'VALID',
-                timestamp: { gte: new Date(now.getTime() - SAME_TYPE_GAP_MS) },
               },
               orderBy: { timestamp: 'desc' },
             });
