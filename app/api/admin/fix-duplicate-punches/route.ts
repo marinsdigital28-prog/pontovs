@@ -11,6 +11,9 @@ export const dynamic = 'force-dynamic';
 const ORDER = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'] as const;
 type PunchType = (typeof ORDER)[number];
 
+/** Abaixo disso (minutos entre 1ª e última batida) trata como evento/parcial — não inventa almoço nem jornada completa */
+const FULL_DAY_SPAN_MIN = 6 * 60;
+
 async function requireManager() {
   const session = (await getServerSession(authOptions as any)) as any;
   const id = session?.user?.id as string | undefined;
@@ -42,14 +45,17 @@ function midPoint(a: Date, b: Date) {
   return new Date(Math.round((a.getTime() + b.getTime()) / 2));
 }
 
+function hmToMinutes(hm: string) {
+  const [h, m] = hm.split(':').map(Number);
+  return h * 60 + m;
+}
+
 /**
- * Correção mega-inteligente (só no sistema, não no app de marcação):
- * 1) Cancela 2ª+ ocorrência do mesmo tipo no dia
- * 2) Completa a sequência do dia conforme a jornada:
- *    - FULL: ENTRADA → INTERVALO → RETORNO → SAIDA
- *    - HALF: ENTRADA → SAIDA
- * 3) Marcações criadas ficam origin=ADJUSTED (folha mostra *)
- * 4) Não inventa dia inteiro sem nenhuma batida; não força SAÍDA no dia corrente ainda em andamento
+ * Correção inteligente (só no sistema):
+ * 1) Sempre cancela 2ª+ do mesmo tipo no dia
+ * 2) Meio expediente (HALF) → NÃO completa nada (só dedupe)
+ * 3) 1–2 batidas com poucas horas → evento externo / parcial → NÃO inventa sequência
+ * 4) Dia integral com jornada longa (≥6h entre 1ª e última) → completa E/I/R/S com *
  */
 export async function POST(request: Request) {
   const manager = await requireManager();
@@ -112,6 +118,8 @@ export async function POST(request: Request) {
   let intervalosCreated = 0;
   let retornosCreated = 0;
   let saidasCreated = 0;
+  let halfSkipped = 0;
+  let eventSkipped = 0;
   const samples: Array<{ employee: string; date: string; action: string }> = [];
 
   async function rejectDuplicate(
@@ -218,9 +226,8 @@ export async function POST(request: Request) {
     if (!user) continue;
     const employeeLabel = `${user.employeeNumber || '—'} ${user.name}`;
     const isPastDay = date < todayKey;
-    const isToday = date === todayKey;
 
-    // 1) Duplicatas → só a 1ª de cada tipo
+    // 1) Duplicatas → só a 1ª de cada tipo (vale para todo mundo, inclusive meio expediente)
     const firstByType = new Map<string, (typeof list)[0]>();
     for (const p of list) {
       const t = String(p.type || '').toUpperCase();
@@ -229,7 +236,6 @@ export async function POST(request: Request) {
       else await rejectDuplicate(p, t, employeeLabel, date);
     }
 
-    // Sem batida válida restante → nada a completar
     if (!firstByType.size) continue;
 
     const weekday = new Date(`${date}T12:00:00-03:00`).getDay();
@@ -244,17 +250,55 @@ export async function POST(request: Request) {
     const mode = schedule?.mode === 'HALF' ? 'HALF' : 'FULL';
     const startHm = schedule?.start || user.scheduleStart?.slice(0, 5) || '08:00';
     const endHm = schedule?.end || user.scheduleEnd?.slice(0, 5) || (mode === 'HALF' ? '12:00' : '17:00');
+    const expectedSpan =
+      schedule ? Math.max(0, hmToMinutes(schedule.end) - hmToMinutes(schedule.start)) : 9 * 60;
 
+    // 2) MEIO EXPEDIENTE → não completa (só dedupe já feito)
+    if (mode === 'HALF') {
+      halfSkipped += 1;
+      if (samples.length < 60) {
+        samples.push({ employee: employeeLabel, date, action: 'meio expediente — só dedupe' });
+      }
+      continue;
+    }
+
+    const orderedUnique = [...firstByType.values()].sort(
+      (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+    );
+    const uniqueCount = orderedUnique.length;
+    const firstTs = orderedUnique[0].timestamp;
+    const lastTs = orderedUnique[orderedUnique.length - 1].timestamp;
+    const spanMin = Math.max(0, Math.round((lastTs.getTime() - firstTs.getTime()) / 60_000));
+
+    /**
+     * Evento externo / dia parcial:
+     * - 1 batida só, ou
+     * - 2 batidas com intervalo curto (< 6h) → não inventa E/I/R/S
+     * O sistema “enxerga” pelas horas do dia, não força jornada de escritório.
+     */
+    const looksLikeExternalOrPartial =
+      uniqueCount === 1 || (uniqueCount === 2 && spanMin < FULL_DAY_SPAN_MIN);
+
+    if (looksLikeExternalOrPartial) {
+      eventSkipped += 1;
+      if (samples.length < 60) {
+        samples.push({
+          employee: employeeLabel,
+          date,
+          action: `evento/parcial (${uniqueCount} batida(s), ${spanMin} min) — sem inventar`,
+        });
+      }
+      continue;
+    }
+
+    // A partir daqui: jornada integral aparente (3+ tipos OU E+S com ≥6h)
     const tsOf = (type: string) => firstByType.get(type)?.timestamp ?? null;
 
-    // 2) ENTRADA faltante
+    // ENTRADA faltante em dia que já parece integral
     if (!firstByType.has('ENTRADA')) {
       let entradaTs = atHm(date, startHm);
-      const firstOther = [...firstByType.values()].sort(
-        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
-      )[0];
-      if (firstOther && firstOther.timestamp.getTime() <= entradaTs.getTime()) {
-        entradaTs = new Date(firstOther.timestamp.getTime() - 60_000);
+      if (firstTs.getTime() <= entradaTs.getTime()) {
+        entradaTs = new Date(firstTs.getTime() - 60_000);
       }
       const ok = await createAdjusted({
         userId,
@@ -263,7 +307,7 @@ export async function POST(request: Request) {
         timestamp: entradaTs,
         date,
         employeeLabel,
-        reason: 'ENTRADA* faltante — havia outras batidas no dia sem entrada.',
+        reason: 'ENTRADA* faltante em dia com jornada aparente (horas longas / várias batidas).',
       });
       if (ok) {
         firstByType.set('ENTRADA', {
@@ -279,74 +323,53 @@ export async function POST(request: Request) {
     }
 
     const entradaTs = tsOf('ENTRADA');
-    const intervaloTs = tsOf('INTERVALO');
-    const retornoTs = tsOf('RETORNO');
     const saidaTs = tsOf('SAIDA');
 
-    // 3) HALF: só ENTRADA + SAIDA
-    if (mode === 'HALF') {
-      // Se tiver INTERVALO/RETORNO “a mais” em meio expediente, não apaga — só completa SAIDA
-      if (entradaTs && !saidaTs && (isPastDay || (isToday && false))) {
-        // for today half: only auto SAIDA if past end + 30min — skip on current ongoing; past days always
-      }
-      if (entradaTs && !saidaTs && isPastDay) {
-        let saida = atHm(date, endHm);
-        if (saida.getTime() <= entradaTs.getTime()) saida = new Date(entradaTs.getTime() + 4 * 60 * 60_000);
+    // E + S com jornada longa e sem almoço → cria I e R
+    if (entradaTs && saidaTs && !firstByType.has('INTERVALO') && !firstByType.has('RETORNO')) {
+      const pairSpan = Math.round((saidaTs.getTime() - entradaTs.getTime()) / 60_000);
+      if (pairSpan >= FULL_DAY_SPAN_MIN) {
+        let lunchStart = atHm(date, '12:00');
+        let lunchEnd = atHm(date, '13:00');
+        lunchStart = clampBetween(lunchStart, entradaTs, saidaTs);
+        lunchEnd = clampBetween(lunchEnd, lunchStart, saidaTs);
+        if (lunchEnd.getTime() - lunchStart.getTime() < 20 * 60_000) {
+          const mid = midPoint(entradaTs, saidaTs);
+          lunchStart = clampBetween(new Date(mid.getTime() - 30 * 60_000), entradaTs, saidaTs);
+          lunchEnd = clampBetween(new Date(mid.getTime() + 30 * 60_000), lunchStart, saidaTs);
+        }
         await createAdjusted({
           userId,
           unitId: user.unitId || null,
-          type: 'SAIDA',
-          timestamp: saida,
+          type: 'INTERVALO',
+          timestamp: lunchStart,
           date,
           employeeLabel,
-          reason: 'SAIDA* faltante (meio expediente) — jornada incompleta no sistema.',
+          reason: 'INTERVALO* — dia integral (≥6h) com E+S sem almoço.',
         });
+        firstByType.set('INTERVALO', { timestamp: lunchStart } as any);
+        await createAdjusted({
+          userId,
+          unitId: user.unitId || null,
+          type: 'RETORNO',
+          timestamp: lunchEnd,
+          date,
+          employeeLabel,
+          reason: 'RETORNO* — dia integral (≥6h) com E+S sem almoço.',
+        });
+        firstByType.set('RETORNO', { timestamp: lunchEnd } as any);
       }
-      continue;
     }
 
-    // 4) FULL: completar INTERVALO / RETORNO / SAIDA
-    // Caso clássico: só E + S → cria I e R no almoço (12h–13h) entre entrada e saída
-    if (entradaTs && saidaTs && !intervaloTs && !retornoTs) {
-      let lunchStart = atHm(date, '12:00');
-      let lunchEnd = atHm(date, '13:00');
-      lunchStart = clampBetween(lunchStart, entradaTs, saidaTs);
-      lunchEnd = clampBetween(lunchEnd, lunchStart, saidaTs);
-      if (lunchEnd.getTime() - lunchStart.getTime() < 20 * 60_000) {
-        // janela apertada: metade do período
-        const mid = midPoint(entradaTs, saidaTs);
-        lunchStart = new Date(mid.getTime() - 30 * 60_000);
-        lunchEnd = new Date(mid.getTime() + 30 * 60_000);
-        lunchStart = clampBetween(lunchStart, entradaTs, saidaTs);
-        lunchEnd = clampBetween(lunchEnd, lunchStart, saidaTs);
-      }
-      await createAdjusted({
-        userId,
-        unitId: user.unitId || null,
-        type: 'INTERVALO',
-        timestamp: lunchStart,
-        date,
-        employeeLabel,
-        reason: 'INTERVALO* faltante — dia com entrada e saída sem almoço registrado.',
-      });
-      firstByType.set('INTERVALO', { timestamp: lunchStart } as any);
-      await createAdjusted({
-        userId,
-        unitId: user.unitId || null,
-        type: 'RETORNO',
-        timestamp: lunchEnd,
-        date,
-        employeeLabel,
-        reason: 'RETORNO* faltante — dia com entrada e saída sem almoço registrado.',
-      });
-      firstByType.set('RETORNO', { timestamp: lunchEnd } as any);
-    }
-
-    // INTERVALO faltante mas tem RETORNO (ou caminho até saída)
-    if (entradaTs && !firstByType.has('INTERVALO') && (firstByType.has('RETORNO') || firstByType.has('SAIDA'))) {
+    // INTERVALO faltante com RETORNO ou SAIDA e span longo
+    if (
+      entradaTs &&
+      !firstByType.has('INTERVALO') &&
+      (firstByType.has('RETORNO') || firstByType.has('SAIDA')) &&
+      spanMin >= FULL_DAY_SPAN_MIN
+    ) {
       const upper = tsOf('RETORNO') || tsOf('SAIDA');
-      let lunchStart = atHm(date, '12:00');
-      lunchStart = clampBetween(lunchStart, entradaTs, upper);
+      let lunchStart = clampBetween(atHm(date, '12:00'), entradaTs, upper);
       await createAdjusted({
         userId,
         unitId: user.unitId || null,
@@ -354,21 +377,22 @@ export async function POST(request: Request) {
         timestamp: lunchStart,
         date,
         employeeLabel,
-        reason: 'INTERVALO* faltante — sequência do dia incompleta.',
+        reason: 'INTERVALO* faltante em sequência de jornada integral.',
       });
       firstByType.set('INTERVALO', { timestamp: lunchStart } as any);
     }
 
-    // RETORNO faltante mas tem INTERVALO
-    if (firstByType.has('INTERVALO') && !firstByType.has('RETORNO') && (firstByType.has('SAIDA') || isPastDay)) {
+    // RETORNO faltante após INTERVALO
+    if (
+      firstByType.has('INTERVALO') &&
+      !firstByType.has('RETORNO') &&
+      (firstByType.has('SAIDA') || (isPastDay && spanMin >= FULL_DAY_SPAN_MIN))
+    ) {
       const iTs = tsOf('INTERVALO')!;
       const upper = tsOf('SAIDA');
       let lunchEnd = new Date(iTs.getTime() + 60 * 60_000);
       if (upper) lunchEnd = clampBetween(lunchEnd, iTs, upper);
-      else if (entradaTs) {
-        const end = atHm(date, endHm);
-        lunchEnd = clampBetween(lunchEnd, iTs, end);
-      }
+      else lunchEnd = clampBetween(lunchEnd, iTs, atHm(date, endHm));
       await createAdjusted({
         userId,
         unitId: user.unitId || null,
@@ -376,16 +400,20 @@ export async function POST(request: Request) {
         timestamp: lunchEnd,
         date,
         employeeLabel,
-        reason: 'RETORNO* faltante — intervalo registrado sem retorno.',
+        reason: 'RETORNO* faltante — intervalo sem retorno em jornada integral.',
       });
       firstByType.set('RETORNO', { timestamp: lunchEnd } as any);
     }
 
-    // SAIDA faltante (só dias passados — hoje pode ainda estar em jornada)
-    if (entradaTs && !firstByType.has('SAIDA') && isPastDay) {
+    // SAIDA faltante só em dia passado com evidência de jornada longa / 3+ batidas
+    if (
+      entradaTs &&
+      !firstByType.has('SAIDA') &&
+      isPastDay &&
+      (uniqueCount >= 3 || spanMin >= Math.min(FULL_DAY_SPAN_MIN, expectedSpan * 0.7))
+    ) {
       let saida = atHm(date, endHm);
-      const lastBefore =
-        tsOf('RETORNO') || tsOf('INTERVALO') || entradaTs;
+      const lastBefore = tsOf('RETORNO') || tsOf('INTERVALO') || entradaTs;
       if (lastBefore && saida.getTime() <= lastBefore.getTime()) {
         saida = new Date(lastBefore.getTime() + 60 * 60_000);
       }
@@ -396,7 +424,7 @@ export async function POST(request: Request) {
         timestamp: saida,
         date,
         employeeLabel,
-        reason: 'SAIDA* faltante — jornada do dia incompleta no sistema.',
+        reason: 'SAIDA* faltante — jornada integral aparente no dia.',
       });
     }
   }
@@ -411,6 +439,8 @@ export async function POST(request: Request) {
     intervalosCreated,
     retornosCreated,
     saidasCreated,
+    halfSkipped,
+    eventSkipped,
     samples,
   };
 
