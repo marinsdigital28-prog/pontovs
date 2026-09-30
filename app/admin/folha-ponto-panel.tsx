@@ -356,7 +356,170 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           <h2>Folha de ponto</h2>
           <p className="small-muted">A4 horizontal · 1 página por colaborador · padrão Espaço Progredir</p>
         </div>
+        <div className="row-actions folha-print-actions">
+          <input className="input folha-month-input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+          <select className="input" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+            <option value={allEmployeesValue}>Todos os colaboradores</option>
+            {employees.map((e) => (
+              <option key={e.id} value={e.id}>{e.employeeNumber || '—'} · {e.name}</option>
+            ))}
+          </select>
+          <button type="button" className="ghost-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button>
+          <button type="button" className="ghost-btn" onClick={handlePrintAll}>Imprimir todos</button>
+          <button type="button" className="primary-btn" onClick={() => void signAllPdfs()} disabled={signing}>{signing ? (batchProgress || 'Gerando…') : 'PDF de todos (assinado)'}</button>
+        </div>
       </div>
+
+      {error ? <div className="status-msg">{error}</div> : null}
+      {batchProgress && !signing ? <div className="status-msg">{batchProgress}</div> : null}
+
+      <div className="folha-preclose card" data-ready={preCloseAudit.ready ? '1' : '0'}>
+        <div className="section-heading">
+          <div>
+            <span className="eyebrow">PRÉ-FECHAMENTO</span>
+            <h3>{preCloseAudit.ready ? 'Pronto para fechar o mês' : 'Pendências antes do fechamento'}</h3>
+            <p className="small-muted">{bounds.label} · {visibleEmployees.length} colaborador(es)</p>
+          </div>
+        </div>
+        <div className="folha-preclose-grid">
+          <div><strong>{preCloseAudit.totalFaltas}</strong><span>Faltas</span></div>
+          <div><strong>{preCloseAudit.totalIncompletos}</strong><span>Incompletos</span></div>
+          <div><strong>{preCloseAudit.totalAtrasos}</strong><span>Atrasos</span></div>
+          <div><strong>{preCloseAudit.pendingRequests.length}</strong><span>Solicitações pend.</span></div>
+          <div><strong>{preCloseAudit.pendingCerts.length}</strong><span>Atestados pend.</span></div>
+          <div><strong>{preCloseAudit.noSchedule.length}</strong><span>Sem jornada</span></div>
+        </div>
+        {!preCloseAudit.ready ? (
+          <ul className="folha-preclose-list">
+            {preCloseAudit.noSchedule.slice(0, 8).map((n) => <li key={n}>Sem horário: {n}</li>)}
+            {preCloseAudit.incompletos.slice(0, 8).map((x) => <li key={x.name}>Incompleto · {x.name}: dias {x.days.join(', ')}</li>)}
+            {preCloseAudit.faltas.slice(0, 8).map((x) => <li key={x.name}>Falta · {x.name}: dias {x.days.join(', ')}</li>)}
+          </ul>
+        ) : null}
+      </div>
+
+      {visibleEmployees.map((employee) => {
+        const rows = dayRowsByEmployee.get(employee.id) || [];
+        const isFolga = (row: DayRow) => row.schedule.startsWith('Folga');
+        const totals = rows.reduce(
+          (acc, row) => {
+            if (row.worked !== null) acc.worked += row.worked;
+            if (row.expected !== null) acc.expected += row.expected;
+            if (row.justified !== null) acc.justified += row.justified;
+            if (row.missing !== null) acc.missing += row.missing;
+            if (row.surplus !== null) acc.surplus += row.surplus;
+            if (row.balance !== null) acc.balance += row.balance;
+            return acc;
+          },
+          { worked: 0, expected: 0, justified: 0, missing: 0, surplus: 0, balance: 0 },
+        );
+        return (
+          <div className="folha-sheet" key={employee.id}>
+            <div className="folha-sheet-header">
+              <div>
+                <strong>{employee.name}</strong>
+                <span className="small-muted">{employee.employeeNumber || '—'} · {employee.jobTitle || '—'} · {employee.cpf || '—'}</span>
+              </div>
+              <div className="row-actions">
+                <button type="button" className="ghost-btn" onClick={() => window.print()}>Imprimir</button>
+                <button type="button" className="primary-btn" onClick={() => void signPdf(employee)} disabled={signing}>PDF assinado</button>
+              </div>
+            </div>
+            <div className="folha-sheet-meta">
+              <span>{monthLabel(month)}</span>
+              <span>Trabalhado {formatMinutes(totals.worked)}</span>
+              <span>Esperado {formatMinutes(totals.expected)}</span>
+              <span>Abonado {formatMinutes(totals.justified)}</span>
+              <span className={totals.balance < 0 ? 'folha-neg' : totals.balance > 0 ? 'folha-pos' : ''}>Saldo {formatMinutes(totals.balance)}</span>
+            </div>
+            <div className="table-wrap">
+              <table className="folha-table">
+                <thead>
+                  <tr>
+                    <th>Dia</th>
+                    <th>Escala</th>
+                    <th>Marcações</th>
+                    <th>Trab.</th>
+                    <th>Esp.</th>
+                    <th>Abono</th>
+                    <th>Falta</th>
+                    <th>Extra</th>
+                    <th>Saldo</th>
+                    <th>Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => {
+                    const isFolgaRow = isFolga(row);
+                    const situation = row.certificate || (row.justified && row.justified > 0)
+                      ? (row.punches.length ? 'ABONO + PONTO' : 'ABONO/ATESTADO')
+                      : row.absent ? 'FALTA'
+                      : row.incomplete ? 'INCOMPLETO'
+                      : isFolgaRow ? 'FOLGA'
+                      : row.punches.length ? 'OK' : '';
+                    const sitClass =
+                      situation.startsWith('ABONO') ? 'folha-sit-abono'
+                      : situation === 'FALTA' ? 'folha-sit-falta'
+                      : situation === 'INCOMPLETO' ? 'folha-sit-incompleto'
+                      : situation === 'FOLGA' ? 'folha-sit-folga'
+                      : situation === 'OK' ? 'folha-sit-ok'
+                      : '';
+                    return (
+                      <tr key={row.date} className={
+                        row.absent ? 'folha-row-falta'
+                        : row.incomplete ? 'folha-row-incompleto'
+                        : row.certificate ? 'folha-row-abono'
+                        : isFolgaRow ? 'folha-row-folga'
+                        : ''
+                      }>
+                        <td className="folha-col-date">
+                          <b>{row.date.slice(8)}</b>
+                          <span>{row.weekday}</span>
+                        </td>
+                        <td className="folha-col-scale">{row.schedule}</td>
+                        <td className="folha-col-marks">
+                          {row.punches.length
+                            ? row.punches.map((p) => (
+                                <span key={p.id} className="folha-mark">{typeLabels[p.type] || p.type} {formatTime(p.timestamp)}</span>
+                              ))
+                            : '—'}
+                        </td>
+                        <td>{formatMinutes(row.worked)}</td>
+                        <td>{formatMinutes(row.expected)}</td>
+                        <td>{formatMinutes(row.justified)}</td>
+                        <td className={row.missing && row.missing > 0 ? 'folha-neg' : ''}>{formatMinutes(row.missing)}</td>
+                        <td className={row.surplus && row.surplus > 0 ? 'folha-pos' : ''}>{formatMinutes(row.surplus)}</td>
+                        <td className={row.balance !== null && row.balance < 0 ? 'folha-neg' : row.balance !== null && row.balance > 0 ? 'folha-pos' : ''}>{formatMinutes(row.balance)}</td>
+                        <td className="folha-col-sit">{situation ? <span className={`folha-sit ${sitClass}`}>{situation}</span> : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="signature-area">
+              <div className="signature-block">
+                {signatureData ? (
+                  <div className="signature-certificate-block">
+                    <strong>Assinado digitalmente</strong>
+                    <span>Certificado A1 · Espaço Progredir</span>
+                  </div>
+                ) : (
+                  <div className="signature-spacer" />
+                )}
+                <div className="signature-line">Assinatura da instituição</div>
+                <span className="signature-caption">Espaço Progredir</span>
+              </div>
+              <div className="signature-block">
+                <div className="signature-spacer" />
+                <div className="signature-line">Assinatura do colaborador</div>
+                <span className="signature-caption">{employee.name}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </section>
   );
 }
