@@ -196,6 +196,8 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [batchProgress, setBatchProgress] = useState('');
   const [fixingDupes, setFixingDupes] = useState(false);
   const [fixMsg, setFixMsg] = useState('');
+  const [analyzingAnomalies, setAnalyzingAnomalies] = useState(false);
+  const [anomalyReport, setAnomalyReport] = useState<{ totals?: any; findings?: any[] } | null>(null);
 
   const load = useCallback(async () => {
     const bounds = monthBounds(month);
@@ -352,6 +354,30 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     setSigning(false);
   }
 
+  async function identifyAnomalies() {
+    const bounds = monthBounds(month);
+    setAnalyzingAnomalies(true);
+    setError('');
+    setAnomalyReport(null);
+    try {
+      const response = await fetch('/api/admin/analyze-punch-anomalies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: bounds.from, to: bounds.to }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || 'Não foi possível analisar o mês.');
+        setAnalyzingAnomalies(false);
+        return;
+      }
+      setAnomalyReport({ totals: data.totals, findings: data.findings || [] });
+    } catch {
+      setError('Falha ao identificar anomalias.');
+    }
+    setAnalyzingAnomalies(false);
+  }
+
   async function fixDuplicatePunches() {
     const bounds = monthBounds(month);
     const ok = window.confirm(
@@ -422,6 +448,9 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           <button type="button" className="ghost-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button>
           <button type="button" className="ghost-btn" onClick={handlePrintAll}>Imprimir todos</button>
           <button type="button" className="primary-btn" onClick={() => void signAllPdfs()} disabled={signing}>{signing ? (batchProgress || 'Gerando…') : 'PDF de todos (assinado)'}</button>
+          <button type="button" className="ghost-btn" onClick={() => void identifyAnomalies()} disabled={analyzingAnomalies || loading}>
+            {analyzingAnomalies ? 'Identificando…' : 'Identificar anomalias'}
+          </button>
           <button type="button" className="ghost-btn" onClick={() => void fixDuplicatePunches()} disabled={fixingDupes || loading}>
             {fixingDupes ? 'Corrigindo…' : 'Corrigir folha do mês'}
           </button>
@@ -430,6 +459,57 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
 
       {error ? <div className="status-msg">{error}</div> : null}
       {fixMsg ? <div className="status-msg">{fixMsg}</div> : null}
+      {anomalyReport ? (
+        <div className="card" style={{ marginTop: '0.75rem', padding: '1rem' }}>
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">IDENTIFICAÇÃO (sem corrigir)</span>
+              <h3>Anomalias do mês</h3>
+              <p className="small-muted">
+                {(anomalyReport.totals?.findings ?? 0)} caso(s) ·{' '}
+                {anomalyReport.totals?.umaBatida ?? 0} com 1 batida ·{' '}
+                {anomalyReport.totals?.foraHorarioCedo ?? 0} bem cedo ·{' '}
+                {anomalyReport.totals?.eventoCurto ?? 0} evento/parcial ·{' '}
+                {anomalyReport.totals?.soAjustadas ?? 0} só ajustadas(*)
+              </p>
+            </div>
+            <button type="button" className="ghost-btn" onClick={() => setAnomalyReport(null)}>Fechar</button>
+          </div>
+          {!anomalyReport.findings?.length ? (
+            <p className="small-muted">Nenhuma anomalia relevante neste mês.</p>
+          ) : (
+            <div className="table-wrap" style={{ maxHeight: '420px', overflow: 'auto' }}>
+              <table className="folha-table" style={{ minWidth: '720px' }}>
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Colaborador</th>
+                    <th>Escala</th>
+                    <th>Tipos</th>
+                    <th>Marcações</th>
+                    <th>Obs.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {anomalyReport.findings.map((f: any, i: number) => (
+                    <tr key={f.employeeNumber + f.date + i}>
+                      <td>{f.date.slice(8)}/{f.date.slice(5, 7)}</td>
+                      <td>{f.employeeNumber} · {f.name}</td>
+                      <td>{f.mode} {f.schedule}</td>
+                      <td>{(f.kinds || []).join(', ')}</td>
+                      <td style={{ fontSize: '12px' }}>{f.marks}</td>
+                      <td style={{ fontSize: '12px' }}>{f.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="small-muted" style={{ marginTop: '0.75rem' }}>
+            Revise a lista. Depois combinamos o que corrigir (passeio, ajuste indevido, etc.).
+          </p>
+        </div>
+      ) : null}
       {batchProgress && !signing ? <div className="status-msg">{batchProgress}</div> : null}
 
       <div className="folha-preclose card" data-ready={preCloseAudit.ready ? '1' : '0'}>
