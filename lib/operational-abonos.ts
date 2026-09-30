@@ -7,7 +7,13 @@ export const MAT_ANA_MARIA = '2904';
 /** Datas operacionais fixas (YYYY-MM-DD, fuso SP) */
 export const DATA_MESA_BRASIL_ANA = '2026-08-25';
 export const DATA_VENDAVAL = '2026-08-07';
+export const DATA_INDEPENDENCIA = '2026-09-07';
 export const HORA_SAIDA_VENDAVAL = '15:00';
+
+/** Feriados nacionais (dia integral abonado para quem está na escala) */
+export const NATIONAL_HOLIDAYS: Record<string, string> = {
+  [DATA_INDEPENDENCIA]: 'Feriado nacional — Independência do Brasil',
+};
 
 export type OperationalAbono = {
   kind: 'FULL_DAY' | 'FROM_TIME';
@@ -34,15 +40,29 @@ export function isLastFridayOfMonth(dateKey: string): boolean {
   return lastFridayOfMonth(y, m) === dateKey;
 }
 
+export function isNationalHoliday(dateKey: string): boolean {
+  return Boolean(NATIONAL_HOLIDAYS[dateKey]);
+}
+
 /**
  * Abono operacional por matrícula + data.
  * Não altera matrícula/jornada cadastrada — só justifica na folha.
+ * Feriados nacionais abonam todo mundo que está na escala do dia.
  */
 export function getOperationalAbono(
   employeeNumber: string | null | undefined,
   dateKey: string,
 ): OperationalAbono | null {
   const mat = String(employeeNumber || '').replace(/\D/g, '');
+
+  // Feriado nacional — abono integral para quem é do dia (escala)
+  const holidayReason = NATIONAL_HOLIDAYS[dateKey];
+  if (holidayReason) {
+    return {
+      kind: 'FULL_DAY',
+      reason: holidayReason,
+    };
+  }
 
   // Kaio — jovem aprendiz: curso toda terça + última sexta do mês
   if (mat === MAT_KAIO) {
