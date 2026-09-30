@@ -31,6 +31,12 @@ const PAGE_H = 595.28;
 const MX = 18;
 const MY = 14;
 
+/** Bloco visual + widget de assinatura A1 no rodapé da mesma página */
+const SIG_BOX_X = MX;
+const SIG_BOX_Y = 8;
+const SIG_BOX_W = 280;
+const SIG_BOX_H = 42;
+
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const weekdayLabels = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const APP_TZ = 'America/Sao_Paulo';
@@ -110,7 +116,6 @@ async function buildTimesheetDocument({
   );
   page.drawText(`Emitido em ${emitted}`, { x: right - 168, y: PAGE_H - MY - 15, size: 7, font: regular, color: muted });
 
-  // Linha dourada sob o cabeçalho
   page.drawRectangle({ x: MX, y: PAGE_H - MY - 25, width: right - MX, height: 1.6, color: green });
   page.drawRectangle({ x: MX, y: PAGE_H - MY - 27.2, width: right - MX, height: 0.9, color: gold });
 
@@ -139,17 +144,15 @@ async function buildTimesheetDocument({
   const lunch = scheduleSpan !== null && scheduleSpan > 6 * 60 ? 60 : 0;
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
-  // Colunas mais equilibradas
   const cols = [MX, 68, 148, 390, 448, 506, 564, 622, 680, 740, right];
   const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Just.', 'Falt.', 'Exc.', 'Saldo', 'Situação'];
   const tableTop = infoY - 34;
-  const footerReserve = 78;
+  const footerReserve = 92;
   const headerH = 13.5;
   const available = tableTop - footerReserve - headerH;
   const rowH = Math.min(13.8, available / lastDay);
   const fs = rowH >= 12.5 ? 7 : rowH >= 11 ? 6.4 : 5.9;
 
-  // Cabeçalho da tabela
   page.drawRectangle({ x: MX, y: tableTop - headerH, width: right - MX, height: headerH, color: green });
   headers.forEach((h, i) => {
     page.drawText(h, {
@@ -290,7 +293,7 @@ async function buildTimesheetDocument({
   page.drawLine({ start: { x: MX, y: tableTop }, end: { x: MX, y: tableBottom }, thickness: 0.4, color: soft });
   page.drawLine({ start: { x: right, y: tableTop }, end: { x: right, y: tableBottom }, thickness: 0.4, color: soft });
 
-  // ——— Totalização alinhada às colunas ———
+  // ——— Totalização ———
   const sumY = tableBottom - 14;
   page.drawRectangle({ x: MX, y: sumY - 4, width: right - MX, height: 16, color: greenSoft });
   page.drawText('TOTAL DO MÊS', { x: MX + 4, y: sumY, size: 6.5, font: bold, color: green });
@@ -303,24 +306,42 @@ async function buildTimesheetDocument({
   page.drawText('FECHADO', { x: cols[9] + 3, y: sumY, size: 6.5, font: bold, color: green });
   page.drawText(`Saldo = trabalhado + justificado − previsto  ·  Faltas ${absences}  ·  Atrasos ${lateCount}`, { x: MX, y: sumY - 10, size: 5.7, font: regular, color: muted });
 
-  // ——— Assinaturas ———
-  // Instituição (esquerda)
+  // ——— Rodapé: certificado A1 na mesma folha A4 ———
   page.drawRectangle({
-    x: MX,
-    y: 10,
-    width: 230,
-    height: 28,
+    x: SIG_BOX_X,
+    y: SIG_BOX_Y,
+    width: SIG_BOX_W,
+    height: SIG_BOX_H,
     borderColor: green,
-    borderWidth: 0.9,
+    borderWidth: 1,
     color: greenSoft,
   });
-  page.drawText('Assinado digitalmente', { x: MX + 8, y: 26, size: 7.2, font: bold, color: green });
-  page.drawText('Espaço Progredir · Certificado A1', { x: MX + 8, y: 15, size: 6.2, font: regular, color: muted });
+  page.drawText('Assinado digitalmente com Certificado A1 (ICP-Brasil)', {
+    x: SIG_BOX_X + 8,
+    y: SIG_BOX_Y + 30,
+    size: 7.2,
+    font: bold,
+    color: green,
+  });
+  page.drawText('ESPAÇO PROGREDIR · CNPJ 05.553.848/0001-61', {
+    x: SIG_BOX_X + 8,
+    y: SIG_BOX_Y + 19,
+    size: 6.3,
+    font: regular,
+    color: dark,
+  });
+  page.drawText('AC SOLUTI · PJ A1 · Válido até 01/04/2027', {
+    x: SIG_BOX_X + 8,
+    y: SIG_BOX_Y + 9,
+    size: 6,
+    font: regular,
+    color: muted,
+  });
 
   // Colaborador (direita)
-  page.drawLine({ start: { x: right - 210, y: 32 }, end: { x: right - 12, y: 32 }, thickness: 0.55, color: soft });
-  page.drawText('Assinatura do colaborador', { x: right - 185, y: 22, size: 6.5, font: regular, color: muted });
-  page.drawText(employee.name, { x: right - 210, y: 12, size: 6.2, font: regular, color: muted, maxWidth: 195 });
+  page.drawLine({ start: { x: right - 210, y: 36 }, end: { x: right - 12, y: 36 }, thickness: 0.55, color: soft });
+  page.drawText('Assinatura do colaborador', { x: right - 185, y: 24, size: 6.5, font: regular, color: muted });
+  page.drawText(employee.name, { x: right - 210, y: 14, size: 6.2, font: regular, color: muted, maxWidth: 195 });
 
   return { pdfDoc, page };
 }
@@ -338,10 +359,14 @@ export async function createSignedTimesheetPdf({
 }) {
   const { pdfDoc, page } = await buildTimesheetDocument({ employee, punches, certificates, requests, month });
   pdflibAddPlaceholder({
-    pdfDoc, pdfPage: page,
-    reason: 'Assinatura institucional da Folha de Ponto',
-    contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ',
-    signatureLength: 20000, widgetRect: [MX, 10, MX + 230, 38],
+    pdfDoc,
+    pdfPage: page,
+    reason: 'Assinatura institucional da Folha de Ponto — Certificado A1 ICP-Brasil',
+    contactInfo: 'ESPAÇO PROGREDIR CNPJ 05.553.848/0001-61',
+    name: 'ESPAÇO PROGREDIR',
+    location: 'Nova Iguaçu - RJ',
+    signatureLength: 20000,
+    widgetRect: [SIG_BOX_X, SIG_BOX_Y, SIG_BOX_X + SIG_BOX_W, SIG_BOX_Y + SIG_BOX_H],
   });
   const pdfWithPlaceholder = Buffer.from(await pdfDoc.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
@@ -383,10 +408,14 @@ export async function createSignedTimesheetPdfBatch({
   if (!lastPage) throw new Error('Falha ao montar PDF em lote');
 
   pdflibAddPlaceholder({
-    pdfDoc: merged, pdfPage: lastPage,
-    reason: 'Assinatura institucional da Folha de Ponto (lote)',
-    contactInfo: 'Espaço Progredir', name: 'Espaço Progredir', location: 'Nova Iguaçu - RJ',
-    signatureLength: 20000, widgetRect: [MX, 10, MX + 230, 38],
+    pdfDoc: merged,
+    pdfPage: lastPage,
+    reason: 'Assinatura institucional da Folha de Ponto (lote) — Certificado A1 ICP-Brasil',
+    contactInfo: 'ESPAÇO PROGREDIR CNPJ 05.553.848/0001-61',
+    name: 'ESPAÇO PROGREDIR',
+    location: 'Nova Iguaçu - RJ',
+    signatureLength: 20000,
+    widgetRect: [SIG_BOX_X, SIG_BOX_Y, SIG_BOX_X + SIG_BOX_W, SIG_BOX_Y + SIG_BOX_H],
   });
   const pdfWithPlaceholder = Buffer.from(await merged.save());
   const signedPdf = await signpdf.sign(pdfWithPlaceholder, new P12Signer(certificate, { passphrase: password }));
