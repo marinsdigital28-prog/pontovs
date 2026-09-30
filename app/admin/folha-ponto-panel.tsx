@@ -355,10 +355,13 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   async function fixDuplicatePunches() {
     const bounds = monthBounds(month);
     const ok = window.confirm(
-      'Corrigir o mês ' + month + '?\n\n' +
-      '• Cancela tipos duplicados no mesmo dia (mantém a 1ª)\n' +
-      '• Cria ENTRADA* quando faltar entrada e houver outras batidas\n\n' +
-      'Isso não altera o aplicativo de marcação — só o que já está no sistema.'
+      'Corrigir o mês ' + month + ' de forma inteligente?\n\n' +
+      '• Cancela tipos duplicados (2× entrada, 2× intervalo, etc.)\n' +
+      '• Completa sequência FULL: Entrada → Intervalo → Retorno → Saída\n' +
+      '• Completa sequência HALF: Entrada → Saída\n' +
+      '• Marcações criadas aparecem com * na folha\n' +
+      '• Não inventa dia sem nenhuma batida; não força saída no dia de hoje\n\n' +
+      'Não altera o app de marcação — só o que já está no sistema.'
     );
     if (!ok) return;
     setFixingDupes(true);
@@ -378,9 +381,12 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       }
       const s = data.summary || {};
       setFixMsg(
-        'Correção concluída: ' +
-        (s.duplicatesRejected || 0) + ' duplicata(s) cancelada(s), ' +
-        (s.entradasCreated || 0) + ' ENTRADA* criada(s).'
+        'Correção inteligente: ' +
+        (s.duplicatesRejected || 0) + ' duplicata(s); ' +
+        (s.entradasCreated || 0) + ' E*; ' +
+        (s.intervalosCreated || 0) + ' I*; ' +
+        (s.retornosCreated || 0) + ' R*; ' +
+        (s.saidasCreated || 0) + ' S*.'
       );
       await load();
     } catch {
@@ -416,7 +422,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           <button type="button" className="ghost-btn" onClick={handlePrintAll}>Imprimir todos</button>
           <button type="button" className="primary-btn" onClick={() => void signAllPdfs()} disabled={signing}>{signing ? (batchProgress || 'Gerando…') : 'PDF de todos (assinado)'}</button>
           <button type="button" className="ghost-btn" onClick={() => void fixDuplicatePunches()} disabled={fixingDupes || loading}>
-            {fixingDupes ? 'Corrigindo…' : 'Corrigir duplicatas do mês'}
+            {fixingDupes ? 'Corrigindo…' : 'Corrigir folha do mês'}
           </button>
         </div>
       </div>
