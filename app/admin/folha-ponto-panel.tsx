@@ -125,7 +125,6 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
       ).map((p) => p.id),
     );
     const filteredDayPunches = rawDayPunches.filter((p) => allowedIds.has(p.id));
-    // Inteligente: no mesmo dia só vale 1 de cada tipo (1ª ocorrência cronológica)
     const dayPunches = (() => {
       const ordered = [...filteredDayPunches].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       const seen = new Set<string>();
@@ -319,7 +318,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
 
   async function signAllPdfs() {
     if (preCloseAudit.blockers > 0) {
-      const ok = window.confirm('Pré-fechamento: ainda há ' + preCloseAudit.blockers + ' pendência(s) (escala, incompletos, solicitações ou atestados).\n\nGerar PDF de todos mesmo assim?');
+      const ok = window.confirm('Pré-fechamento: ainda há ' + preCloseAudit.blockers + ' pendência(s).\n\nGerar PDF de todos mesmo assim?');
       if (!ok) return;
     }
     return signAllPdfsInner();
@@ -364,7 +363,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         <div>
           <span className="eyebrow">CONFERÊNCIA MENSAL</span>
           <h2>Folha de ponto</h2>
-          <p className="small-muted">A4 horizontal · 1 página por colaborador · padrão Espaço Progredir</p>
+          <p className="small-muted">A4 horizontal · 1 página por colaborador · * = marcação ajustada no sistema</p>
         </div>
         <div className="row-actions folha-print-actions">
           <input className="input folha-month-input" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
@@ -490,7 +489,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                         <td className="folha-col-marks">
                           {row.punches.length
                             ? row.punches.map((p) => (
-                                <span key={p.id} className="folha-mark">{typeLabels[p.type] || p.type} {formatTime(p.timestamp)}</span>
+                                <span key={p.id} className="folha-mark">{typeLabels[p.type] || p.type}{p.origin === 'ADJUSTED' ? '*' : ''} {formatTime(p.timestamp)}</span>
                               ))
                             : '—'}
                         </td>
