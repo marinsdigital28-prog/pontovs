@@ -194,6 +194,8 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [batchProgress, setBatchProgress] = useState('');
+  const [fixingDupes, setFixingDupes] = useState(false);
+  const [fixMsg, setFixMsg] = useState('');
 
   const load = useCallback(async () => {
     const bounds = monthBounds(month);
@@ -350,6 +352,43 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     setSigning(false);
   }
 
+  async function fixDuplicatePunches() {
+    const bounds = monthBounds(month);
+    const ok = window.confirm(
+      'Corrigir o mês ' + month + '?\n\n' +
+      '• Cancela tipos duplicados no mesmo dia (mantém a 1ª)\n' +
+      '• Cria ENTRADA* quando faltar entrada e houver outras batidas\n\n' +
+      'Isso não altera o aplicativo de marcação — só o que já está no sistema.'
+    );
+    if (!ok) return;
+    setFixingDupes(true);
+    setFixMsg('');
+    setError('');
+    try {
+      const response = await fetch('/api/admin/fix-duplicate-punches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: bounds.from, to: bounds.to }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.error || 'Não foi possível corrigir as marcações.');
+        setFixingDupes(false);
+        return;
+      }
+      const s = data.summary || {};
+      setFixMsg(
+        'Correção concluída: ' +
+        (s.duplicatesRejected || 0) + ' duplicata(s) cancelada(s), ' +
+        (s.entradasCreated || 0) + ' ENTRADA* criada(s).'
+      );
+      await load();
+    } catch {
+      setError('Falha ao corrigir duplicatas.');
+    }
+    setFixingDupes(false);
+  }
+
   function handlePrintAll() {
     setEmployeeId(allEmployeesValue);
     setTimeout(() => window.print(), 300);
@@ -376,10 +415,14 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
           <button type="button" className="ghost-btn" onClick={() => void load()} disabled={loading}>{loading ? 'Atualizando…' : 'Atualizar'}</button>
           <button type="button" className="ghost-btn" onClick={handlePrintAll}>Imprimir todos</button>
           <button type="button" className="primary-btn" onClick={() => void signAllPdfs()} disabled={signing}>{signing ? (batchProgress || 'Gerando…') : 'PDF de todos (assinado)'}</button>
+          <button type="button" className="ghost-btn" onClick={() => void fixDuplicatePunches()} disabled={fixingDupes || loading}>
+            {fixingDupes ? 'Corrigindo…' : 'Corrigir duplicatas do mês'}
+          </button>
         </div>
       </div>
 
       {error ? <div className="status-msg">{error}</div> : null}
+      {fixMsg ? <div className="status-msg">{fixMsg}</div> : null}
       {batchProgress && !signing ? <div className="status-msg">{batchProgress}</div> : null}
 
       <div className="folha-preclose card" data-ready={preCloseAudit.ready ? '1' : '0'}>
