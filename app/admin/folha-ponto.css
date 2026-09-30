@@ -135,6 +135,56 @@
   font-weight: 600;
 }
 
+/* Uma folha por colaborador (tela) */
+.folha-sheet {
+  margin-top: 1.35rem;
+  padding: 1.3rem 1.4rem 1.45rem;
+  border-radius: 16px;
+  border: 1px solid rgba(201, 162, 39, 0.22);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)), rgba(8, 28, 20, 0.35);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.folha-sheet-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 2px solid rgba(201, 162, 39, 0.4);
+}
+
+.folha-sheet-header strong {
+  display: block;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #eef8f2;
+}
+
+.folha-sheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.88rem;
+  color: #9bb5a6;
+  font-weight: 600;
+}
+
+.folha-sheet-meta span {
+  white-space: nowrap;
+}
+
+.folha-ponto-root .table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1.5px solid #b7cec0;
+  background: #fbfefc;
+  color: var(--folha-ink);
+}
+
 .folha-print-header { display: block; }
 
 .folha-print-org {
@@ -408,7 +458,7 @@
 }
 
 /* ============================================================
-   IMPRESSÃO — A4 paisagem, denso, legível, sem desperdício
+   IMPRESSÃO — A4 paisagem, 1 colaborador por página
    ============================================================ */
 @media print {
   @page {
@@ -434,7 +484,8 @@
   .no-print, .folha-toolbar, .folha-print-actions,
   .folha-live-dot, .folha-batch-progress, .folha-preclose, .folha-hint,
   .eyebrow, button, .ghost-btn, .primary-btn, .status-msg, .admin-toast,
-  .row-actions.no-print, .folha-competence-banner { display: none !important; }
+  .row-actions.no-print, .folha-competence-banner,
+  .folha-sheet-header .row-actions { display: none !important; }
 
   .folha-ponto-root,
   .timesheet-panel {
@@ -450,12 +501,13 @@
     overflow: visible !important;
   }
 
+  /* 1 colaborador = 1 página A4 paisagem */
   .folha-block,
+  .folha-sheet,
   .timesheet-employee-block {
     display: block !important;
-    margin: 0 !important;
+    margin: 0 0 0 !important;
     box-sizing: border-box !important;
-    height: 197mm !important;
     max-height: 197mm !important;
     padding: 2.2mm 2.5mm 1.5mm !important;
     border: 1.2pt solid #0b5c42 !important;
@@ -465,20 +517,21 @@
     color: #111 !important;
     page-break-after: always !important;
     break-after: page !important;
-    page-break-inside: avoid;
-    break-inside: avoid;
-    overflow: visible !important;
-    height: auto !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
   }
 
   .folha-block:last-of-type,
+  .folha-sheet:last-of-type,
   .timesheet-employee-block:last-of-type {
     page-break-after: auto !important;
     break-after: auto !important;
   }
 
   .folha-emp-heading,
-  .folha-block > .section-heading {
+  .folha-block > .section-heading,
+  .folha-sheet-header {
     display: block !important;
     margin: 0 0 1.6mm !important;
     padding: 0 0 1.2mm !important;
@@ -545,7 +598,8 @@
   }
 
   .folha-print-header h3,
-  .folha-block > .section-heading h3 {
+  .folha-block > .section-heading h3,
+  .folha-sheet-header strong {
     color: #111 !important;
     font-size: 10.5pt !important;
     font-weight: 800 !important;
@@ -554,7 +608,8 @@
   }
 
   .folha-print-meta,
-  .folha-block > .section-heading .small-muted {
+  .folha-block > .section-heading .small-muted,
+  .folha-sheet-meta {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 0.8mm 4.5mm !important;
@@ -565,13 +620,15 @@
     line-height: 1.25 !important;
   }
 
-  .folha-print-meta span { white-space: nowrap !important; }
+  .folha-print-meta span,
+  .folha-sheet-meta span { white-space: nowrap !important; }
   .folha-print-meta b {
     font-weight: 800 !important;
     color: #0b5c42 !important;
   }
 
-  .folha-table-scroll {
+  .folha-table-scroll,
+  .folha-ponto-root .table-wrap {
     overflow: visible !important;
     max-height: none !important;
     border: 0.7pt solid #333 !important;
