@@ -1,5 +1,6 @@
 import { resolveDaySchedule } from './day-schedule';
 import { parseWorkDays } from './timesheet-schedule';
+import { getOperationalAbono } from './operational-abonos';
 
 export const BRAZIL_TIME_ZONE = 'America/Sao_Paulo';
 export const REQUIRED_PUNCH_TYPES = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'] as const;
@@ -160,6 +161,10 @@ export function detectInconsistencies({ employees, punches, exceptions, from, to
       const schedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday);
       if (!schedule || !workDays.has(weekdayCodes[weekday])) continue;
       if (hasException(exceptions, employee.id, date)) continue;
+
+      // Abono operacional integral (ex.: feriado 07/09) — não gera inconsistência
+      const opsAbono = getOperationalAbono(employee.employeeNumber, date);
+      if (opsAbono?.kind === 'FULL_DAY') continue;
 
       const dayPunches = (punchByDay.get(`${employee.id}|${date}`) || []).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
       const expected = expectedPunchTypes(schedule.mode);
