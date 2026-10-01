@@ -57,6 +57,22 @@
   overflow-x: auto; border-radius: 12px; border: 1.5px solid #b7cec0;
   background: #fbfefc; color: var(--folha-ink); box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
 }
+.folha-summary {
+  display: flex; gap: 0.7rem; padding: 0.8rem 0.8rem 0.55rem; background: #f4f8f6;
+  border-bottom: 1px solid #d5e3db;
+}
+.folha-summary > div {
+  min-width: 150px; padding: 0.55rem 0.75rem; border: 1px solid #c9ddd1; border-radius: 10px;
+  background: #fff; display: grid; gap: 0.2rem;
+}
+.folha-summary span { color: var(--folha-muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+.folha-summary strong { color: var(--folha-green); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.folha-total-row {
+  display: grid; grid-template-columns: minmax(58px, 0.7fr) minmax(170px, 1.5fr) minmax(220px, 2.2fr) repeat(5, minmax(72px, 0.75fr));
+  align-items: center; min-width: 920px; padding: 0.65rem 0.6rem; border-top: 2px solid var(--folha-green);
+  background: #f4f8f6; color: var(--folha-green); font-size: 0.86rem; font-variant-numeric: tabular-nums;
+}
+.folha-total-row strong { text-align: right; font-weight: 850; }
 .folha-table {
   width: 100%; border-collapse: separate; border-spacing: 0; min-width: 920px;
   font-size: 13.5px; line-height: 1.35;
@@ -268,6 +284,14 @@
     box-shadow: none !important;
   }
 
+  .folha-summary {
+    display: grid !important; grid-template-columns: repeat(3, 1fr); gap: 1.5mm; padding: 1.2mm 0 1mm !important;
+    border: 0 !important; background: #fff !important;
+  }
+  .folha-summary > div { min-width: 0; padding: 1mm 1.5mm; border: 0.5pt solid #b8c8be; border-radius: 1.5mm; }
+  .folha-summary span { font-size: 5.8pt; }
+  .folha-summary strong { font-size: 8pt; }
+
   .folha-table {
     min-width: 0 !important;
     width: 100% !important;
@@ -299,6 +323,11 @@
     background: #fff !important;
     vertical-align: middle !important;
   }
+  .folha-total-row {
+    display: grid !important; min-width: 0 !important; grid-template-columns: minmax(7%, 0.7fr) minmax(17%, 1.5fr) minmax(27%, 2.2fr) repeat(5, minmax(7%, 0.75fr));
+    padding: 1mm 0.8mm !important; font-size: 6.5pt !important; border-top: 1pt solid #0b5c42 !important; background: #eef5f0 !important;
+  }
+  .folha-total-row strong { font-size: 6.5pt !important; }
   .folha-table tbody tr:nth-child(even) td { background: #eef5f0 !important; }
   .folha-row-falta td { background: #fdeceb !important; }
   .folha-row-incompleto td { background: #fff6e8 !important; }

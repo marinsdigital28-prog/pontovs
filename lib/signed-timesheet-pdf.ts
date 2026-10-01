@@ -132,7 +132,7 @@ async function buildTimesheetDocument({
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
   const cols = [MX, 72, 155, 400, 455, 510, 565, 620, right];
-  const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Just.', 'Saldo', 'Situação'];
+  const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Falta', 'Saldo', 'Situação'];
   const tableTop = infoY - 36;
   const footerReserve = 78;
   const headerH = 14;
@@ -209,6 +209,7 @@ async function buildTimesheetDocument({
     if (late) lateCount += 1;
 
     const balance = creditedWorked === null || expected === null ? null : creditedWorked - expected;
+    const missing = expected === null || creditedWorked === null ? null : Math.max(0, expected - creditedWorked);
     if (balance !== null) totalBalance += balance;
 
     const y = tableTop - headerH - rowH * (index + 1) + 3.5;
@@ -236,7 +237,7 @@ async function buildTimesheetDocument({
       marks || (absent ? '—' : ''),
       formatMinutes(creditedWorked),
       formatMinutes(expected),
-      justified > 0 ? formatMinutes(justified) : '—',
+      formatMinutes(missing),
       formatSignedMinutes(balance),
       justificativa || (!scheduled ? 'Folga' : dayPunches.length ? 'OK' : ''),
     ];
@@ -255,15 +256,14 @@ async function buildTimesheetDocument({
   page.drawLine({ start: { x: right, y: tableTop }, end: { x: right, y: tableBottom }, thickness: 0.4, color: soft });
 
   const sumY = tableBottom - 16;
-  page.drawText(`Trabalhado ${formatMinutes(totalWorked)}`, { x: MX, y: sumY, size: 7.5, font: regular, color: dark });
-  page.drawText(`Previsto ${formatMinutes(totalExpected)}`, { x: MX + 120, y: sumY, size: 7.5, font: regular, color: dark });
-  page.drawText(`Justificado ${formatMinutes(totalJustified)}`, { x: MX + 230, y: sumY, size: 7.5, font: regular, color: dark });
-  page.drawText(`Saldo ${formatSignedMinutes(totalBalance)}`, { x: MX + 360, y: sumY, size: 8, font: bold, color: green });
-  page.drawText(`Faltas ${absences}`, { x: MX + 470, y: sumY, size: 7.5, font: regular, color: muted });
+  page.drawText(`Total: ${formatMinutes(totalWorked)}`, { x: cols[3] + 3, y: sumY, size: 7.2, font: bold, color: green });
+  page.drawText(`Total: ${formatMinutes(totalExpected)}`, { x: cols[4] + 3, y: sumY, size: 7.2, font: bold, color: green });
+  page.drawText(`Justificado ${formatMinutes(totalJustified)}`, { x: cols[5] + 3, y: sumY, size: 6.8, font: regular, color: muted });
+  page.drawText(`Saldo ${formatSignedMinutes(totalBalance)}`, { x: cols[6] + 3, y: sumY, size: 7.2, font: bold, color: green });
+  page.drawText(`Faltas ${absences}`, { x: cols[7] + 3, y: sumY, size: 6.8, font: regular, color: muted });
 
   page.drawLine({ start: { x: right - 200, y: 36 }, end: { x: right - 20, y: 36 }, thickness: 0.5, color: soft });
   page.drawText('Assinatura do colaborador', { x: right - 175, y: 26, size: 6.5, font: regular, color: muted });
-  page.drawText(employee.name, { x: right - 200, y: 16, size: 6, font: regular, color: muted, maxWidth: 175 });
 
   page.drawRectangle({ x: MX, y: 12, width: 220, height: 26, borderColor: green, borderWidth: 0.8 });
   page.drawText('Assinado digitalmente', { x: MX + 8, y: 26, size: 7, font: bold, color: green });

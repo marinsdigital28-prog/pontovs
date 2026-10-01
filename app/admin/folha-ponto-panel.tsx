@@ -415,6 +415,19 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
               </div>
             </div>
             <div className="folha-table-scroll">
+              {(() => {
+                const totalWorked = rows.reduce((total, row) => total + (row.worked ?? 0), 0);
+                const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);
+                const totalBalance = rows.reduce((total, row) => total + (row.balance ?? 0), 0);
+                const workedDays = rows.filter((row) => row.worked !== null && row.worked > 0).length;
+                return (
+                  <div className="folha-summary" aria-label="Resumo mensal">
+                    <div><span>Dias trabalhados</span><strong>{String(workedDays).padStart(2, '0')}</strong></div>
+                    <div><span>Carga diária</span><strong>{formatMinutes(rows.find((row) => row.expected !== null)?.expected ?? null)}</strong></div>
+                    <div><span>Saldo do mês</span><strong className={totalBalance < 0 ? 'folha-neg' : 'folha-pos'}>{formatMinutes(totalBalance)}</strong></div>
+                  </div>
+                );
+              })()}
               <table className="folha-table">
                 <thead>
                   <tr>
@@ -448,7 +461,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                         )) : '—'}</td>
                         <td>{formatMinutes(row.worked)}</td>
                         <td>{formatMinutes(row.expected)}</td>
-                        <td>{formatMinutes(row.justified)}</td>
+                        <td>{formatMinutes(row.missing)}</td>
                         <td className={row.balance !== null && row.balance < 0 ? 'folha-neg' : row.balance !== null && row.balance > 0 ? 'folha-pos' : ''}>{formatMinutes(row.balance)}</td>
                         <td className="folha-col-sit">{situation ? <span className={`folha-sit ${sitClass}`}>{situation}</span> : '—'}</td>
                       </tr>
@@ -456,6 +469,22 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                   })}
                 </tbody>
               </table>
+              {(() => {
+                const totalWorked = rows.reduce((total, row) => total + (row.worked ?? 0), 0);
+                const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);
+                return (
+                  <div className="folha-total-row" aria-label="Totais mensais">
+                    <span />
+                    <span />
+                    <span />
+                    <strong>Total: {formatMinutes(totalWorked)}</strong>
+                    <strong>Total: {formatMinutes(totalExpected)}</strong>
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                );
+              })()}
             </div>
             <div className="signature-area">
               <div className="signature-block institution-signature-block">
@@ -469,7 +498,6 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
               <div className="signature-block employee-signature-block">
                 <div className="signature-spacer" aria-hidden="true" />
                 <div className="signature-line">Assinatura do colaborador</div>
-                <span className="signature-caption">{employee.name}</span>
               </div>
             </div>
           </div>
