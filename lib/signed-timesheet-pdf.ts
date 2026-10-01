@@ -4,6 +4,7 @@ import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { filterPunchesOutsideCertificates } from './certificate-conflicts';
+import { getOperationalAbono, operationalJustifiedMinutes } from './operational-abonos';
 
 export type TimesheetEmployee = {
   name: string;
@@ -191,8 +192,16 @@ async function buildTimesheetDocument({
           (item.type === 'TROCA_DIA' && (rowDayKey(item.startDate) === dateKey || rowDayKey(item.endDate) === dateKey))),
     );
 
+    const operationalAbono = getOperationalAbono(employee.employeeNumber, dateKey);
+    const operationalJustified = operationalAbono
+      ? operationalJustifiedMinutes(operationalAbono, employee.scheduleStart, employee.scheduleEnd, expected)
+      : 0;
     const justified =
-      certificateMinutes > 0 ? certificateMinutes : approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0;
+      Math.max(
+        certificateMinutes,
+        approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0,
+        operationalJustified,
+      );
     const creditedWorked = worked === null ? (justified > 0 ? justified : null) : worked + justified;
 
     if (creditedWorked !== null) totalWorked += creditedWorked;
@@ -224,6 +233,7 @@ async function buildTimesheetDocument({
     if (cert) justificativa = 'Atestado';
     else if (approvedRequest?.type === 'AUSENCIA') justificativa = 'Ausência';
     else if (approvedRequest?.type === 'TROCA_DIA') justificativa = 'Troca';
+    else if (operationalAbono) justificativa = 'Abono';
     else if (absent) justificativa = 'Falta';
 
     const escala = !scheduled

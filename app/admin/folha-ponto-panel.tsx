@@ -18,7 +18,7 @@ type RecordItem = {
   user: { id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle: string | null };
 };
 type DayRow = {
-  date: string; weekday: string; punches: RecordItem[]; worked: number | null; expected: number | null;
+  date: string; weekday: string; punches: RecordItem[]; worked: number | null; creditedWorked: number | null; expected: number | null;
   justified: number | null; missing: number | null; surplus: number | null; balance: number | null;
   absent: boolean; late: boolean; certificate: boolean; incomplete: boolean; schedule: string;
 };
@@ -166,7 +166,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
       && (!types.has('ENTRADA') || !types.has('SAIDA')),
     );
     return {
-      date, weekday: weekdayNames[weekday], punches: dayPunches, worked, expected, justified, missing, surplus, balance,
+      date, weekday: weekdayNames[weekday], punches: dayPunches, worked, creditedWorked: considered, expected, justified, missing, surplus, balance,
       absent: configuredWorkday && !dayPunches.length && !covered, late: configuredWorkday && late && !covered,
       certificate: covered, incomplete, schedule: scheduleLabel,
     };
@@ -416,10 +416,10 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
             </div>
             <div className="folha-table-scroll">
               {(() => {
-                const totalWorked = rows.reduce((total, row) => total + (row.worked ?? 0), 0);
+                const totalWorked = rows.reduce((total, row) => total + (row.creditedWorked ?? 0), 0);
                 const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);
                 const totalBalance = rows.reduce((total, row) => total + (row.balance ?? 0), 0);
-                const workedDays = rows.filter((row) => row.worked !== null && row.worked > 0).length;
+                const workedDays = rows.filter((row) => row.creditedWorked !== null && row.creditedWorked > 0).length;
                 return (
                   <div className="folha-summary" aria-label="Resumo mensal">
                     <div><span>Dias trabalhados</span><strong>{String(workedDays).padStart(2, '0')}</strong></div>
@@ -459,7 +459,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                         <td className="folha-col-marks">{row.punches.length ? row.punches.map((punch) => (
                           <span key={punch.id} className="folha-mark">{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}</span>
                         )) : '—'}</td>
-                        <td>{formatMinutes(row.worked)}</td>
+                        <td>{formatMinutes(row.creditedWorked)}</td>
                         <td>{formatMinutes(row.expected)}</td>
                         <td>{formatMinutes(row.missing)}</td>
                         <td className={row.balance !== null && row.balance < 0 ? 'folha-neg' : row.balance !== null && row.balance > 0 ? 'folha-pos' : ''}>{formatMinutes(row.balance)}</td>
@@ -470,7 +470,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                 </tbody>
               </table>
               {(() => {
-                const totalWorked = rows.reduce((total, row) => total + (row.worked ?? 0), 0);
+                const totalWorked = rows.reduce((total, row) => total + (row.creditedWorked ?? 0), 0);
                 const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);
                 return (
                   <div className="folha-total-row" aria-label="Totais mensais">
