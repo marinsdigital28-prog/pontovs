@@ -418,8 +418,8 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
               <table className="folha-table">
                 <thead>
                   <tr>
-                    <th>Data</th><th>Escala</th><th>Marcações</th><th>Trab.</th><th>Just.</th>
-                    <th>Prev.</th><th>Falta</th><th>Extra</th><th>Saldo</th><th>Situação</th>
+                    <th>Data</th><th>Escala</th><th>Marcações</th><th>Trab.</th>
+                    <th>Prev.</th><th>Falta</th><th>Saldo</th><th>Situação</th>
                   </tr>
                 </thead>
                 <tbody>

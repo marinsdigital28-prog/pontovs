@@ -95,6 +95,9 @@ describe('navegação da folha de ponto', () => {
     expect(signedTimesheetPdf).not.toContain('Atrasos');
     expect(signedTimesheetPdf).not.toContain("justificativa = 'Atraso'");
     expect(timesheet).toContain('CPF não cadastrado');
+    expect(timesheet).toContain('<th>Data</th><th>Escala</th><th>Marcações</th><th>Trab.</th>');
+    expect(timesheet).not.toContain('<th>Just.</th>');
+    expect(timesheet).not.toContain('<th>Extra</th>');
     expect(timesheet).not.toContain(": row.late ? 'ATRASO'");
   });
 });
