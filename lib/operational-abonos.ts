@@ -3,12 +3,15 @@ import { brazilDateKey } from './brazil-time';
 /** Matrículas */
 export const MAT_KAIO = '0803';
 export const MAT_ANA_MARIA = '2904';
+export const MAT_VIVIANE = '1404';
 
 /** Datas operacionais fixas (YYYY-MM-DD, fuso SP) */
 export const DATA_MESA_BRASIL_ANA = '2026-08-25';
 export const DATA_VENDAVAL = '2026-08-07';
 export const DATA_INDEPENDENCIA = '2026-09-07';
+export const DATA_OBITO_VIVIANE = '2026-09-22';
 export const HORA_SAIDA_VENDAVAL = '15:00';
+export const HORA_INICIO_ABONO_OBITO_VIVIANE = '15:51';
 
 /** Feriados nacionais (dia integral abonado para quem está na escala) */
 export const NATIONAL_HOLIDAYS: Record<string, string> = {
@@ -87,6 +90,15 @@ export function getOperationalAbono(
     return {
       kind: 'FULL_DAY',
       reason: 'Trabalho externo — reunião Mesa Brasil',
+    };
+  }
+
+  // Viviane 1404 — atestado de óbito em 22/09/2026; abona o restante após a saída registrada.
+  if (mat === MAT_VIVIANE && dateKey === DATA_OBITO_VIVIANE) {
+    return {
+      kind: 'FROM_TIME',
+      fromTime: HORA_INICIO_ABONO_OBITO_VIVIANE,
+      reason: 'Atestado de óbito — restante do expediente',
     };
   }
 
