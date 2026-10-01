@@ -133,18 +133,18 @@ async function buildTimesheetDocument({
   const expectedBase = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunch);
 
   const cols = [MX, 72, 155, 400, 455, 510, 565, 620, right];
-  const headers = ['Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Falta', 'Saldo', 'Situação'];
+  const headers = ['Data', 'Escala', 'Marcações', 'Trab. cred.', 'Prev.', 'Falta', 'Saldo', 'Situação'];
   const tableTop = infoY - 36;
   const footerReserve = 78;
   const headerH = 14;
   const available = tableTop - footerReserve - headerH;
   const rowH = Math.min(14, available / lastDay);
-  const fs = rowH >= 13 ? 7.6 : rowH >= 11.5 ? 7.2 : 6.8;
+  const fs = rowH >= 13 ? 8.4 : rowH >= 11.5 ? 8.0 : 7.4;
 
   page.drawRectangle({ x: MX, y: tableTop - headerH, width: right - MX, height: headerH, color: green });
   headers.forEach((h, i) => {
       page.drawText(h, {
-      x: cols[i] + 3, y: tableTop - 10, size: 7, font: bold, color: rgb(1, 1, 1),
+      x: cols[i] + 3, y: tableTop - 10, size: 7.8, font: bold, color: rgb(1, 1, 1),
       maxWidth: cols[i + 1] - cols[i] - 4,
     });
   });
@@ -254,7 +254,7 @@ async function buildTimesheetDocument({
     values.forEach((value, i) => {
       const maxLen = i === 2 ? 48 : i === 1 ? 14 : i === 7 ? 12 : 10;
       page.drawText(String(value).slice(0, maxLen), {
-        x: cols[i] + 3, y, size: i === 2 ? Math.max(6.2, fs - 0.4) : fs, font: regular, color: dark,
+        x: cols[i] + 3, y, size: i === 2 ? Math.max(7.0, fs - 0.4) : fs, font: regular, color: dark,
         maxWidth: cols[i + 1] - cols[i] - 5,
       });
     });
@@ -271,9 +271,12 @@ async function buildTimesheetDocument({
   page.drawText(`Justificado ${formatMinutes(totalJustified)}`, { x: cols[5] + 3, y: sumY, size: 6.8, font: regular, color: muted });
   page.drawText(`Saldo ${formatSignedMinutes(totalBalance)}`, { x: cols[6] + 3, y: sumY, size: 7.2, font: bold, color: green });
   page.drawText(`Faltas ${absences}`, { x: cols[7] + 3, y: sumY, size: 6.8, font: regular, color: muted });
+  page.drawText('Legenda: Trab. cred. = marcações + abonos · Prev. = jornada prevista · Saldo = Trab. cred. − Prev. · Falta = horas não cumpridas', {
+    x: MX, y: sumY - 10, size: 6.8, font: regular, color: muted, maxWidth: right - MX,
+  });
 
   page.drawLine({ start: { x: right - 200, y: 36 }, end: { x: right - 20, y: 36 }, thickness: 0.5, color: soft });
-  page.drawText('Assinatura do colaborador', { x: right - 175, y: 26, size: 6.5, font: regular, color: muted });
+  page.drawText('Assinatura do colaborador', { x: right - 175, y: 26, size: 7.2, font: regular, color: muted });
 
   page.drawRectangle({ x: MX, y: 12, width: 220, height: 26, borderColor: green, borderWidth: 0.8 });
   page.drawText('Assinado digitalmente', { x: MX + 8, y: 26, size: 7, font: bold, color: green });

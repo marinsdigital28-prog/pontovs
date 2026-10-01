@@ -67,6 +67,13 @@
 }
 .folha-summary span { color: var(--folha-muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
 .folha-summary strong { color: var(--folha-green); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.folha-legend {
+  display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; align-items: baseline;
+  padding: 0.65rem 0.85rem; background: #fff; color: #40564a; border-bottom: 1px solid #d5e3db;
+  font-size: 0.86rem; line-height: 1.35;
+}
+.folha-legend strong { color: var(--folha-green); font-size: 0.92rem; }
+.folha-legend b { color: #1d4938; font-weight: 850; }
 .folha-total-row {
   display: grid; grid-template-columns: minmax(58px, 0.7fr) minmax(170px, 1.5fr) minmax(220px, 2.2fr) repeat(5, minmax(72px, 0.75fr));
   align-items: center; min-width: 920px; padding: 0.65rem 0.6rem; border-top: 2px solid var(--folha-green);
@@ -75,21 +82,21 @@
 .folha-total-row strong { text-align: right; font-weight: 850; }
 .folha-table {
   width: 100%; border-collapse: separate; border-spacing: 0; min-width: 920px;
-  font-size: 13.5px; line-height: 1.35;
+  font-size: 14.5px; line-height: 1.4;
   font-family: "Segoe UI", system-ui, -apple-system, Arial, Helvetica, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 .folha-table thead th {
   position: sticky; top: 0; z-index: 1;
   background: linear-gradient(180deg, #0d6a4c, #0b5c42); color: #fff;
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
   text-align: left; padding: 12px 10px; white-space: nowrap; border-bottom: 3px solid var(--folha-gold);
 }
 .folha-table thead th:nth-child(n+4) { text-align: right; }
 .folha-table thead th:last-child { text-align: center; }
 .folha-table tbody td {
   padding: 9px 10px; border-bottom: 1px solid var(--folha-line); vertical-align: middle;
-  font-size: 13.5px; background: #fbfefc;
+  font-size: 14.5px; background: #fbfefc;
 }
 .folha-table tbody td:nth-child(n+4) {
   text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; color: #1e3328;
@@ -103,17 +110,17 @@
   font-weight: 700; letter-spacing: 0.03em;
 }
 .folha-col-scale {
-  max-width: 200px; white-space: normal; font-size: 12.5px; color: #3a4f44;
+  max-width: 200px; white-space: normal; font-size: 13.5px; color: #3a4f44;
   text-align: left !important; font-weight: 500;
 }
 .folha-col-marks { min-width: 200px; white-space: normal; text-align: left !important; }
 .folha-mark {
   display: inline-block; margin: 2px 4px 2px 0; padding: 3px 8px; border-radius: 7px;
-  background: #d8ebe2; color: var(--folha-green); font-weight: 750; font-size: 12px; border: 1px solid #b8d6c6;
+  background: #d8ebe2; color: var(--folha-green); font-weight: 750; font-size: 13px; border: 1px solid #b8d6c6;
 }
 .folha-col-sit { text-align: center !important; white-space: nowrap; min-width: 112px; }
 .folha-sit {
-  display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 10.5px;
+  display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11.5px;
   font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.25;
   box-shadow: 0 1px 0 rgba(0,0,0,0.04);
 }
@@ -289,16 +296,22 @@
     border: 0 !important; background: #fff !important;
   }
   .folha-summary > div { min-width: 0; padding: 1mm 1.5mm; border: 0.5pt solid #b8c8be; border-radius: 1.5mm; }
-  .folha-summary span { font-size: 6.4pt; }
-  .folha-summary strong { font-size: 9pt; }
+  .folha-summary span { font-size: 7.1pt; }
+  .folha-summary strong { font-size: 10pt; }
+  .folha-legend {
+    display: flex !important; flex-wrap: wrap !important; gap: 0.8mm 2.2mm !important;
+    padding: 0.8mm 1mm !important; border-bottom: 0.5pt solid #b8c8be !important;
+    color: #222 !important; font-size: 7pt !important; line-height: 1.2 !important;
+  }
+  .folha-legend strong { color: #0b5c42 !important; font-size: 7.4pt !important; }
 
   .folha-table {
     min-width: 0 !important;
     width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 7.2pt !important;
-    line-height: 1.25 !important;
+    font-size: 8.2pt !important;
+    line-height: 1.28 !important;
   }
 
   .folha-table thead { display: table-header-group !important; }
@@ -306,7 +319,7 @@
     position: static !important;
     background: #0b5c42 !important;
     color: #fff !important;
-    font-size: 7pt !important;
+    font-size: 8pt !important;
     font-weight: 800 !important;
     padding: 0.65mm 0.8mm !important;
     border: 0.3pt solid #094a36 !important;
@@ -315,9 +328,9 @@
   }
 
   .folha-table tbody td {
-    padding: 0.34mm 0.65mm !important;
-    font-size: 7.2pt !important;
-    line-height: 0.98 !important;
+    padding: 0.42mm 0.65mm !important;
+    font-size: 8.2pt !important;
+    line-height: 1.02 !important;
     border: 0.3pt solid #b8c8be !important;
     color: #111 !important;
     background: #fff !important;
@@ -325,9 +338,9 @@
   }
   .folha-total-row {
     display: grid !important; min-width: 0 !important; grid-template-columns: minmax(7%, 0.7fr) minmax(17%, 1.5fr) minmax(27%, 2.2fr) repeat(5, minmax(7%, 0.75fr));
-    padding: 0.8mm 0.8mm !important; font-size: 7pt !important; border-top: 1pt solid #0b5c42 !important; background: #eef5f0 !important;
+    padding: 0.8mm 0.8mm !important; font-size: 8pt !important; border-top: 1pt solid #0b5c42 !important; background: #eef5f0 !important;
   }
-  .folha-total-row strong { font-size: 7pt !important; }
+  .folha-total-row strong { font-size: 8pt !important; }
   .folha-table tbody tr:nth-child(even) td { background: #eef5f0 !important; }
   .folha-row-falta td { background: #fdeceb !important; }
   .folha-row-incompleto td { background: #fff6e8 !important; }
@@ -337,14 +350,14 @@
   .folha-col-date b,
   .folha-col-date span {
     display: inline !important;
-    font-size: 7.2pt !important;
+    font-size: 8.2pt !important;
     color: #111 !important;
     font-weight: 700 !important;
   }
   .folha-col-date span::before { content: ' · '; color: #666; }
 
   .folha-col-scale {
-    font-size: 6.9pt !important;
+    font-size: 7.8pt !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -357,13 +370,13 @@
     background: transparent !important;
     border: none !important;
     color: #111 !important;
-    font-size: 6.9pt !important;
+    font-size: 7.8pt !important;
     font-weight: 700 !important;
   }
 
   .folha-sit {
     padding: 0.3mm 1.4mm !important;
-    font-size: 6.9pt !important;
+    font-size: 7.8pt !important;
     border: 0.5pt solid #555 !important;
     background: #fff !important;
     color: #111 !important;

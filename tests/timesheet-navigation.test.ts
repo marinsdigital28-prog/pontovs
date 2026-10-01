@@ -86,7 +86,8 @@ describe('navegação da folha de ponto', () => {
     expect(timesheetPdfRoute).toContain('createSignedTimesheetPdfBatch');
     expect(timesheetPdfRoute).toContain('createSignedTimesheetPdf');
     expect(signedTimesheetPdf).toContain('A4 paisagem');
-    expect(signedTimesheetPdf).toContain("'Data', 'Escala', 'Marcações', 'Trab.', 'Prev.', 'Falta', 'Saldo', 'Situação'");
+    expect(signedTimesheetPdf).toContain("'Data', 'Escala', 'Marcações', 'Trab. cred.', 'Prev.', 'Falta', 'Saldo', 'Situação'");
+    expect(signedTimesheetPdf).toContain('Legenda: Trab. cred. = marcações + abonos');
     expect(signedTimesheetPdf).toContain('Assinado digitalmente');
     expect(signedTimesheetPdf).toContain('Espaço Progredir');
     expect(signedTimesheetPdf).toContain('Certificado A1');

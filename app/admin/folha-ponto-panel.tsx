@@ -428,6 +428,14 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                   </div>
                 );
               })()}
+              <div className="folha-legend" aria-label="Como interpretar a folha">
+                <strong>Como interpretar:</strong>
+                <span><b>Trab.</b> horas creditadas, incluindo abonos</span>
+                <span><b>Prev.</b> horas previstas para a escala</span>
+                <span><b>Falta</b> horas não cumpridas</span>
+                <span><b>Saldo</b> Trab. menos Prev.</span>
+                <span><b>Abono/Atestado</b> período justificado</span>
+              </div>
               <table className="folha-table">
                 <thead>
                   <tr>
