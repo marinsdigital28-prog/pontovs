@@ -28,7 +28,8 @@ function get(url) {
 // senão baixa a versão commitada da main.
 let t = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
 const hasApprovedTenColumnLayout = t.includes("'Falt.', 'Exc.', 'Saldo', 'Situação'") && t.includes('totalMissing');
-if (!hasApprovedTenColumnLayout && !(t.includes('Banco de Horas') && t.includes('Concordo com as marcações'))) {
+const hasApprovedEspacoLayout = t.includes('CPF não cadastrado') && t.includes('Assinado digitalmente') && t.includes('Faltas ${absences}');
+if (!hasApprovedTenColumnLayout && !hasApprovedEspacoLayout && !(t.includes('Banco de Horas') && t.includes('Concordo com as marcações'))) {
   t = await get('https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/main/lib/signed-timesheet-pdf.ts');
   fs.writeFileSync(outPath, t);
 }

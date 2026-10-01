@@ -20,11 +20,11 @@ const pdfPath = path.join(root, 'lib/signed-timesheet-pdf.ts');
 const cssPath = path.join(root, 'app/admin/folha-ponto.css');
 
 let panel = fs.existsSync(panelPath) ? fs.readFileSync(panelPath, 'utf8') : '';
-if (!panel.includes('export default function FolhaPontoPanel') || panel.trim().startsWith('PLACEHOLDER')) {
+if (!panel.includes('export default function FolhaPontoPanel') || panel.trim().startsWith('PLACEHOLDER') || panel.includes('TEMP: content loaded via next push')) {
   console.log('restoring panel from', GOOD_PANEL);
   panel = await fetchText(`https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_PANEL}/app/admin/folha-ponto-panel.tsx`);
   if (!panel.includes('folha-sit') && panel.includes("row.punches.length ? 'OK' : '';")) {
-    const newSit = `const situation = row.certificate || (row.justified && row.justified > 0)\n                      ? (row.punches.length ? 'ABONO + PONTO' : 'ABONO/ATESTADO')\n                      : row.absent ? 'FALTA'\n                      : row.incomplete ? 'INCOMPLETO'\n                      : row.late ? 'ATRASO'\n                      : isFolga ? 'FOLGA'\n                      : row.punches.length ? 'OK' : '';\n                    const sitClass =\n                      situation.startsWith('ABONO') ? 'folha-sit-abono'\n                      : situation === 'FALTA' ? 'folha-sit-falta'\n                      : situation === 'INCOMPLETO' ? 'folha-sit-incompleto'\n                      : situation === 'ATRASO' ? 'folha-sit-atraso'\n                      : situation === 'FOLGA' ? 'folha-sit-folga'\n                      : situation === 'OK' ? 'folha-sit-ok'\n                      : '';`;
+    const newSit = `const situation = row.certificate || (row.justified && row.justified > 0)\n                      ? (row.punches.length ? 'ABONO + PONTO' : 'ABONO/ATESTADO')\n                      : row.absent ? 'FALTA'\n                      : row.incomplete ? 'INCOMPLETO'\n                      : row.late ? ''\n                      : isFolga ? 'FOLGA'\n                      : row.punches.length ? 'OK' : '';\n                    const sitClass =\n                      situation.startsWith('ABONO') ? 'folha-sit-abono'\n                      : situation === 'FALTA' ? 'folha-sit-falta'\n                      : situation === 'INCOMPLETO' ? 'folha-sit-incompleto'\n                      : situation === 'ATRASO' ? ''\n                      : situation === 'FOLGA' ? 'folha-sit-folga'\n                      : situation === 'OK' ? 'folha-sit-ok'\n                      : '';`;
     panel = panel.replace(/const situation = row\.certificate[\s\S]*?row\.punches\.length \? 'OK' : '';/, newSit.trim());
     panel = panel.replace(
       '<td className="folha-col-sit">{situation}</td>',

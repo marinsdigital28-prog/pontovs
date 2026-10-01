@@ -11,7 +11,7 @@ const RAW = `https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GO
 
 async function main() {
   let t = fs.existsSync(panelPath) ? fs.readFileSync(panelPath, 'utf8') : '';
-  const broken = !t.includes('export default function FolhaPontoPanel') || t.trim() === 'PLACEHOLDER';
+  const broken = !t.includes('export default function FolhaPontoPanel') || t.trim() === 'PLACEHOLDER' || t.includes('TEMP: content loaded via next push');
 
   if (broken) {
     console.log('folha panel PLACEHOLDER/quebrado — baixando versao boa do commit', GOOD_COMMIT);
@@ -30,14 +30,14 @@ async function main() {
                       ? (row.punches.length ? 'ABONO + PONTO' : 'ABONO/ATESTADO')
                       : row.absent ? 'FALTA'
                       : row.incomplete ? 'INCOMPLETO'
-                      : row.late ? 'ATRASO'
+                      : row.late ? ''
                       : isFolga ? 'FOLGA'
                       : row.punches.length ? 'OK' : '';
                     const sitClass =
                       situation.startsWith('ABONO') ? 'folha-sit-abono'
                       : situation === 'FALTA' ? 'folha-sit-falta'
                       : situation === 'INCOMPLETO' ? 'folha-sit-incompleto'
-                      : situation === 'ATRASO' ? 'folha-sit-atraso'
+                      : situation === 'ATRASO' ? ''
                       : situation === 'FOLGA' ? 'folha-sit-folga'
                       : situation === 'OK' ? 'folha-sit-ok'
                       : '';`;

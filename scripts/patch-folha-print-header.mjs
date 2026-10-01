@@ -36,7 +36,7 @@ const newHeading = [
   '                <h3>{employee.name}</h3>',
   '                <p className="folha-print-meta">',
   "                  <span><b>Matrícula:</b> {employee.employeeNumber || '—'}</span>",
-  "                  <span><b>CPF:</b> {employee.cpf || '—'}</span>",
+  "                  <span><b>CPF:</b> {employee.cpf || 'CPF não cadastrado'}</span>",
   "                  <span><b>Cargo:</b> {employee.jobTitle || '—'}</span>",
   '                </p>',
   '                <p className="folha-print-meta">',
