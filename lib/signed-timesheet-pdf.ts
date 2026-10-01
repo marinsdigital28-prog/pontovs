@@ -138,12 +138,12 @@ async function buildTimesheetDocument({
   const headerH = 14;
   const available = tableTop - footerReserve - headerH;
   const rowH = Math.min(14, available / lastDay);
-  const fs = rowH >= 13 ? 7 : rowH >= 11.5 ? 6.5 : 6;
+  const fs = rowH >= 13 ? 7.6 : rowH >= 11.5 ? 7.2 : 6.8;
 
   page.drawRectangle({ x: MX, y: tableTop - headerH, width: right - MX, height: headerH, color: green });
   headers.forEach((h, i) => {
-    page.drawText(h, {
-      x: cols[i] + 3, y: tableTop - 10, size: 6.5, font: bold, color: rgb(1, 1, 1),
+      page.drawText(h, {
+      x: cols[i] + 3, y: tableTop - 10, size: 7, font: bold, color: rgb(1, 1, 1),
       maxWidth: cols[i + 1] - cols[i] - 4,
     });
   });
@@ -244,7 +244,7 @@ async function buildTimesheetDocument({
     values.forEach((value, i) => {
       const maxLen = i === 2 ? 48 : i === 1 ? 14 : i === 7 ? 12 : 10;
       page.drawText(String(value).slice(0, maxLen), {
-        x: cols[i] + 3, y, size: i === 2 ? Math.max(5.5, fs - 0.5) : fs, font: regular, color: dark,
+        x: cols[i] + 3, y, size: i === 2 ? Math.max(6.2, fs - 0.4) : fs, font: regular, color: dark,
         maxWidth: cols[i + 1] - cols[i] - 5,
       });
     });
