@@ -4,7 +4,7 @@ import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { filterPunchesOutsideCertificates } from './certificate-conflicts';
-import { getOperationalAbono, operationalJustifiedMinutes } from './operational-abonos';
+import { getOperationalAbono, operationalJustifiedMinutes, shouldSuppressAbono } from './operational-abonos';
 
 export type TimesheetEmployee = {
   name: string;
@@ -158,10 +158,13 @@ async function buildTimesheetDocument({
     const date = new Date(year, monthNumber - 1, index + 1, 12, 0, 0);
     const dateKey = `${year}-${String(monthNumber).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`;
     const dateBr = `${String(index + 1).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}`;
+    const suppress = shouldSuppressAbono(employee.employeeNumber, dateKey);
     const rawDayPunches = punches.filter((p) => rowDayKey(p.timestamp) === dateKey);
-    const dayCerts = certificates.map((c) => ({
-      userId: '', startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status,
-    }));
+    const dayCerts = suppress
+      ? []
+      : certificates.map((c) => ({
+          userId: '', startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status,
+        }));
     const dayPunches = filterPunchesOutsideCertificates(
       rawDayPunches.map((p, i) => ({ id: String(i), userId: '', type: p.type, timestamp: p.timestamp, status: 'VALID' })),
       dayCerts as any,
@@ -173,10 +176,12 @@ async function buildTimesheetDocument({
     const configuredWorkday = scheduled && expected !== null;
     const worked = workedMinutes(dayPunches);
 
-    const cert = certificates.find((item) => {
-      if (item.status !== 'APROVADO' && item.status !== 'ATIVO') return false;
-      return rowDayKey(item.startDate) <= dateKey && rowDayKey(item.endDate) >= dateKey;
-    });
+    const cert = suppress
+      ? undefined
+      : certificates.find((item) => {
+          if (item.status !== 'APROVADO' && item.status !== 'ATIVO') return false;
+          return rowDayKey(item.startDate) <= dateKey && rowDayKey(item.endDate) >= dateKey;
+        });
     const certificateMinutes = cert
       ? cert.startTime && cert.endTime
         ? Math.max(0, (minutesFromClock(cert.endTime) || 0) - (minutesFromClock(cert.startTime) || 0))
