@@ -69,9 +69,10 @@ if (!pdf.includes('createSignedTimesheetPdf') || pdf.trim().startsWith('PLACEHOL
 let css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
 const hasReadablePrint =
   css.includes('letra maior') ||
+  css.includes('Cabeçalho compacto') ||
   (css.includes('font-size: 8.5pt') && css.includes('@media print') && css.includes('page-break-after: always')) ||
   (css.includes('page-break-inside: avoid !important') && css.includes('font-size: 6.3pt !important') && css.includes('A4 landscape')) ||
-  (css.includes('font-size: 17px') && css.includes('@media print'));
+  ((css.includes('font-size: 17px') || css.includes('font-size: 16.5px')) && css.includes('@media print'));
 
 if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER') || !hasReadablePrint) {
   console.log('restoring readable print CSS from', GOOD_CSS);
