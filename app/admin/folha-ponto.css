@@ -1,1 +1,413 @@
-PLACEHOLDER
+/* Folha de ponto — tela + impressão A4 landscape legível */
+.folha-ponto-root {
+  overflow: visible;
+  --folha-green: #084a35;
+  --folha-gold: #c9a227;
+  --folha-ink: #0a1210;
+  --folha-muted: #3d5348;
+  --folha-line: #c5d8cc;
+  --folha-alt: #e4f0e9;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  font-synthesis: none;
+}
+.folha-toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: flex-end; margin-bottom: 0.15rem; }
+.folha-month-input, .folha-employee-select {
+  min-width: 180px; font-size: 1rem !important; padding: 0.65rem 0.85rem !important; font-weight: 600; border-radius: 10px !important;
+}
+.folha-competence-banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem;
+  margin: 0.5rem 0 0.75rem; padding: 0.55rem 0.9rem; border-radius: 12px;
+  background: linear-gradient(135deg, #0b5c42 0%, #0d6e4f 55%, #0a523b 100%);
+  color: #f4fff8; border: 1px solid rgba(201, 162, 39, 0.55);
+  box-shadow: 0 4px 14px rgba(8, 74, 53, 0.18); position: relative; overflow: hidden;
+}
+.folha-competence-banner::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background: linear-gradient(90deg, #c9a227, #e6c65a, #c9a227);
+}
+.folha-competence-banner strong { font-size: 1.08rem; letter-spacing: 0.04em; }
+.folha-competence-banner span { font-size: 0.9rem; opacity: 0.95; }
+.folha-competence-banner b { color: #ffe7a0; font-weight: 800; }
+.folha-batch-progress { font-size: 0.85rem; color: #ffe7a0; }
+.folha-live-dot {
+  display: inline-flex; align-items: center; gap: 0.4rem; margin-left: auto;
+  font-size: 0.72rem; font-weight: 700; color: #b8f5c8; letter-spacing: 0.05em; text-transform: uppercase;
+}
+.folha-live-dot::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%; background: #3dd68c;
+  box-shadow: 0 0 0 3px rgba(61, 214, 140, 0.25); animation: folha-pulse 1.6s ease-in-out infinite;
+}
+@keyframes folha-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+.folha-block {
+  margin: 1rem 0 1.5rem; padding: 1rem 1.1rem 1.1rem; border-radius: 14px;
+  border: 1px solid rgba(12, 90, 66, 0.18); background: #fbfefc;
+  box-shadow: 0 8px 28px rgba(8, 40, 28, 0.06);
+}
+.folha-block > .section-heading {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.35rem 1rem;
+  margin-bottom: 0.65rem; padding-bottom: 0.45rem; border-bottom: 2px solid rgba(8, 74, 53, 0.12);
+}
+.folha-block > .section-heading h3 {
+  margin: 0; font-size: 1.2rem; font-weight: 800; letter-spacing: 0.01em; color: #eef8f2;
+}
+.folha-block > .section-heading .small-muted {
+  margin: 0.15rem 0 0; font-size: 0.86rem; color: #9bb5a6; font-weight: 600;
+}
+.folha-summary {
+  display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; margin: 0 0 0.65rem;
+}
+.folha-summary span { color: var(--folha-muted); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.folha-summary strong { color: var(--folha-green); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.folha-table-scroll {
+  overflow: auto; border-radius: 12px; border: 1px solid var(--folha-line); background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+}
+.folha-table {
+  width: 100%; border-collapse: separate; border-spacing: 0; min-width: 920px;
+  font-size: 13.5px; line-height: 1.35;
+}
+.folha-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: linear-gradient(180deg, #0d6e4f, #0b5c42);
+  color: #f4fff8; text-align: left; padding: 0.55rem 0.65rem;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
+  border-bottom: 2px solid rgba(201,162,39,0.45);
+}
+.folha-table tbody td {
+  padding: 0.45rem 0.65rem; border-bottom: 1px solid #e3eee8;
+  font-size: 13.5px; background: #fbfefc;
+}
+.folha-table tbody tr:nth-child(even) td { background: var(--folha-alt); }
+.folha-table tbody tr:hover td { background: #e8f4ed; }
+.folha-col-date { white-space: nowrap; min-width: 58px; text-align: left !important; }
+.folha-col-date b { display: block; font-size: 1.05rem; color: var(--folha-green); font-weight: 800; line-height: 1.15; }
+.folha-col-date span {
+  display: block; font-size: 0.74rem; text-transform: uppercase; color: var(--folha-muted);
+}
+.folha-col-scale {
+  max-width: 200px; white-space: normal; font-size: 12.5px; color: #3a4f44;
+}
+.folha-col-marks { min-width: 200px; white-space: normal; text-align: left !important; }
+.folha-mark {
+  display: inline-block; margin: 0 0.25rem 0.2rem 0; padding: 0.15rem 0.45rem; border-radius: 6px;
+  background: #d8ebe2; color: var(--folha-green); font-weight: 750; font-size: 12px; border: 1px solid #b8d6c6;
+}
+.folha-col-sit { text-align: center !important; white-space: nowrap; min-width: 112px; }
+.folha-sit {
+  display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 10.5px;
+  font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.25;
+  border: 1px solid transparent;
+}
+.folha-sit-ok { background: #e6f6ec; color: #0b5c42; border-color: #9fcbb5; }
+.folha-sit-falta { background: #fdeceb; color: #9b1c1c; border-color: #f0b4ae; }
+.folha-sit-abono { background: #e8f6ee; color: #0b5c42; border-color: #9fcbb5; }
+.folha-sit-incompleto { background: #fff6e8; color: #9a5b00; border-color: #f0d2a0; }
+.folha-sit-folga { background: #eef1ef; color: #4a5c54; border-color: #c5d0ca; }
+.folha-neg { color: #b42318 !important; font-weight: 800; }
+.folha-pos { color: #0b5c42 !important; font-weight: 800; }
+.folha-row-falta td { background: #fdeceb !important; }
+.folha-row-abono td { background: #e8f6ee !important; }
+.folha-row-incompleto td { background: #fff6e8 !important; }
+.folha-row-folga td { color: #6a7c72; }
+.folha-hint { margin-top: 1rem; font-size: 0.95rem; color: var(--muted, #8a9a90); }
+.signature-area {
+  display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.25rem; padding-top: 0.85rem;
+  border-top: 1px solid var(--folha-line); align-items: flex-end;
+}
+.signature-block { flex: 1; min-width: 200px; max-width: 300px; text-align: center; }
+.institution-signature { display: block; max-width: 200px; max-height: 52px; margin: 0 auto 6px; object-fit: contain; }
+.signature-certificate-block {
+  display: block; padding: 0.45rem 0.65rem; border-radius: 8px; background: rgba(11, 92, 66, 0.08);
+  color: #b8dcc2; text-align: left; font-size: 0.78rem; line-height: 1.35; max-width: 280px;
+}
+.signature-certificate-block strong { font-size: 0.82rem; color: #c9a227; }
+.signature-line {
+  margin: 0; padding-top: 0.35rem; border-top: 1px solid rgba(201,162,39,0.35);
+  font-size: 0.8rem; color: #b8c9be; font-weight: 700;
+}
+.signature-caption { display: block; margin-top: 4px; color: #9bb5a6; font-size: 0.78rem; font-weight: 600; }
+.signature-spacer { height: 44px; border-bottom: 1.5px dashed rgba(201,162,39,0.4); margin: 0 auto 4px; max-width: 200px; }
+.folha-preclose {
+  margin: 0.75rem 0; padding: 0.75rem 0.9rem; border-radius: 12px;
+  background: linear-gradient(135deg, #0b5c42, #0a4a35); color: #e8f5ee;
+}
+.folha-preclose-head strong { font-size: 0.95rem; }
+.folha-preclose-head span { font-size: 0.82rem; opacity: 0.9; }
+.folha-preclose-list { margin: 0.4rem 0 0; padding-left: 1.1rem; font-size: 0.86rem; line-height: 1.45; }
+.folha-preclose-ok { margin: 0.25rem 0 0; font-size: 0.88rem; opacity: 0.95; }
+
+/* ===== IMPRESSÃO: 1 página A4 paisagem, letras legíveis ===== */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 5mm 6mm;
+  }
+
+  html, body {
+    background: #fff !important;
+    color: #111 !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body > * { display: none !important; }
+  body > .admin-shell,
+  body > main,
+  body > div { display: block !important; }
+
+  .admin-tabs, nav, header, footer,
+  .no-print, .folha-toolbar, .folha-print-actions,
+  .folha-live-dot, .folha-batch-progress, .folha-preclose, .folha-hint,
+  .eyebrow, button, .ghost-btn, .primary-btn, .status-msg, .admin-toast,
+  .row-actions.no-print,
+  .folha-competence-banner {
+    display: none !important;
+  }
+
+  .folha-ponto-root,
+  .timesheet-panel {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: #111 !important;
+    overflow: visible !important;
+  }
+
+  .folha-block,
+  .timesheet-employee-block {
+    display: block !important;
+    margin: 0 !important;
+    padding: 2mm 2.5mm 1.5mm !important;
+    border: 1.4pt solid #0b5c42 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    color: #111 !important;
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: 100% !important;
+  }
+  .folha-block:last-of-type,
+  .timesheet-employee-block:last-of-type {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .folha-block > .section-heading {
+    display: flex !important;
+    align-items: baseline !important;
+    justify-content: space-between !important;
+    gap: 4mm !important;
+    margin: 0 0 1.2mm !important;
+    padding: 0 0 0.8mm !important;
+    border-bottom: 1.4pt solid #0b5c42 !important;
+  }
+  .folha-block > .section-heading h3 {
+    color: #0b5c42 !important;
+    font-size: 13pt !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    line-height: 1.15 !important;
+  }
+  .folha-block > .section-heading .small-muted {
+    color: #222 !important;
+    font-size: 9.5pt !important;
+    font-weight: 650 !important;
+    margin: 0 !important;
+  }
+
+  .folha-summary {
+    display: flex !important;
+    gap: 5mm !important;
+    margin: 0 0 1.2mm !important;
+    padding: 0 !important;
+    font-size: 10pt !important;
+  }
+  .folha-summary span {
+    font-size: 8.5pt !important;
+    color: #333 !important;
+    font-weight: 700 !important;
+  }
+  .folha-summary strong {
+    font-size: 11pt !important;
+    color: #0b5c42 !important;
+    font-weight: 800 !important;
+  }
+
+  .folha-table-scroll {
+    overflow: visible !important;
+    max-height: none !important;
+    border: 0.9pt solid #222 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+
+  .folha-table {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    font-size: 10pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .folha-table thead th {
+    background: #0b5c42 !important;
+    color: #fff !important;
+    font-size: 8.5pt !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.03em !important;
+    text-transform: uppercase !important;
+    padding: 1.2mm 1.5mm !important;
+    border: 0.5pt solid #0a4a35 !important;
+    line-height: 1.15 !important;
+  }
+
+  .folha-table tbody td {
+    font-size: 10pt !important;
+    font-weight: 650 !important;
+    color: #111 !important;
+    padding: 0.85mm 1.4mm !important;
+    border: 0.4pt solid #bbb !important;
+    vertical-align: middle !important;
+    line-height: 1.2 !important;
+  }
+
+  .folha-table tbody tr:nth-child(even) td {
+    background: #f3f7f4 !important;
+  }
+
+  .folha-table tbody td:nth-child(n+4) {
+    font-size: 10.5pt !important;
+    font-weight: 750 !important;
+    font-variant-numeric: tabular-nums !important;
+    text-align: right !important;
+  }
+
+  .folha-col-date {
+    white-space: nowrap !important;
+    width: 9% !important;
+  }
+  .folha-col-date b,
+  .folha-col-date span {
+    display: inline !important;
+    font-size: 10pt !important;
+    color: #111 !important;
+    font-weight: 750 !important;
+  }
+  .folha-col-date span::before { content: ' · '; color: #555; }
+
+  .folha-col-scale {
+    font-size: 9pt !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    width: 16% !important;
+  }
+
+  .folha-col-marks {
+    font-size: 9.5pt !important;
+    width: 28% !important;
+  }
+
+  .folha-mark {
+    display: inline !important;
+    padding: 0 !important;
+    margin: 0 1.8mm 0 0 !important;
+    background: transparent !important;
+    border: none !important;
+    color: #111 !important;
+    font-size: 9.5pt !important;
+    font-weight: 750 !important;
+  }
+
+  .folha-col-sit {
+    text-align: center !important;
+    width: 12% !important;
+  }
+  .folha-sit {
+    padding: 0.4mm 1.6mm !important;
+    font-size: 8pt !important;
+    border: 0.6pt solid #444 !important;
+    background: #fff !important;
+    color: #111 !important;
+    box-shadow: none !important;
+    border-radius: 2px !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  .folha-neg { color: #9b1c1c !important; font-weight: 800 !important; }
+  .folha-pos { color: #0b5c42 !important; font-weight: 800 !important; }
+  .folha-row-falta td { background: #fdeceb !important; }
+  .folha-row-abono td { background: #e8f6ee !important; }
+  .folha-row-incompleto td { background: #fff8eb !important; }
+  .folha-row-folga td { color: #444 !important; }
+
+  .signature-area {
+    display: flex !important;
+    margin-top: 2mm !important;
+    padding-top: 1.5mm !important;
+    border-top: 0.9pt solid #333 !important;
+    gap: 8mm !important;
+    align-items: flex-end !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  .signature-block {
+    max-width: 48% !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+  .signature-certificate-block {
+    display: block !important;
+    padding: 1.2mm 2.2mm !important;
+    font-size: 8.5pt !important;
+    line-height: 1.25 !important;
+    background: #eef8f1 !important;
+    color: #0b5c42 !important;
+    border: 0.8pt solid #3d9b63 !important;
+    border-radius: 2px !important;
+    max-width: 100% !important;
+    margin: 0 0 1mm !important;
+  }
+  .signature-certificate-block strong {
+    color: #0b5c42 !important;
+    font-size: 9pt !important;
+  }
+  .signature-spacer {
+    height: 6mm !important;
+    max-width: 200px !important;
+    margin: 0 auto 0.6mm !important;
+    border-bottom: 0.9pt solid #222 !important;
+  }
+  .signature-line,
+  .signature-caption {
+    color: #111 !important;
+    font-size: 9pt !important;
+    margin: 0 !important;
+    padding-top: 0.5mm !important;
+    border-top-color: #333 !important;
+  }
+  .institution-signature {
+    max-height: 9mm !important;
+    margin-bottom: 0.5mm !important;
+  }
+}
