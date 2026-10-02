@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
 import { resolveDaySchedule } from '@/lib/day-schedule';
-import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay } from '@/lib/operational-abonos';
+import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay, shouldSuppressAbono } from '@/lib/operational-abonos';
 import { filterPunchesOutsideCertificates } from '@/lib/certificate-conflicts';
 import { brazilDateKey } from '@/lib/brazil-time';
 import './folha-ponto.css';
@@ -111,14 +111,17 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
   const expectedMinutes = scheduleSpan === null ? null : Math.max(0, scheduleSpan - lunchMinutes);
   return Array.from({ length: lastDay }, (_, index) => {
     const date = `${month}-${String(index + 1).padStart(2, '0')}`;
+    const suppressAbono = shouldSuppressAbono(employee.employeeNumber, date);
     const hidePunches = shouldHidePunchesForDay(employee.employeeNumber, date);
     const rawDayPunches = hidePunches ? [] : records.filter((record) => record.user.id === employee.id && dayKey(record.timestamp) === date);
-    const dayCertificates = certificates
-      .filter((item) => item.userId === employee.id)
-      .map((item) => ({
-        userId: item.userId, type: item.type, startDate: item.startDate, endDate: item.endDate,
-        startTime: item.startTime, endTime: item.endTime, status: item.status,
-      }));
+    const dayCertificates = suppressAbono
+      ? []
+      : certificates
+          .filter((item) => item.userId === employee.id)
+          .map((item) => ({
+            userId: item.userId, type: item.type, startDate: item.startDate, endDate: item.endDate,
+            startTime: item.startTime, endTime: item.endTime, status: item.status,
+          }));
     const allowedIds = new Set(
       filterPunchesOutsideCertificates(
         rawDayPunches.map((p) => ({ id: p.id, userId: employee.id, timestamp: new Date(p.timestamp) })),
@@ -140,9 +143,13 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const lunch = span !== null && span > 6 * 60 ? 60 : 0;
     const expected = scheduled && span !== null ? Math.max(0, span - lunch) : scheduled ? expectedMinutes : null;
     const configuredWorkday = scheduled && expected !== null;
-    const certificate = certificates.find((item) => item.userId === employee.id && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
+    const certificate = suppressAbono
+      ? undefined
+      : certificates.find((item) => item.userId === employee.id && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
     const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
-    const justifiedByCertificate = certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;
+    const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null
+      ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected)
+      : 0;
     const justifiedByRequest = approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0;
     const opsAbono = getOperationalAbono(employee.employeeNumber, date);
     const justifiedByOps = opsAbono ? operationalJustifiedMinutes(opsAbono, daySchedule?.start || employee.scheduleStart, daySchedule?.end || employee.scheduleEnd, expected) : 0;
@@ -353,27 +360,119 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
         return;
       }
       const blob = await response.blob();
-      await downloadPdfBlob(blob, `folhas-todos-${month}-assinadas.pdf`);
-      setBatchProgress(`Pronto: ${employees.length} folhas em 1 PDF.`);
+      await downloadPdfBlob(blob, `folhas-${month}.pdf`);
+      setBatchProgress('PDFs gerados.');
     } catch {
-      setError('Falha ao gerar PDF de todos.');
-      setBatchProgress('');
+      setError('Falha ao gerar PDFs em lote.');
     }
     setSigning(false);
   }
 
-  function handlePrintAll() {
-    setEmployeeId(allEmployeesValue);
-    setTimeout(() => window.print(), 300);
-  }
-
-  const bounds = monthBounds(month);
-
   return (
-    <section className="card timesheet-panel folha-ponto-root">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">CONFERÊNCIA MENSAL</span>
-          <h2>Folha de ponto</h2>
-          <p className="small-muted">A4 horizontal · 1 página por colaborador · padrão Espaço Progredir</p>
+    <div className="folha-ponto">
+      <div className="folha-toolbar">
+        <label>
+          Competência
+          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        </label>
+        <label>
+          Colaborador
+          <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+            <option value={allEmployeesValue}>Todos</option>
+            {employees.map((e) => (
+              <option key={e.id} value={e.id}>{e.employeeNumber || '—'} · {e.name}</option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={() => void load()} disabled={loading}>Atualizar</button>
+        <button type="button" onClick={() => void signAllPdfs()} disabled={signing || loading}>Assinar todos (PDF)</button>
+        {batchProgress ? <span className="folha-batch-progress">{batchProgress}</span> : null}
+      </div>
+
+      <div className={`folha-preclose ${preCloseAudit.ready ? 'ok' : 'warn'}`} role="status">
+        <div className="folha-preclose-head">
+          <strong>{preCloseAudit.ready ? 'Pré-fechamento: pronto' : 'Pré-fechamento: revisar antes de fechar'}</strong>
+          <span>
+            {preCloseAudit.totalFaltas} falta(s) · {preCloseAudit.totalIncompletos} incompleto(s) · {preCloseAudit.totalAtrasos} atraso(s) · {preCloseAudit.pendingRequests.length} solicitação(ões) pendente(s) · {preCloseAudit.pendingCerts.length} atestado(s) pendente(s)
+          </span>
         </div>
+        {!preCloseAudit.ready ? (
+          <ul className="folha-preclose-list">
+            {preCloseAudit.noSchedule.length ? (
+              <li><b>Sem jornada cadastrada:</b> {preCloseAudit.noSchedule.slice(0, 8).join(' · ')}{preCloseAudit.noSchedule.length > 8 ? ` · +${preCloseAudit.noSchedule.length - 8}` : ''}</li>
+            ) : null}
+            {preCloseAudit.incompletos.slice(0, 6).map((item) => (
+              <li key={`inc-${item.name}`}><b>Incompleto — {item.name}:</b> dia(s) {item.days.join(', ')}</li>
+            ))}
+            {preCloseAudit.faltas.slice(0, 6).map((item) => (
+              <li key={`fal-${item.name}`}><b>Falta — {item.name}:</b> dia(s) {item.days.join(', ')}</li>
+            ))}
+            {preCloseAudit.pendingRequests.length ? (
+              <li><b>Solicitações pendentes no mês:</b> {preCloseAudit.pendingRequests.length} (aba Solicitações)</li>
+            ) : null}
+            {preCloseAudit.pendingCerts.length ? (
+              <li><b>Atestados pendentes no mês:</b> {preCloseAudit.pendingCerts.length} (aba Atestados)</li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="folha-preclose-ok">Nenhuma pendência crítica nesta visão. Pode exportar / imprimir com mais segurança.</p>
+        )}
+      </div>
+
+      {error ? <p className="status-msg">{error}</p> : null}
+      {loading ? <p className="status-msg">Carregando…</p> : null}
+
+      {visibleEmployees.map((emp) => {
+        const rows = dayRowsByEmployee.get(emp.id) || [];
+        return (
+          <section key={emp.id} className="folha-employee">
+            <header className="folha-employee-head">
+              <div>
+                <strong>{emp.name}</strong>
+                <span>{emp.employeeNumber || '—'} · {emp.jobTitle || '—'}</span>
+              </div>
+              <button type="button" onClick={() => void signPdf(emp)} disabled={signing}>PDF assinado</button>
+            </header>
+            <table className="folha-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Escala</th>
+                  <th>Marcações</th>
+                  <th>H.Trab</th>
+                  <th>H.Just</th>
+                  <th>H.Prev</th>
+                  <th>Saldo</th>
+                  <th>Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const situation = row.certificate || (row.justified && row.justified > 0)
+                    ? (row.punches.length ? (row.abonoLabel ? `${row.abonoLabel} + ponto` : 'ABONO + PONTO') : (row.abonoLabel || 'ABONO/ATESTADO'))
+                    : row.absent ? 'FALTA'
+                    : row.incomplete ? 'INCOMPLETO'
+                    : row.late ? 'ATRASO'
+                    : !row.expected ? 'FOLGA'
+                    : row.punches.length ? 'OK' : '';
+                  return (
+                    <tr key={row.date} className={row.absent ? 'falta' : row.incomplete ? 'incompleto' : row.certificate ? 'abono' : ''}>
+                      <td>{row.date.slice(8)}/{row.date.slice(5, 7)} <span className="wd">{row.weekday}</span></td>
+                      <td>{row.schedule}</td>
+                      <td>{row.punches.map((p) => `${typeLabels[p.type] || p.type[0]} ${formatTime(p.timestamp)}`).join(' · ') || '—'}</td>
+                      <td>{formatMinutes(row.worked)}</td>
+                      <td>{formatMinutes(row.justified)}</td>
+                      <td>{formatMinutes(row.expected)}</td>
+                      <td>{formatMinutes(row.balance)}</td>
+                      <td>{situation}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
