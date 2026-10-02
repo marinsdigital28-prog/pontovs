@@ -69,10 +69,30 @@ async function main() {
   // justifiedByCertificate
   if (t.includes('const suppressAbono') && !t.includes('!suppressAbono && certificate')) {
     t = t.replace(
-      'const justifiedByCertificate = certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === \'FULL\', expected) : 0;',
+      "const justifiedByCertificate = certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;",
       "const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;",
     );
     console.log('folha: justifiedByCertificate suppress');
+  }
+
+  if (t.includes('const suppressAbono') && !t.includes("suppressAbono ? 0 : (approvedRequest")) {
+    t = t.replace(
+      "const justifiedByRequest = approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0;",
+      "const justifiedByRequest = suppressAbono ? 0 : (approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0);",
+    );
+    console.log('folha: justifiedByRequest suppress');
+  }
+
+  // Força zero de abono/justificado quando suppress (Taiane 30/09 etc.)
+  if (t.includes('const suppressAbono') && !t.includes('/* FORCE_SUPPRESS_ZERO */')) {
+    t = t.replace(
+      /const justified = Math\.max\(justifiedByCertificate, justifiedByRequest, justifiedByOps\);\s*\n\s*const considered = worked === null \? \(justified > 0 \? justified : null\) : worked \+ justified;/,
+      `const justifiedRaw = Math.max(justifiedByCertificate, justifiedByRequest, justifiedByOps);
+    /* FORCE_SUPPRESS_ZERO */
+    const justified = suppressAbono ? 0 : justifiedRaw;
+    const considered = worked === null ? (justified > 0 ? justified : null) : worked + justified;`,
+    );
+    console.log('folha: FORCE zero justified no suppress');
   }
 
   if (!t.includes('folha-sit') && t.includes("row.punches.length ? 'OK' : '';")) {
@@ -112,7 +132,7 @@ async function main() {
   }
 
   fs.writeFileSync(panelPath, t);
-  console.log('folha panel ok', fs.statSync(panelPath).size, t.includes('folha-sit') ? 'com badges' : 'sem badges', t.includes('suppressAbono') ? 'com suppress' : '');
+  console.log('folha panel ok', fs.statSync(panelPath).size, t.includes('folha-sit') ? 'com badges' : 'sem badges', t.includes('suppressAbono') ? 'com suppress' : '', t.includes('FORCE_SUPPRESS_ZERO') ? 'FORCE' : '');
 }
 
 main().catch((e) => {
