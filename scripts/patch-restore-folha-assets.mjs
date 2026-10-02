@@ -10,7 +10,7 @@ async function fetchText(url) {
   return res.text();
 }
 
-const GOOD_PANEL = '7e7b290decae4398c6c7d9b8ef42bb23e65fd501';
+const GOOD_PANEL = '6cec1049282155fb7cb8dd61361dc47c27deb71a';
 const GOOD_PDF = 'e4f876610e0ccb6404a99ba0b2436068284e64b9';
 /** CSS impressão legível (letra ~8.5pt, menos branco) */
 const GOOD_CSS = 'c91be42332d762209f678d78a485601ed63cb781';
@@ -20,15 +20,22 @@ const pdfPath = path.join(root, 'lib/signed-timesheet-pdf.ts');
 const cssPath = path.join(root, 'app/admin/folha-ponto.css');
 
 let panel = fs.existsSync(panelPath) ? fs.readFileSync(panelPath, 'utf8') : '';
-if (!panel.includes('export default function FolhaPontoPanel') || panel.trim().startsWith('PLACEHOLDER') || panel.includes('TEMP: content loaded via next push')) {
-  console.log('restoring panel from', GOOD_PANEL);
+const panelBroken =
+  !panel.includes('export default function FolhaPontoPanel') ||
+  panel.trim().startsWith('PLACEHOLDER') ||
+  panel.includes('TEMP: content loaded via next push') ||
+  !panel.includes('folha-table') ||
+  !panel.trim().endsWith('}') ||
+  panel.length < 25000;
+if (panelBroken) {
+  console.log('restoring panel from', GOOD_PANEL, '(local len', panel.length + ')');
   panel = await fetchText(`https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_PANEL}/app/admin/folha-ponto-panel.tsx`);
   if (!panel.includes('folha-sit') && panel.includes("row.punches.length ? 'OK' : '';")) {
     const newSit = `const situation = row.certificate || (row.justified && row.justified > 0)\n                      ? (row.punches.length ? 'ABONO + PONTO' : 'ABONO/ATESTADO')\n                      : row.absent ? 'FALTA'\n                      : row.incomplete ? 'INCOMPLETO'\n                      : row.late ? ''\n                      : isFolga ? 'FOLGA'\n                      : row.punches.length ? 'OK' : '';\n                    const sitClass =\n                      situation.startsWith('ABONO') ? 'folha-sit-abono'\n                      : situation === 'FALTA' ? 'folha-sit-falta'\n                      : situation === 'INCOMPLETO' ? 'folha-sit-incompleto'\n                      : situation === 'ATRASO' ? ''\n                      : situation === 'FOLGA' ? 'folha-sit-folga'\n                      : situation === 'OK' ? 'folha-sit-ok'\n                      : '';`;
     panel = panel.replace(/const situation = row\.certificate[\s\S]*?row\.punches\.length \? 'OK' : '';/, newSit.trim());
     panel = panel.replace(
       '<td className="folha-col-sit">{situation}</td>',
-      "<td className=\"folha-col-sit\">{situation ? <span className={`folha-sit ${sitClass}`}>{situation}</span> : '—'}</td>"
+      "<td className=\"folha-col-sit\">{situation ? <span className={`folha-sit ${sitClass}`}>{situation}</span> : '—'}</td>",
     );
   }
   fs.writeFileSync(panelPath, panel);
@@ -44,13 +51,13 @@ if (!pdf.includes('createSignedTimesheetPdf') || pdf.trim().startsWith('PLACEHOL
   if (pdf.includes("page.drawText('ESPAÇO PROGREDIR'") && !pdf.includes('// moldura-externa')) {
     pdf = pdf.replace(
       "page.drawText('ESPAÇO PROGREDIR'",
-      `// moldura-externa\n  page.drawRectangle({ x: MX - 3, y: MY - 3, width: right - MX + 6, height: PAGE_H - 2 * MY + 6, borderColor: green, borderWidth: 1.3 });\n  page.drawRectangle({ x: MX - 0.5, y: MY - 0.5, width: right - MX + 1, height: PAGE_H - 2 * MY + 1, borderColor: rgb(0.788, 0.635, 0.153), borderWidth: 0.6 });\n  page.drawText('ESPAÇO PROGREDIR'`
+      `// moldura-externa\n  page.drawRectangle({ x: MX - 3, y: MY - 3, width: right - MX + 6, height: PAGE_H - 2 * MY + 6, borderColor: green, borderWidth: 1.3 });\n  page.drawRectangle({ x: MX - 0.5, y: MY - 0.5, width: right - MX + 1, height: PAGE_H - 2 * MY + 1, borderColor: rgb(0.788, 0.635, 0.153), borderWidth: 0.6 });\n  page.drawText('ESPAÇO PROGREDIR'`,
     );
   }
   if (pdf.includes('page.drawRectangle({ x: MX, y: PAGE_H - MY - 22, width: right - MX, height: 1.2, color: green });') && !pdf.includes('gold-line')) {
     pdf = pdf.replace(
       'page.drawRectangle({ x: MX, y: PAGE_H - MY - 22, width: right - MX, height: 1.2, color: green });',
-      `page.drawRectangle({ x: MX, y: PAGE_H - MY - 22, width: right - MX, height: 1.2, color: green });\n  // gold-line\n  page.drawRectangle({ x: MX, y: PAGE_H - MY - 24, width: right - MX, height: 0.9, color: rgb(0.788, 0.635, 0.153) });`
+      `page.drawRectangle({ x: MX, y: PAGE_H - MY - 22, width: right - MX, height: 1.2, color: green });\n  // gold-line\n  page.drawRectangle({ x: MX, y: PAGE_H - MY - 24, width: right - MX, height: 0.9, color: rgb(0.788, 0.635, 0.153) });`,
     );
   }
   fs.writeFileSync(pdfPath, pdf);
@@ -63,7 +70,8 @@ let css = fs.existsSync(cssPath) ? fs.readFileSync(cssPath, 'utf8') : '';
 const hasReadablePrint =
   css.includes('letra maior') ||
   (css.includes('font-size: 8.5pt') && css.includes('@media print') && css.includes('page-break-after: always')) ||
-  (css.includes('page-break-inside: avoid !important') && css.includes('font-size: 6.3pt !important') && css.includes('A4 landscape'));
+  (css.includes('page-break-inside: avoid !important') && css.includes('font-size: 6.3pt !important') && css.includes('A4 landscape')) ||
+  (css.includes('font-size: 17px') && css.includes('@media print'));
 
 if (!css.includes('.folha-table') || css.trim().startsWith('PLACEHOLDER') || !hasReadablePrint) {
   console.log('restoring readable print CSS from', GOOD_CSS);
