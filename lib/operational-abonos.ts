@@ -120,7 +120,11 @@ export function minutesFromClock(value: string | null | undefined): number | nul
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
-/** Minutos creditados pelo abono operacional no dia. */
+/**
+ * Minutos creditados pelo abono operacional no dia.
+ * Feriado / FULL_DAY: conta como HORAS TRABALHADAS (pedido contábil) —
+ * credita a jornada prevista integral.
+ */
 export function operationalJustifiedMinutes(
   abono: OperationalAbono,
   scheduleStart: string | null | undefined,
@@ -128,13 +132,27 @@ export function operationalJustifiedMinutes(
   expectedMinutes: number | null,
 ): number {
   if (abono.kind === 'FULL_DAY') {
-    return expectedMinutes ?? 0;
+    // Preferência: jornada prevista do dia. Se não houver expected,
+    // calcula pela escala cadastrada (início–fim − almoço se > 6h).
+    if (expectedMinutes != null && expectedMinutes > 0) return expectedMinutes;
+    const start = minutesFromClock(scheduleStart);
+    const end = minutesFromClock(scheduleEnd);
+    if (start === null || end === null || end <= start) return 0;
+    const span = end - start;
+    const lunch = span > 6 * 60 ? 60 : 0;
+    return Math.max(0, span - lunch);
   }
   const end = minutesFromClock(scheduleEnd);
   const from = minutesFromClock(abono.fromTime || HORA_SAIDA_VENDAVAL);
   if (end === null || from === null) return 0;
   const raw = Math.max(0, end - from);
   return expectedMinutes !== null ? Math.min(expectedMinutes, raw) : raw;
+}
+
+/** True se a data é feriado nacional cadastrado (crédito integral como trabalhado). */
+export function isHolidayAbono(abono: OperationalAbono | null | undefined): boolean {
+  if (!abono) return false;
+  return abono.kind === 'FULL_DAY' && /feriado/i.test(abono.reason || '');
 }
 
 export function shouldHidePunchesForDay(
