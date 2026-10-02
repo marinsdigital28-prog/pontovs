@@ -4,12 +4,15 @@ import { brazilDateKey } from './brazil-time';
 export const MAT_KAIO = '0803';
 export const MAT_ANA_MARIA = '2904';
 export const MAT_VIVIANE = '1404';
+export const MAT_TAIANE = '2611';
 
 /** Datas operacionais fixas (YYYY-MM-DD, fuso SP) */
 export const DATA_MESA_BRASIL_ANA = '2026-08-25';
 export const DATA_VENDAVAL = '2026-08-07';
 export const DATA_INDEPENDENCIA = '2026-09-07';
 export const DATA_OBITO_VIVIANE = '2026-09-22';
+/** Abono lançado por engano — Taiane não tem atestado neste dia */
+export const DATA_ABONO_ERRADO_TAIANE = '2026-09-30';
 export const HORA_SAIDA_VENDAVAL = '15:00';
 export const HORA_INICIO_ABONO_OBITO_VIVIANE = '15:51';
 
@@ -48,6 +51,18 @@ export function isNationalHoliday(dateKey: string): boolean {
 }
 
 /**
+ * True quando qualquer abono/atestado deve ser ignorado na folha
+ * (lançamento errado — colaborador não possui o documento).
+ */
+export function shouldSuppressAbono(
+  employeeNumber: string | null | undefined,
+  dateKey: string,
+): boolean {
+  const mat = String(employeeNumber || '').replace(/\D/g, '');
+  return mat === MAT_TAIANE && dateKey === DATA_ABONO_ERRADO_TAIANE;
+}
+
+/**
  * Abono operacional por matrícula + data.
  * Não altera matrícula/jornada cadastrada — só justifica na folha.
  * Feriados nacionais abonam todo mundo que está na escala do dia.
@@ -57,6 +72,11 @@ export function getOperationalAbono(
   dateKey: string,
 ): OperationalAbono | null {
   const mat = String(employeeNumber || '').replace(/\D/g, '');
+
+  // Correção: Taiane 2611 — não tem atestado no dia 30/09/2026 (abono errado que gerava 15:58h)
+  if (shouldSuppressAbono(employeeNumber, dateKey)) {
+    return null;
+  }
 
   // Feriado nacional — abono integral para quem é do dia (escala)
   const holidayReason = NATIONAL_HOLIDAYS[dateKey];
