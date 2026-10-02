@@ -12,8 +12,8 @@ async function fetchText(url) {
 
 const GOOD_PANEL = '6cec1049282155fb7cb8dd61361dc47c27deb71a';
 const GOOD_PDF = 'e4f876610e0ccb6404a99ba0b2436068284e64b9';
-/** CSS impressão legível — letras ~10pt, 1 página A4 landscape */
-const GOOD_CSS = 'fd2287b47b73efc9faa498f7f0faef18a20a164a';
+/** CSS impressão legível — letras maiores + totais tfoot */
+const GOOD_CSS = '01501be0d46eba50664ec02c85b2be83c2e04bf6';
 
 const panelPath = path.join(root, 'app/admin/folha-ponto-panel.tsx');
 const pdfPath = path.join(root, 'lib/signed-timesheet-pdf.ts');
@@ -72,7 +72,7 @@ const hasReadablePrint =
   css.includes('IMPRESSÃO: 1 página A4') ||
   css.includes('Cabeçalho compacto') ||
   (css.includes('font-size: 10pt') && css.includes('@media print') && css.includes('A4 landscape')) ||
-  (css.includes('font-size: 8.5pt') && css.includes('@media print') && css.includes('page-break-after: always')) ||
+  (css.includes('font-size: 10.5pt') && css.includes('@media print') && css.includes('A4 landscape')) ||
   (css.includes('page-break-inside: avoid !important') && css.includes('A4 landscape')) ||
   ((css.includes('font-size: 17px') || css.includes('font-size: 16.5px')) && css.includes('@media print'));
 
