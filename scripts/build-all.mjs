@@ -46,7 +46,6 @@ const patches = [
   'scripts/patch-restore-certificates-route.mjs',
   'scripts/patch-certificates-panel-payload.mjs',
   'scripts/patch-restore-folha-assets.mjs',
-  'scripts/patch-folha-visual.mjs',
   'scripts/patch-timesheet-pdf-borders.mjs',
   'scripts/patch-timesheet-signature-api.mjs',
   'scripts/patch-folha-preclose.mjs',
@@ -61,12 +60,11 @@ const patches = [
   'scripts/expand-employee-shell.mjs',
   'scripts/expand-folga.mjs',
   'scripts/patch-ponto-perf.mjs',
-  'scripts/patch-folha-visual.mjs',
-  'scripts/patch-restore-folha-assets.mjs',
   'scripts/patch-folha-print-header.mjs',
   'scripts/patch-late-tolerance.mjs',
-  // jornada por matrícula (Eduardo 0028 quarta meio exp.)
   'scripts/patch-folha-day-schedule-mat.mjs',
+  // ÚLTIMO: aplica suppress Taiane + badges (depois de qualquer restore)
+  'scripts/patch-folha-visual.mjs',
 ];
 
 for (const p of patches) {
