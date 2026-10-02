@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const panelPath = path.join(root, 'app/admin/folha-ponto-panel.tsx');
 
-// Commit onde o painel ainda estava completo (antes do PLACEHOLDER)
 const GOOD_COMMIT = '7e7b290decae4398c6c7d9b8ef42bb23e65fd501';
 const RAW = `https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/${GOOD_COMMIT}/app/admin/folha-ponto-panel.tsx`;
 
@@ -21,16 +20,10 @@ async function main() {
   if (broken) {
     console.log('folha panel PLACEHOLDER/quebrado — baixando versao boa do commit', GOOD_COMMIT);
     const res = await fetch(RAW);
-    if (!res.ok) {
-      throw new Error('fetch panel failed ' + res.status + ' url=' + RAW);
-    }
+    if (!res.ok) throw new Error('fetch panel failed ' + res.status);
     t = await res.text();
-    if (!t.includes('export default function FolhaPontoPanel')) {
-      throw new Error('conteudo baixado nao parece o painel');
-    }
   }
 
-  // Import shouldSuppressAbono
   if (!t.includes('shouldSuppressAbono')) {
     t = t.replace(
       "import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay } from '@/lib/operational-abonos';",
@@ -39,7 +32,6 @@ async function main() {
     console.log('folha: import shouldSuppressAbono');
   }
 
-  // suppressAbono no dia
   if (!t.includes('const suppressAbono = shouldSuppressAbono')) {
     t = t.replace(
       "const hidePunches = shouldHidePunchesForDay(employee.employeeNumber, date);",
@@ -48,7 +40,6 @@ async function main() {
     console.log('folha: suppressAbono no dia');
   }
 
-  // dayCertificates vazio quando suppress
   if (t.includes('const suppressAbono') && !t.includes('suppressAbono\n      ? []')) {
     t = t.replace(
       /const dayCertificates = certificates\s*\n\s*\.filter\(\(item\) => item\.userId === employee\.id\)/,
@@ -57,7 +48,6 @@ async function main() {
     console.log('folha: dayCertificates suppress');
   }
 
-  // certificate find
   if (t.includes('const suppressAbono') && !t.includes('suppressAbono\n      ? undefined')) {
     t = t.replace(
       'const certificate = certificates.find((item) => item.userId === employee.id && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);',
@@ -66,7 +56,6 @@ async function main() {
     console.log('folha: certificate suppress');
   }
 
-  // justifiedByCertificate
   if (t.includes('const suppressAbono') && !t.includes('!suppressAbono && certificate')) {
     t = t.replace(
       "const justifiedByCertificate = certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;",
@@ -83,7 +72,6 @@ async function main() {
     console.log('folha: justifiedByRequest suppress');
   }
 
-  // Força zero de abono/justificado quando suppress (Taiane 30/09 etc.)
   if (t.includes('const suppressAbono') && !t.includes('/* FORCE_SUPPRESS_ZERO */')) {
     t = t.replace(
       /const justified = Math\.max\(justifiedByCertificate, justifiedByRequest, justifiedByOps\);\s*\n\s*const considered = worked === null \? \(justified > 0 \? justified : null\) : worked \+ justified;/,
@@ -111,18 +99,14 @@ async function main() {
                       : situation === 'FOLGA' ? 'folha-sit-folga'
                       : situation === 'OK' ? 'folha-sit-ok'
                       : '';`;
-    t = t.replace(
-      /const situation = row\.certificate[\s\S]*?row\.punches\.length \? 'OK' : '';/,
-      newSit.trim()
-    );
+    t = t.replace(/const situation = row\.certificate[\s\S]*?row\.punches\.length \? 'OK' : '';/, newSit.trim());
     t = t.replace(
       '<td className="folha-col-sit">{situation}</td>',
-      "<td className=\"folha-col-sit\">{situation ? <span className={`folha-sit ${sitClass}`}>{situation}</span> : '—'}</td>"
+      "<td className=\"folha-col-sit\">{situation ? <span className={`folha-sit ${sitClass}`}>{situation}</span> : '—'}</td>",
     );
-    console.log('folha panel: badges de situacao aplicados');
+    console.log('folha panel: badges de situacao');
   }
 
-  // Garante isFolga definido se a situação o referencia
   if (t.includes('isFolga ?') && !t.includes('const isFolga')) {
     t = t.replace(
       /const situation = row\.certificate/,
@@ -131,8 +115,38 @@ async function main() {
     console.log('folha: isFolga definido');
   }
 
+  // Totais sob cada coluna (tfoot)
+  if (!t.includes('folha-tfoot') && t.includes('</tbody>')) {
+    const tfootBlock = `                {(() => {
+                  const totalWorked = rows.reduce((s, r) => s + (r.creditedWorked ?? 0), 0);
+                  const totalExpected = rows.reduce((s, r) => s + (r.expected ?? 0), 0);
+                  const totalMissing = rows.reduce((s, r) => s + (r.missing ?? 0), 0);
+                  const totalBalance = rows.reduce((s, r) => s + (r.balance ?? 0), 0);
+                  return (
+                    <tfoot className="folha-tfoot">
+                      <tr>
+                        <td className="folha-tfoot-label" colSpan={3}>Totais do mês</td>
+                        <td>{formatMinutes(totalWorked)}</td>
+                        <td>{formatMinutes(totalExpected)}</td>
+                        <td>{formatMinutes(totalMissing)}</td>
+                        <td className={totalBalance < 0 ? 'folha-neg' : totalBalance > 0 ? 'folha-pos' : ''}>{formatMinutes(totalBalance)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  );
+                })()}`;
+    t = t.replace('</tbody>', '</tbody>\n' + tfootBlock);
+    console.log('folha: tfoot totais por coluna');
+  }
+
   fs.writeFileSync(panelPath, t);
-  console.log('folha panel ok', fs.statSync(panelPath).size, t.includes('folha-sit') ? 'com badges' : 'sem badges', t.includes('suppressAbono') ? 'com suppress' : '', t.includes('FORCE_SUPPRESS_ZERO') ? 'FORCE' : '');
+  console.log(
+    'folha panel ok',
+    fs.statSync(panelPath).size,
+    t.includes('folha-sit') ? 'com badges' : 'sem badges',
+    t.includes('suppressAbono') ? 'com suppress' : '',
+    t.includes('folha-tfoot') ? 'com totais' : '',
+  );
 }
 
 main().catch((e) => {
