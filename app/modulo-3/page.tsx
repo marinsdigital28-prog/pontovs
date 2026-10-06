@@ -74,6 +74,7 @@ export default function Modulo3Page() {
           <p>Beneficiários sincronizados diretamente com o Espaço Progredir.</p>
         </div>
         <div className="module3-actions">
+          <a className="primary-btn" href="/modulo-3/presenca">Abrir chamada</a>
           <a className="ghost-btn" href="/ponto">Ponto</a>
           <a className="ghost-btn" href="/admin">Administração</a>
         </div>
