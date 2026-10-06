@@ -2,9 +2,9 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Ponto Progredir — Colaborador',
-    short_name: 'Meu Ponto',
-    description: 'Consulte suas marcações, jornada e solicite ausências.',
+    name: 'Portal Progredir',
+    short_name: 'Progredir',
+    description: 'Ponto, cadastro de beneficiários e chamada das atividades.',
     start_url: '/app',
     scope: '/',
     display: 'standalone',
@@ -21,6 +21,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { name: 'App do colaborador', short_name: 'Meu Ponto', url: '/app', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
       { name: 'Registrar ponto', short_name: 'Ponto', url: '/ponto', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
       { name: 'Painel administrativo', short_name: 'Admin', url: '/admin', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
+      { name: 'Módulo 3 — Beneficiários', short_name: 'Beneficiários', url: '/modulo-3', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
     ],
   };
 }

@@ -95,6 +95,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
             <button className="primary-btn admin-action" onClick={() => setTab('punches')}>Ver marcações</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Abrir folha</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('employees')}>Equipe</button>
+            <a className="ghost-btn admin-action" href="/modulo-3">Módulo 3 · Beneficiários</a>
             <button className="ghost-btn admin-action" onClick={() => setTab('timesheet')}>Espelho mensal</button>
             <button className="ghost-btn admin-action" onClick={() => setTab('integrity')}>Central de Integridade</button>
           </div>

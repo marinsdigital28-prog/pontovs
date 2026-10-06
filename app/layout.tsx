@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Providers from '../components/Providers';
 import './globals.css';
+import './modulo-3/module3.css';
 import PwaRegister from '@/components/PwaRegister';
 
 export const metadata: Metadata = {
