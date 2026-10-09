@@ -89,6 +89,7 @@ export async function POST(request: Request) {
                 endDate: { gte: from },
               },
               select: {
+                type: true,
                 startDate: true,
                 endDate: true,
                 startTime: true,
@@ -179,6 +180,7 @@ export async function POST(request: Request) {
           endDate: { gte: from },
         },
         select: {
+          type: true,
           startDate: true,
           endDate: true,
           startTime: true,

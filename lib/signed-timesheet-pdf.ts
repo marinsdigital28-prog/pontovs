@@ -1,4 +1,6 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
@@ -20,7 +22,7 @@ export type TimesheetEmployee = {
 
 export type TimesheetPunch = { type: string; timestamp: Date };
 export type TimesheetCertificate = {
-  startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null;
+  type?: string | null; startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null;
   hoursPerDayMinutes?: number | null; status: string;
 };
 export type TimesheetRequest = { type: string; startDate: Date; endDate: Date; status: string; reason: string };
@@ -34,6 +36,16 @@ const MY = 16;
 const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 'QUA', 4: 'QUI', 5: 'SEX', 6: 'SÁB' };
 const weekdayLabels = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const APP_TZ = 'America/Sao_Paulo';
+let brandLogoBytesPromise: Promise<Buffer> | null = null;
+
+async function loadBrandLogo(pdfDoc: PDFDocument) {
+  try {
+    brandLogoBytesPromise ??= readFile(path.join(process.cwd(), 'public', 'espaco-progredir-logo.jpeg'));
+    return await pdfDoc.embedJpg(await brandLogoBytesPromise);
+  } catch {
+    return null;
+  }
+}
 
 function formatTime(value: Date) {
   return value.toLocaleTimeString('pt-BR', { timeZone: APP_TZ, hour: '2-digit', minute: '2-digit' });
@@ -54,6 +66,33 @@ function formatSignedMinutes(value: number | null) {
   if (value === null) return '—';
   const sign = value < 0 ? '−' : value > 0 ? '+' : '';
   return `${sign}${formatMinutes(Math.abs(value))}`;
+}
+function certificateEventLabel(type?: string | null) {
+  const labels: Record<string, string> = {
+    DIA_INTEGRAL: 'Atestado', PERIODO_DIAS: 'Atestado', HORAS: 'Atestado', PERIODO_HORAS: 'Atestado',
+    CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica',
+    TRABALHO_EXTERNO: 'Trabalho externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo', OUTRO: 'Atestado — outro',
+  };
+  return labels[type || ''] || 'Atestado';
+}
+function certificateEventText(certificate: TimesheetCertificate) {
+  let period = 'dia integral';
+  if (certificate.startTime && certificate.endTime) {
+    period = `${certificate.startTime.slice(0, 5)}–${certificate.endTime.slice(0, 5)}`;
+  } else if (certificate.hoursPerDayMinutes != null) {
+    const minutes = certificate.hoursPerDayMinutes;
+    period = `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')} por dia`;
+  }
+  return `${certificateEventLabel(certificate.type)} · ${period}`;
+}
+function conciseOperationalReason(reason: string) {
+  if (/independ[eê]ncia/i.test(reason)) return 'Feriado nacional';
+  if (/curso jovem aprendiz/i.test(reason)) return 'Curso jovem aprendiz';
+  if (/mesa brasil/i.test(reason)) return 'Trabalho externo · Mesa Brasil';
+  if (/trabalho externo/i.test(reason)) return 'Trabalho externo';
+  if (/atestado de óbito/i.test(reason)) return 'Atestado de óbito';
+  if (/vendaval/i.test(reason)) return 'Liberação por vendaval';
+  return reason;
 }
 function rowDayKey(value: Date) {
   return value.toLocaleDateString('en-CA', { timeZone: APP_TZ });
@@ -100,14 +139,22 @@ async function buildTimesheetDocument({
 
   page.drawRectangle({ x: MX - 3, y: MY - 3, width: right - MX + 6, height: PAGE_H - 2 * MY + 6, borderColor: green, borderWidth: 1.3 });
   page.drawRectangle({ x: MX - 0.5, y: MY - 0.5, width: right - MX + 1, height: PAGE_H - 2 * MY + 1, borderColor: rgb(0.788, 0.635, 0.153), borderWidth: 0.6 });
-  page.drawText('ESPAÇO PROGREDIR', { x: MX, y: PAGE_H - MY - 4, size: 11, font: bold, color: green });
-  page.drawText('Relatório de ponto', { x: MX, y: PAGE_H - MY - 16, size: 8, font: regular, color: muted });
+  const logo = await loadBrandLogo(pdfDoc);
+  if (logo) {
+    const logoWidth = 46;
+    const logoHeight = logoWidth * (logo.height / logo.width);
+    page.drawImage(logo, { x: MX, y: PAGE_H - MY - logoHeight - 1, width: logoWidth, height: logoHeight });
+  }
+  page.drawText('ESPAÇO PROGREDIR', { x: MX + 51, y: PAGE_H - MY - 24, size: 14, font: bold, color: green });
+  const title = 'FOLHA DE PONTO';
+  const titleSize = 15;
+  page.drawText(title, { x: (PAGE_W - bold.widthOfTextAtSize(title, titleSize)) / 2, y: PAGE_H - MY - 24, size: titleSize, font: bold, color: green });
   page.drawText(`01/${String(monthNumber).padStart(2, '0')}/${year} – ${String(lastDay).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}/${year}`, { x: right - 175, y: PAGE_H - MY - 4, size: 8, font: bold, color: dark });
   page.drawText(`Emitido em ${emitted}`, { x: right - 175, y: PAGE_H - MY - 16, size: 7, font: regular, color: muted });
-  page.drawRectangle({ x: MX, y: PAGE_H - MY - 22, width: right - MX, height: 1.2, color: green });
-  page.drawRectangle({ x: MX, y: PAGE_H - MY - 24, width: right - MX, height: 0.9, color: rgb(0.788, 0.635, 0.153) });
+  page.drawRectangle({ x: MX, y: PAGE_H - MY - 48, width: right - MX, height: 1.2, color: green });
+  page.drawRectangle({ x: MX, y: PAGE_H - MY - 50, width: right - MX, height: 0.9, color: rgb(0.788, 0.635, 0.153) });
 
-  const infoY = PAGE_H - MY - 36;
+  const infoY = PAGE_H - MY - 66;
   const jornada =
     employee.scheduleStart && employee.scheduleEnd
       ? `${employee.scheduleStart.slice(0, 5)}–${employee.scheduleEnd.slice(0, 5)}`
@@ -233,10 +280,17 @@ async function buildTimesheetDocument({
       ? dayPunches.map((p) => `${formatTime(p.timestamp)}${shortType(p.type)}`).join(' ')
       : '';
     let justificativa = '';
-    if (cert) justificativa = 'Atestado';
-    else if (approvedRequest?.type === 'AUSENCIA') justificativa = 'Ausência';
+    if (cert) justificativa = certificateEventText(cert);
+    else if (approvedRequest?.type === 'AUSENCIA') justificativa = `${approvedRequest.reason || 'Ausência'} · dia integral`;
     else if (approvedRequest?.type === 'TROCA_DIA') justificativa = 'Troca';
-    else if (operationalAbono) justificativa = operationalAbono.reason?.toLowerCase().includes('feriado') ? 'Feriado' : 'Abono';
+    else if (operationalAbono) {
+      const eventName = conciseOperationalReason(operationalAbono.reason || 'Abono registrado');
+      const eventEnd = employee.scheduleEnd?.slice(0, 5);
+      const period = operationalAbono.kind === 'FROM_TIME' && operationalAbono.fromTime
+        ? `${operationalAbono.fromTime.slice(0, 5)}–${eventEnd || 'fim da jornada'}`
+        : 'dia integral';
+      justificativa = `${eventName} · ${period}`;
+    }
     else if (absent) justificativa = 'Falta';
 
     const escala = !scheduled
@@ -255,9 +309,9 @@ async function buildTimesheetDocument({
       justificativa || (!scheduled ? 'Folga' : dayPunches.length ? 'OK' : ''),
     ];
     values.forEach((value, i) => {
-      const maxLen = i === 2 ? 48 : i === 1 ? 14 : i === 7 ? 12 : 10;
+      const maxLen = i === 2 ? 48 : i === 1 ? 14 : i === 7 ? 44 : 10;
       page.drawText(String(value).slice(0, maxLen), {
-        x: cols[i] + 3, y, size: i === 2 ? Math.max(7.0, fs - 0.4) : fs, font: regular, color: dark,
+        x: cols[i] + 3, y, size: i === 2 ? Math.max(7.0, fs - 0.4) : i === 7 ? Math.max(7.2, fs - 0.6) : fs, font: regular, color: dark,
         maxWidth: cols[i + 1] - cols[i] - 5,
       });
     });

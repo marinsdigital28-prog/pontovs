@@ -65,6 +65,8 @@ const patches = [
   'scripts/patch-folha-day-schedule-mat.mjs',
   // ÚLTIMO: aplica suppress Taiane + badges (depois de qualquer restore)
   'scripts/patch-folha-visual.mjs',
+  // Mantém identidade visual da folha e mostra detalhes dos eventos justificados.
+  'scripts/patch-folha-standard-design.mjs',
 ];
 
 for (const p of patches) {
