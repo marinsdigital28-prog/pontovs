@@ -3,6 +3,10 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import prisma from './prisma';
 
+if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_URL) {
+  process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
+}
+
 const managerRoles = ['ADMIN', 'MANAGER'];
 
 export const authOptions: NextAuthOptions = {

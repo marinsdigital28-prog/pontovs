@@ -4,6 +4,7 @@ import './emp-app.css';
 import './emp-radar.css';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
+import CallAttendancePanel from '@/components/modulo3/CallAttendancePanel';
 
 type Punch = { id: string; type: string; timestamp: string; status: string; photoData?: string | null; hasPhoto?: boolean };
 type EmpProfile = {
@@ -52,7 +53,7 @@ const timeFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, hour: '2-di
 const dateFmt = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 const shortDate = new Intl.DateTimeFormat('pt-BR', { timeZone: APP_TZ, day: '2-digit', month: '2-digit', year: 'numeric' });
 function padMat(v: string) { return v.replace(/\D/g, '').padStart(4, '0'); }
-type Tab = 'home' | 'journey' | 'month' | 'absences' | 'profile';
+type Tab = 'home' | 'call' | 'journey' | 'month' | 'absences' | 'profile';
 
 export default function EmployeeAppPage() {
   const { status: sessionStatus } = useSession();
@@ -77,6 +78,7 @@ export default function EmployeeAppPage() {
   const [isStandalone, setIsStandalone] = useState<boolean | null>(null);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [callPending, setCallPending] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [quickForgotLoading, setQuickForgotLoading] = useState(false);
   const [quickForgotDone, setQuickForgotDone] = useState(false);
@@ -151,6 +153,25 @@ export default function EmployeeAppPage() {
     requestsReady.current = true;
     setRequests(list);
   }, []);
+
+  const refreshCallPending = useCallback(async () => {
+    if (sessionStatus !== 'authenticated') { setCallPending(false); return; }
+    try {
+      const response = await fetch('/api/modulo-3/chamada/pendencias', { cache: 'no-store' });
+      if (!response.ok) { setCallPending(false); return; }
+      const json = await response.json();
+      setCallPending(Boolean(json.pending));
+    } catch { setCallPending(false); }
+  }, [sessionStatus]);
+
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated') { setCallPending(false); return; }
+    void refreshCallPending();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshCallPending();
+    }, 60_000);
+    return () => window.clearInterval(interval);
+  }, [sessionStatus, refreshCallPending]);
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
@@ -694,6 +715,12 @@ export default function EmployeeAppPage() {
           </section>
         )}
 
+        {tab === 'call' && (
+          <section className="emp-section emp-call-section">
+            <CallAttendancePanel />
+          </section>
+        )}
+
         {tab === 'journey' && (
           <section className="emp-section">
             <div className="emp-card">
@@ -918,9 +945,9 @@ export default function EmployeeAppPage() {
       ) : null}
 
       <nav className="emp-bottom-nav" aria-label="Menu principal">
-        {([['home', 'Início', '🏠'], ['journey', 'Jornada', '⏱️'], ['month', 'Meu mês', '📅'], ['absences', 'Avisos', '📝'], ['profile', 'Perfil', '👤']] as const).map(([id, label, icon]) => (
-          <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}>
-            <span aria-hidden>{icon}</span>{label}
+        {([['home', 'Início', '🏠'], ['call', 'Chamada', '📋'], ['journey', 'Jornada', '⏱️'], ['month', 'Meu mês', '📅'], ['absences', 'Avisos', '📝'], ['profile', 'Perfil', '👤']] as const).map(([id, label, icon]) => (
+          <button key={id} type="button" className={`${tab === id ? 'active' : ''} ${id === 'call' && callPending ? 'emp-call-pending' : ''}`} aria-label={id === 'call' && callPending ? 'Chamada pendente — abrir lista' : label} onClick={() => setTab(id)}>
+            <span aria-hidden>{icon}</span>{label}{id === 'call' && callPending ? <i className="emp-call-dot" aria-hidden /> : null}
           </button>
         ))}
       </nav>

@@ -75,7 +75,11 @@ for (const p of patches) {
 
 // 3) prisma + next
 run('npx', ['prisma', 'generate']);
-run('npx', ['prisma', 'db', 'push', '--skip-generate'], { optional: true });
+if (process.env.VERCEL_ENV === 'production') {
+  run('npx', ['prisma', 'db', 'push', '--skip-generate'], { optional: true });
+} else {
+  console.log('>>> prisma db push ignorado fora de Production para manter Preview/Development sem alterações no banco');
+}
 run('npx', ['next', 'build']);
 
 console.log('\n>>> build-all concluído');

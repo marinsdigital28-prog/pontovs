@@ -132,7 +132,11 @@ export async function PATCH(request: Request) {
     }
   }
   if (body.profile !== undefined) {
-    if (body.profile === null) data.profileJson = null;
+    if (body.profile === null) {
+      let prev: Record<string, unknown> = {};
+      try { prev = current.profileJson ? JSON.parse(current.profileJson) : {}; } catch { prev = {}; }
+      data.profileJson = Array.isArray(prev.callAssignments) ? JSON.stringify({ callAssignments: prev.callAssignments }) : null;
+    }
     else if (typeof body.profile === 'object') {
       let prev: Record<string, unknown> = {};
       try {

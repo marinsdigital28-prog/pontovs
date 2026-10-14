@@ -1,37 +1,27 @@
-# Módulo 3 — Beneficiários e chamada
+# Módulo 3 — Beneficiários e PRESENÇAS
 
-O módulo 3 possui duas telas:
+O Módulo 3 mantém a fonte de beneficiários já configurada no Ponto. A organização de chamadas fica em **Módulo 3 → PRESENÇAS** (`/modulo-3/presencas`), e o profissional acessa a própria chamada pela aba **Chamada** do Ponto (`/app`) ou pela rota `/modulo-3/presenca`.
 
-- `/modulo-3`: cadastro externo de beneficiários;
-- `/modulo-3/presenca`: PWA instalável para professores fazerem a chamada.
+## Acesso e atribuições
 
-## PWA de chamada
+A identidade do profissional vem da sessão NextAuth. As rotas conferem no servidor se a conta está ativa, se o colaborador existe e se a chamada pertence a um vínculo salvo para aquele perfil. O colaborador não informa o nome do responsável e não recebe as chamadas de outras pessoas.
 
-O professor informa o nome, escolhe a data e a turma. O portal consulta em tempo real os beneficiários ativos e as matrículas do sistema Lovable/Supabase.
+Administradores e gestores ativos podem consultar os perfis e configurar vínculos explícitos. A configuração é armazenada na propriedade namespaced `callAssignments` de `User.profileJson`, mesclando o JSON existente sem migration. Não há criação automática de profissionais, turmas, horários ou vínculos.
 
-Cada toque em **Presente**, **Falta**, **Justificado** ou **Não compareceu** envia imediatamente um `PATCH` para o portal, que atualiza a mesma lista na tabela `listas_presenca` do Supabase externo. A chamada, portanto, aparece no sistema externo sem exportação ou importação manual.
+## Programas e registro
 
-A primeira marcação do dia/turma cria a lista; as marcações seguintes atualizam a lista existente. A estrutura gravada é compatível com a lista de presença já existente no sistema Lovable: `mes`, `ano`, `turma_id`, `turma`, `educador`, `participantes`, `marcacoes` e `total_alunos`.
+O roster utiliza a fonte existente de turmas, beneficiários e matrículas. As faixas são Espaço Crescer (10–14 anos) e Espaço Jovem (15–17 anos), calculadas na data da chamada. O app não gera listas de demonstração. Cada sessão identifica data, programa, tipo de chamada, turma, turno, horário e profissional; as marcações ficam em chaves namespaced dentro de `listas_presenca.marcacoes`, com metadados em `filtros`, preservando o conteúdo legado.
 
-## Variáveis obrigatórias em produção
+As situações disponíveis são Presente, Falta, Justificado e Não compareceu. O fluxo não carrega nem exibe observações clínicas ou registros psicológicos.
 
-```env
-BENEFICIARIOS_SUPABASE_URL=https://pwnxvwpxvflgcpxkvwyw.supabase.co
-BENEFICIARIOS_SUPABASE_ACCESS_TOKEN=<token autorizado do projeto Supabase>
-```
+## Catálogo de oficinas — pendência de verificação
 
-Como alternativa, use uma chave de serviço somente como variável secreta:
+As atividades que devem ser contempladas, conforme a especificação, são Educação Física, Capoeira, Futsal, Música, Teatro, Leitura, Desenho, Jiu-Jitsu, Fonoaudiologia e acompanhamento psicológico quando cadastrado como atendimento ou atividade. A lista de requisitos não comprova que cada atividade exista no catálogo da fonte.
 
-```env
-BENEFICIARIOS_SUPABASE_SERVICE_ROLE_KEY=<service role key>
-```
+O esquema/catálogo do projeto Supabase usado pelo Ponto ainda não pôde ser confirmado. Por segurança, a interface não grava vínculos de oficina enquanto não puder verificar a atividade real associada à turma; a API também rejeita esse tipo de vínculo. Não criar uma atividade, turma ou horário para contornar a ausência do catálogo.
 
-O token/chave não é enviado ao celular. O PWA fala apenas com as rotas server-side do portal. Nunca use essas credenciais em `NEXT_PUBLIC_*`.
+## Preview e banco
 
-## Instalação no celular
+O Preview é somente para leitura. O build ignora `prisma db push` fora de Production e o middleware bloqueia POST, PUT, PATCH e DELETE em Preview, exceto autenticação. As APIs novas deixam explícito quando não podem gravar. Não habilitar `CHAMADA_PREVIEW_WRITE_ENABLED` sem conectar e verificar uma fonte de dados isolada para Preview.
 
-1. Abrir `https://portalprogredir.org/modulo-3/presenca` no Chrome/Safari;
-2. Escolher **Adicionar à tela inicial** ou **Instalar aplicativo**;
-3. Abrir o ícone **Chamada** para usar a lista como aplicativo.
-
-A versão inicial ainda não exige login individual de professor; o nome informado é salvo localmente no aparelho e enviado como responsável da chamada. A próxima camada recomendada é autenticar cada professor com PIN ou conta individual antes de liberar o uso amplo.
+A fonte de beneficiários tem credencial de Production; ela não deve ser copiada ao Preview. Não foi executada nenhuma gravação ou migration do banco durante a implementação.
