@@ -98,7 +98,9 @@ export function isCallAssignment(value: unknown): value is CallAssignment {
     && (item.startTime === null || typeof item.startTime === 'string' && validTime.test(item.startTime))
     && (item.endTime === null || typeof item.endTime === 'string' && validTime.test(item.endTime))
     && typeof item.active === 'boolean'
-    && (item.kind === 'GENERAL' ? item.activity === null : activityValues.has(String(item.activity)));
+    && (item.kind === 'GENERAL'
+      ? item.program === 'CRESCER' && item.activity === null
+      : activityValues.has(String(item.activity)));
 }
 
 export function readCallAssignments(profileJson: string | null | undefined): CallAssignment[] {
@@ -140,6 +142,7 @@ export function normalizeCallAssignments(value: unknown): { assignments?: CallAs
     if (endTime !== null && !validTime.test(endTime)) return { error: 'Informe o horário final no formato HH:MM.' };
     if (startTime && endTime && startTime >= endTime) return { error: 'O horário final deve ser posterior ao inicial.' };
     if (kind === 'GENERAL' && activity !== null) return { error: 'Chamada geral não deve receber uma oficina.' };
+    if (kind === 'GENERAL' && program !== 'CRESCER') return { error: 'A chamada geral na quadra é exclusiva do Espaço Crescer.' };
     if (kind === 'WORKSHOP' && (!activity || !activityValues.has(activity))) return { error: 'Selecione uma atividade da lista prevista.' };
 
     ids.add(id);
