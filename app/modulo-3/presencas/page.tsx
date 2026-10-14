@@ -81,6 +81,12 @@ function statusLabel(status: AttendanceMarkStatus | null) {
   if (!status) return 'Sem marcação';
   return CALL_STATUSES.includes(status) ? ({ presente: 'Presente', falta: 'Falta', justificado: 'Justificado', nao_compareceu: 'Não compareceu' } as const)[status] : 'Sem marcação';
 }
+async function responseJson(response: Response) {
+  const text = await response.text();
+  if (!text.trim()) throw new Error('O Preview não retornou dados. Confirme o acesso da Vercel e a sessão de gestor do Ponto, depois atualize.');
+  try { return JSON.parse(text); }
+  catch { throw new Error('O Preview respondeu com uma página de autenticação em vez dos dados do Módulo 3. Entre no Ponto e atualize.'); }
+}
 
 export default function PresencasAdminPage() {
   const current = thisMonth();
@@ -121,7 +127,7 @@ export default function PresencasAdminPage() {
     setSettingsError('');
     try {
       const response = await fetch('/api/admin/modulo-3/chamada/assignments', { cache: 'no-store' });
-      const data = await response.json();
+      const data = await responseJson(response);
       if (!response.ok) throw new Error(data.error || 'Não foi possível carregar os vínculos.');
       const list: EmployeeOption[] = Array.isArray(data.employees) ? data.employees : [];
       setEmployees(list);
@@ -147,7 +153,7 @@ export default function PresencasAdminPage() {
     try {
       const params = new URLSearchParams({ mes: month, ano: year, limit: '500' });
       const response = await fetch(`/api/modulo-3/presencas?${params}`, { cache: 'no-store' });
-      const data = await response.json();
+      const data = await responseJson(response);
       if (!response.ok) throw new Error(data.error || 'Não foi possível carregar o histórico.');
       setHistory(Array.isArray(data.records) ? data.records : []);
     } catch (error) {
