@@ -154,17 +154,29 @@
 
 .emp-bottom-nav {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: 0;
-  width: 100%; max-width: 480px; display: grid; grid-template-columns: repeat(5, 1fr);
+  width: 100%; max-width: 480px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr));
   background: #fff; border-top: 1px solid var(--emp-border);
   padding: 0.35rem 0 calc(0.35rem + env(safe-area-inset-bottom)); z-index: 20;
   box-shadow: 0 -4px 16px rgba(30, 92, 47, 0.06);
 }
 .emp-bottom-nav button {
-  border: 0; background: none; display: grid; gap: 0.15rem; justify-items: center;
-  font-size: 0.65rem; font-weight: 700; color: var(--emp-muted); padding: 0.4rem 0; cursor: pointer;
+  position: relative; border: 0; background: none; display: grid; gap: 0.15rem; justify-items: center;
+  font-size: 0.62rem; font-weight: 700; color: var(--emp-muted); padding: 0.4rem 0; cursor: pointer;
 }
 .emp-bottom-nav button span { font-size: 1.15rem; }
 .emp-bottom-nav button.active { color: var(--emp-green); }
+.emp-bottom-nav button.emp-call-pending { color: #9b1c1c; animation: emp-call-pulse 1.15s ease-in-out infinite; }
+.emp-bottom-nav button .emp-call-dot {
+  position: absolute; top: 2px; right: calc(50% - 20px); width: 9px; height: 9px;
+  border-radius: 50%; background: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+}
+@keyframes emp-call-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.48; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .emp-bottom-nav button.emp-call-pending { animation: none; outline: 2px solid #dc2626; outline-offset: -2px; }
+}
 
 .emp-install-card { display: grid; gap: 1rem; margin: 1rem 0; }
 .emp-install-feedback { text-align: center; line-height: 1.35; }

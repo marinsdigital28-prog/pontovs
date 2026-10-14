@@ -29,7 +29,11 @@ function get(url) {
 const BASE =
   'https://raw.githubusercontent.com/marinsdigital28-prog/pontovs/225e7421df9312e57af678440ec5e052fa74a21e/app/app/page.tsx';
 
-let t = await get(BASE);
+const localShell = fs.existsSync(outPath) ? fs.readFileSync(outPath, 'utf8') : '';
+const localShellIsComplete = localShell.includes('export default function EmployeeAppPage')
+  && localShell.includes('emp-bottom-nav')
+  && localShell.length > 20_000;
+let t = localShellIsComplete ? localShell : await get(BASE);
 
 if (!t.includes("import './emp-radar.css'")) {
   t = t.replace("import './emp-app.css';", "import './emp-app.css';\nimport './emp-radar.css';");

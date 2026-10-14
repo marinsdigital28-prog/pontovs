@@ -11,6 +11,7 @@ export type Beneficiario = {
 export type Turma = { id: string; nome: string; oficina_id?: string | null; dias_semana?: string[] | null; horario_inicio?: string | null; horario_fim?: string | null };
 export type Matricula = { id: string; beneficiario_id: string; turma_id: string; status: string | null };
 export type PresencaParticipante = { id: string; nome: string; codigo?: number | string | null; turma?: string; idade?: number | null };
+export type PresencaParticipanteCompleto = PresencaParticipante & { data_nascimento: string | null };
 export type PresencaStatus = 'presente' | 'falta' | 'justificado' | 'nao_compareceu';
 
 const SELECT = ['id', 'nome', 'codigo', 'bairro', 'escola', 'escolaridade', 'ativo', 'classe_risco', 'data_nascimento', 'celular', 'whatsapp', 'genero', 'turno', 'nome_mae', 'responsavel'].join(',');
@@ -36,23 +37,38 @@ export async function listBeneficiarios(options: { search?: string; status?: 'to
 export async function getBeneficiario(id: string) { const rows = (await supabase('beneficiarios', new URLSearchParams({ select: SELECT, id: `eq.${id}`, limit: '1' }))) as Beneficiario[]; return rows[0] ?? null; }
 export async function listTurmas() { return (await supabase('turmas', new URLSearchParams({ select: 'id,nome,oficina_id,dias_semana,horario_inicio,horario_fim', order: 'nome.asc', limit: '1000' }))) as Turma[]; }
 export async function listMatriculas(turmaId?: string) { const params = new URLSearchParams({ select: 'id,beneficiario_id,turma_id,status', status: 'neq.cancelada', limit: '2000' }); if (turmaId) params.set('turma_id', `eq.${turmaId}`); return (await supabase('matriculas', params)) as Matricula[]; }
-export async function listAtivosParaChamada(turmaId?: string) {
-  const [beneficiarios, matriculas, turmas] = await Promise.all([listBeneficiarios({ status: 'ativos', limit: 1000 }), listMatriculas(turmaId), listTurmas()]);
+async function listBeneficiariosMinimosParaChamada() {
+  const params = new URLSearchParams({ select: 'id,nome,codigo,data_nascimento', ativo: 'eq.true', order: 'nome.asc', limit: '1000' });
+  return (await supabase('beneficiarios', params)) as Array<Pick<Beneficiario, 'id' | 'nome' | 'codigo' | 'data_nascimento'>>;
+}
+export async function listAtivosParaChamadaDetalhada(turmaId?: string): Promise<PresencaParticipanteCompleto[]> {
+  const [beneficiarios, matriculas, turmas] = await Promise.all([listBeneficiariosMinimosParaChamada(), listMatriculas(turmaId), listTurmas()]);
   const turmaName = new Map(turmas.map((item) => [item.id, item.nome]));
   const enrolled = new Set(matriculas.filter((item) => !turmaId || item.turma_id === turmaId).map((item) => item.beneficiario_id));
-  return beneficiarios.filter((item) => !turmaId || enrolled.has(item.id)).map((item) => ({ id: item.id, nome: item.nome, codigo: item.codigo, turma: turmaId ? turmaName.get(turmaId) || '' : undefined }));
+  return beneficiarios.filter((item) => !turmaId || enrolled.has(item.id)).map((item) => ({ id: item.id, nome: item.nome, codigo: item.codigo, turma: turmaId ? turmaName.get(turmaId) || '' : undefined, data_nascimento: item.data_nascimento }));
+}
+export async function listAtivosParaChamada(turmaId?: string) {
+  const participants = await listAtivosParaChamadaDetalhada(turmaId);
+  return participants.map(({ data_nascimento: _birthDate, ...item }) => item);
 }
 export async function findAttendanceList(mes: number, ano: number, turmaId?: string | null) {
-  const params = new URLSearchParams({ select: '*', mes: `eq.${mes}`, ano: `eq.${ano}`, order: 'created_at.desc', limit: '1' });
+  const params = new URLSearchParams({ select: 'id,turma,participantes,marcacoes,filtros', mes: `eq.${mes}`, ano: `eq.${ano}`, order: 'created_at.desc', limit: '1' });
   if (turmaId) params.set('turma_id', `eq.${turmaId}`); else params.set('turma_id', 'is.null');
   const rows = (await supabase('listas_presenca', params)) as Array<Record<string, unknown>>;
   return rows[0] ?? null;
 }
+export async function listAttendanceHistory(options: { mes?: number; ano?: number; turmaId?: string; limit?: number; offset?: number } = {}) {
+  const params = new URLSearchParams({ select: 'id,mes,ano,turma_id,turma,turno,educador,autor,participantes,marcacoes,filtros,created_at', order: 'created_at.desc', limit: String(Math.min(Math.max(options.limit ?? 200, 1), 500)), offset: String(Math.max(options.offset ?? 0, 0)) });
+  if (options.mes) params.set('mes', `eq.${options.mes}`);
+  if (options.ano) params.set('ano', `eq.${options.ano}`);
+  if (options.turmaId) params.set('turma_id', `eq.${options.turmaId}`);
+  return (await supabase('listas_presenca', params)) as Array<Record<string, unknown>>;
+}
 export async function createAttendanceList(data: Record<string, unknown>) {
-  const rows = (await supabase('listas_presenca', new URLSearchParams({ select: '*' }), { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(data) })) as Array<Record<string, unknown>>;
+  const rows = (await supabase('listas_presenca', new URLSearchParams({ select: 'id,marcacoes' }), { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(data) })) as Array<Record<string, unknown>>;
   return rows[0] ?? null;
 }
 export async function updateAttendanceList(id: string, data: Record<string, unknown>) {
-  const rows = (await supabase('listas_presenca', new URLSearchParams({ select: '*', id: `eq.${id}` }), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(data) })) as Array<Record<string, unknown>>;
+  const rows = (await supabase('listas_presenca', new URLSearchParams({ select: 'id,marcacoes', id: `eq.${id}` }), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(data) })) as Array<Record<string, unknown>>;
   return rows[0] ?? null;
 }
