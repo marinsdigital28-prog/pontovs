@@ -27,80 +27,8 @@ export async function GET() {
   const session = await getServerSession(authOptions as any) as any;
   const employeeId = session?.user?.id as string | undefined;
   if (!employeeId || sessionRole(session) !== 'EMPLOYEE') return NextResponse.json({ error: 'Sessão de colaborador necessária.' }, { status: 401 });
-  const requests = await prisma.employeeRequest.findMany({
-    where: { employeeId },
-    orderBy: { createdAt: 'desc' },
-    take: 100,
-    select: {
-      id: true, type: true, status: true, startDate: true, endDate: true, reason: true, details: true,
-      medicalSpecialty: true, classification: true, returnExpected: true, documentName: true, documentMime: true,
-      reviewNote: true, reviewedAt: true, createdAt: true,
-    },
-  });
+  const requests = await prisma.employeeRequest.findMany({ where: { employeeId }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, type: true, status: true, startDate: true, endDate: true, reason: true, details: true, medicalSpecialty: true, classification: true, returnExpected: true, documentName: true, documentMime: true, reviewNote: true, reviewedAt: true, createdAt: true } });
   return NextResponse.json({ requests });
-}
-
-export async function PATCH(request: Request) {
-  const session = await getServerSession(authOptions as any) as any;
-  const employeeId = session?.user?.id as string | undefined;
-  if (!employeeId || sessionRole(session) !== 'EMPLOYEE') {
-    return NextResponse.json({ error: 'Sessão de colaborador necessária.' }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => null);
-  const parsed = z
-    .object({
-      id: z.string().min(1),
-      action: z.literal('CANCELAR'),
-    })
-    .safeParse(body);
-
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
-  }
-
-  const existing = await prisma.employeeRequest.findFirst({
-    where: { id: parsed.data.id, employeeId },
-    select: { id: true, type: true, status: true, reason: true },
-  });
-
-  if (!existing) {
-    return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 });
-  }
-
-  if (existing.status === 'CANCELADO' || existing.status === 'REJEITADO') {
-    return NextResponse.json({ error: 'Esta solicitação já está desmarcada ou rejeitada.' }, { status: 409 });
-  }
-
-  // Colaborador pode desmarcar pendentes e aprovadas (consultas, eventos, avisos).
-  if (!['PENDENTE', 'APROVADO'].includes(existing.status)) {
-    return NextResponse.json({ error: 'Não é possível desmarcar neste status.' }, { status: 409 });
-  }
-
-  const updated = await prisma.employeeRequest.update({
-    where: { id: existing.id },
-    data: {
-      status: 'CANCELADO',
-      reviewNote: existing.status === 'PENDENTE'
-        ? 'Desmarcado pelo próprio colaborador antes da análise'
-        : 'Desmarcado pelo próprio colaborador após aprovação',
-      reviewedAt: new Date(),
-    },
-    select: { id: true, status: true, type: true },
-  });
-
-  await appendAuditEvent({
-    action: 'SOLICITACAO_CANCELADA_COLABORADOR',
-    actorId: employeeId,
-    resource: 'EmployeeRequest',
-    resourceId: existing.id,
-    metadata: { type: existing.type, previousStatus: existing.status, reason: existing.reason },
-  });
-
-  return NextResponse.json({
-    request: updated,
-    message: 'Solicitação desmarcada.',
-  });
 }
 
 export async function POST(request: Request) {
@@ -113,35 +41,65 @@ export async function POST(request: Request) {
   if (endDate < startDate) return NextResponse.json({ error: 'A data final não pode ser anterior à inicial.' }, { status: 400 });
   const duplicate = await prisma.employeeRequest.findFirst({ where: { employeeId, type: input.type, status: 'PENDENTE', startDate, endDate }, select: { id: true } });
   if (duplicate) return NextResponse.json({ error: 'Já existe uma solicitação pendente para este período.' }, { status: 409 });
-  const created = await prisma.employeeRequest.create({
-    data: {
-      employeeId,
-      type: input.type,
-      startDate,
-      endDate,
-      reason: input.reason,
-      details: input.details || null,
-      medicalSpecialty: input.medicalSpecialty || null,
-      classification: input.classification || null,
-      returnExpected: input.returnExpected ?? null,
-      documentName: input.documentName || null,
-      documentMime: input.documentMime || null,
-      documentData: input.documentData || null,
-    },
-    select: { id: true, type: true, status: true, startDate: true, endDate: true, createdAt: true },
+  const created = await prisma.employeeRequest.create({ data: { employeeId, type: input.type, startDate, endDate, reason: input.reason, details: input.details || null, medicalSpecialty: input.medicalSpecialty || null, classification: input.classification || null, returnExpected: input.returnExpected ?? null, documentName: input.documentName || null, documentMime: input.documentMime || null, documentData: input.documentData || null }, select: { id: true, type: true, status: true, startDate: true, endDate: true, createdAt: true } });
+  await appendAuditEvent({ action: 'SOLICITACAO_CRIADA', actorId: employeeId, resource: 'EmployeeRequest', resourceId: created.id, metadata: { type: created.type, startDate: input.startDate, endDate: input.endDate, classification: input.classification || null, hasDocument: Boolean(input.documentData) } });
+  return NextResponse.json({ request: created }, { status: 201 });
+}
+
+export async function PATCH(request: Request) {
+  const session = await getServerSession(authOptions as any) as any;
+  const employeeId = session?.user?.id as string | undefined;
+  if (!employeeId || sessionRole(session) !== 'EMPLOYEE') {
+    return NextResponse.json({ error: 'Sessão de colaborador necessária.' }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = z.object({
+    id: z.string().min(1),
+    action: z.literal('CANCELAR'),
+  }).safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
+  }
+
+  const existing = await prisma.employeeRequest.findUnique({
+    where: { id: parsed.data.id },
+    select: { id: true, employeeId: true, type: true, status: true, reason: true },
   });
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 });
+  }
+  if (existing.employeeId !== employeeId) {
+    return NextResponse.json({ error: 'Solicitação não pertence a este colaborador.' }, { status: 403 });
+  }
+  if (existing.status === 'CANCELADO' || existing.status === 'REJEITADO') {
+    return NextResponse.json({ error: 'Solicitação já está desmarcada ou rejeitada.' }, { status: 409 });
+  }
+  if (existing.status !== 'PENDENTE' && existing.status !== 'APROVADO') {
+    return NextResponse.json({ error: 'Só é possível desmarcar solicitações pendentes ou aprovadas.' }, { status: 409 });
+  }
+
+  const updated = await prisma.employeeRequest.update({
+    where: { id: existing.id },
+    data: {
+      status: existing.status === 'PENDENTE' ? 'REJEITADO' : 'CANCELADO',
+      reviewedAt: new Date(),
+      reviewNote: existing.status === 'PENDENTE'
+        ? 'Desmarcado pelo colaborador antes da análise'
+        : 'Desmarcado pelo colaborador',
+    },
+    select: { id: true, status: true },
+  });
+
   await appendAuditEvent({
-    action: 'SOLICITACAO_CRIADA',
+    action: 'SOLICITACAO_CANCELADA',
     actorId: employeeId,
     resource: 'EmployeeRequest',
-    resourceId: created.id,
-    metadata: {
-      type: created.type,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      classification: input.classification || null,
-      hasDocument: Boolean(input.documentData),
-    },
+    resourceId: existing.id,
+    metadata: { type: existing.type, by: 'employee', previousStatus: existing.status },
   });
-  return NextResponse.json({ request: created }, { status: 201 });
+
+  return NextResponse.json({ request: updated });
 }
