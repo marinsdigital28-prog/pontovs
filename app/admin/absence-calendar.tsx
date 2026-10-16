@@ -279,7 +279,7 @@ export default function AbsenceCalendar({
             type="button"
             className="ghost-btn compact-btn"
             onClick={() => {
-              setCursor(new Date(now.getFullYear(), now.getMonth(), les1));
+              setCursor(new Date(now.getFullYear(), now.getMonth(), 1));
               setSelectedDay(null);
             }}
           >
