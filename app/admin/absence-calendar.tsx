@@ -28,6 +28,7 @@ type CalendarCertificate = {
 
 type CalendarItem = {
   id: string;
+  rawId: string;
   source: 'SOLICITAÇÃO' | 'ATESTADO';
   status: string;
   start: Date;
@@ -83,18 +84,32 @@ function dateRange(start: Date, end: Date) {
   return count === 1 ? dayFormatter.format(start) : `${dayFormatter.format(start)} – ${dayFormatter.format(end)}`;
 }
 
-export default function AbsenceCalendar({ requests, certificates, onChanged }: { requests: CalendarRequest[]; certificates: CalendarCertificate[]; onChanged?: () => void }) {
-  void onChanged;
+function canCancel(item: CalendarItem) {
+  return !['CANCELADO', 'REJEITADO'].includes(item.status);
+}
+
+export default function AbsenceCalendar({
+  requests,
+  certificates,
+  onChanged,
+}: {
+  requests: CalendarRequest[];
+  certificates: CalendarCertificate[];
+  onChanged?: () => void;
+}) {
   const now = new Date();
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [filter, setFilter] = useState<'TODOS' | 'PENDENTE' | 'APROVADO'>('TODOS');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState('');
 
   const items = useMemo<CalendarItem[]>(() => {
     const requestItems = requests
-      .filter((item) => ['AUSENCIA','PASSEIO','EVENTO_EXTERNO'].includes(item.type))
+      .filter((item) => ['AUSENCIA', 'PASSEIO', 'EVENTO_EXTERNO'].includes(item.type))
       .map((item) => ({
         id: `request-${item.id}`,
+        rawId: item.id,
         source: 'SOLICITAÇÃO' as const,
         status: item.status,
         start: localDate(item.startDate),
@@ -107,18 +122,32 @@ export default function AbsenceCalendar({ requests, certificates, onChanged }: {
       }));
     const certificateItems = certificates.map((item) => ({
       id: `certificate-${item.id}`,
+      rawId: item.id,
       source: 'ATESTADO' as const,
       status: item.status,
       start: localDate(item.startDate),
       end: localDate(item.endDate),
-      title: item.type === 'TRABALHO_EXTERNO' ? 'Trabalho externo' : 'Atestado',
+      title:
+        item.type === 'CONSULTA_MEDICA'
+          ? 'Consulta médica'
+          : item.type === 'TRABALHO_EXTERNO' || item.type === 'TRABALHO_EXTERNO_HORAS'
+            ? 'Trabalho externo'
+            : item.type === 'SAIDA_MEDICA'
+              ? 'Saída médica'
+              : 'Atestado',
       subtitle: item.observation || 'Documento cadastrado pela administração',
       period: item.startTime && item.endTime ? `${item.startTime}–${item.endTime}` : 'Dia todo',
       employee: item.user.name,
       employeeNumber: item.user.employeeNumber,
     }));
     return [...requestItems, ...certificateItems]
-      .filter((item) => filter === 'TODOS' || (filter === 'PENDENTE' ? item.status === 'PENDENTE' : ['APROVADO', 'ATIVO'].includes(item.status)))
+      .filter((item) =>
+        filter === 'TODOS'
+          ? true
+          : filter === 'PENDENTE'
+            ? item.status === 'PENDENTE'
+            : ['APROVADO', 'ATIVO'].includes(item.status),
+      )
       .sort((a, b) => a.start.getTime() - b.start.getTime() || a.employee.localeCompare(b.employee));
   }, [certificates, filter, requests]);
 
@@ -144,9 +173,60 @@ export default function AbsenceCalendar({ requests, certificates, onChanged }: {
   }, [items]);
 
   const selectedItems = selectedDay ? itemsByDay.get(selectedDay) || [] : [];
-  const monthItems = items.filter((item) => item.end >= cursor && item.start < new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1));
+  const monthItems = items.filter(
+    (item) => item.end >= cursor && item.start < new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1),
+  );
   const approvedCount = monthItems.filter((item) => ['APROVADO', 'ATIVO'].includes(item.status)).length;
   const pendingCount = monthItems.filter((item) => item.status === 'PENDENTE').length;
+
+  async function handleCancel(item: CalendarItem) {
+    const label =
+      item.source === 'ATESTADO' && item.title.toLowerCase().includes('consulta')
+        ? 'consulta'
+        : item.title.toLowerCase().includes('evento') || item.title.toLowerCase().includes('passeio')
+          ? 'evento'
+          : item.source === 'ATESTADO'
+            ? 'atestado'
+            : 'ausência';
+    const reason = window.prompt(`Motivo para desmarcar esta ${label} (${item.employee}):`);
+    if (reason === null) return;
+    const note = reason.trim() || `Desmarcado no calendário administrativo`;
+
+    setBusyId(item.id);
+    setActionMsg('');
+    try {
+      if (item.source === 'SOLICITAÇÃO') {
+        const response = await fetch('/api/admin/requests', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.rawId, action: 'CANCELAR', reviewNote: note }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setActionMsg(data.error || 'Não foi possível desmarcar a solicitação.');
+          return;
+        }
+        setActionMsg(`${item.employee}: ${label} desmarcada.`);
+      } else {
+        const response = await fetch('/api/admin/certificates', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: item.rawId, action: 'cancel', reason: note }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          setActionMsg(data.error || 'Não foi possível desmarcar o atestado/consulta.');
+          return;
+        }
+        setActionMsg(`${item.employee}: ${label} desmarcada.`);
+      }
+      onChanged?.();
+    } catch {
+      setActionMsg('Falha de rede ao desmarcar. Tente novamente.');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <section className="card absence-calendar-card">
@@ -154,20 +234,57 @@ export default function AbsenceCalendar({ requests, certificates, onChanged }: {
         <div>
           <span className="eyebrow">PLANEJAMENTO E COBERTURA</span>
           <h3>Calendário de ausências</h3>
-          <p className="small-muted">Acompanhe ausências, atestados e períodos parciais por colaborador antes do fechamento.</p>
+          <p className="small-muted">
+            Acompanhe ausências, consultas, eventos e atestados. Use Desmarcar para cancelar um registro.
+          </p>
         </div>
         <div className="absence-calendar-summary">
-          <span><strong>{approvedCount}</strong> confirmadas</span>
-          <span className={pendingCount ? 'is-pending' : ''}><strong>{pendingCount}</strong> pendentes</span>
+          <span>
+            <strong>{approvedCount}</strong> confirmadas
+          </span>
+          <span className={pendingCount ? 'is-pending' : ''}>
+            <strong>{pendingCount}</strong> pendentes
+          </span>
         </div>
       </div>
 
+      {actionMsg ? <div className="status-msg">{actionMsg}</div> : null}
+
       <div className="absence-calendar-toolbar">
         <div className="absence-calendar-month-nav">
-          <button type="button" className="ghost-btn compact-btn" aria-label="Mês anterior" onClick={() => { setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1)); setSelectedDay(null); }}>‹</button>
+          <button
+            type="button"
+            className="ghost-btn compact-btn"
+            aria-label="Mês anterior"
+            onClick={() => {
+              setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1));
+              setSelectedDay(null);
+            }}
+          >
+            ‹
+          </button>
           <strong>{monthFormatter.format(cursor)}</strong>
-          <button type="button" className="ghost-btn compact-btn" aria-label="Próximo mês" onClick={() => { setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)); setSelectedDay(null); }}>›</button>
-          <button type="button" className="ghost-btn compact-btn" onClick={() => { setCursor(new Date(now.getFullYear(), now.getMonth(), 1)); setSelectedDay(null); }}>Hoje</button>
+          <button
+            type="button"
+            className="ghost-btn compact-btn"
+            aria-label="Próximo mês"
+            onClick={() => {
+              setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1));
+              setSelectedDay(null);
+            }}
+          >
+            ›
+          </button>
+          <button
+            type="button"
+            className="ghost-btn compact-btn"
+            onClick={() => {
+              setCursor(new Date(now.getFullYear(), now.getMonth(), les1));
+              setSelectedDay(null);
+            }}
+          >
+            Hoje
+          </button>
         </div>
         <div className="absence-calendar-filters" role="group" aria-label="Filtrar ausências">
           {(['TODOS', 'PENDENTE', 'APROVADO'] as const).map((value) => (
@@ -179,24 +296,51 @@ export default function AbsenceCalendar({ requests, certificates, onChanged }: {
       </div>
 
       <div className="absence-calendar-legend">
-        <span><i className="calendar-dot approved" /> Confirmada / ativa</span>
-        <span><i className="calendar-dot pending" /> Aguardando análise</span>
-        <span><i className="calendar-dot rejected" /> Rejeitada / cancelada</span>
-        <span><i className="calendar-dot partial" /> Período parcial</span>
+        <span>
+          <i className="calendar-dot approved" /> Confirmada / ativa
+        </span>
+        <span>
+          <i className="calendar-dot pending" /> Aguardando análise
+        </span>
+        <span>
+          <i className="calendar-dot rejected" /> Rejeitada / cancelada
+        </span>
+        <span>
+          <i className="calendar-dot partial" /> Período parcial
+        </span>
       </div>
 
       <div className="absence-calendar-grid" role="grid" aria-label={`Calendário de ${monthFormatter.format(cursor)}`}>
-        {weekDays.map((day) => <div key={day} className="absence-calendar-weekday">{day}</div>)}
+        {weekDays.map((day) => (
+          <div key={day} className="absence-calendar-weekday">
+            {day}
+          </div>
+        ))}
         {monthCells.map((date) => {
           const dayKey = keyOf(date);
           const dayItems = itemsByDay.get(dayKey) || [];
           const inMonth = date.getMonth() === cursor.getMonth();
           const isToday = dayKey === keyOf(now);
           return (
-            <button key={dayKey} type="button" className={`absence-calendar-day ${inMonth ? '' : 'outside'} ${isToday ? 'today' : ''} ${selectedDay === dayKey ? 'selected' : ''}`} onClick={() => setSelectedDay(dayKey)} aria-label={`${dateFormatter(date)}: ${dayItems.length} registro(s)`}>
+            <button
+              key={dayKey}
+              type="button"
+              className={`absence-calendar-day ${inMonth ? '' : 'outside'} ${isToday ? 'today' : ''} ${selectedDay === dayKey ? 'selected' : ''}`}
+              onClick={() => setSelectedDay(dayKey)}
+              aria-label={`${dateFormatter(date)}: ${dayItems.length} registro(s)`}
+            >
               <span className="absence-calendar-day-number">{date.getDate()}</span>
               <span className="absence-calendar-events">
-                {dayItems.slice(0, 3).map((item) => <span key={item.id} className={`absence-calendar-event ${statusClass(item.status)} ${item.period !== 'DIA_TODO' && item.source === 'SOLICITAÇÃO' ? 'partial' : ''}`} title={`${item.employee} — ${item.title}`}><i />{item.employee.split(' ')[0]}</span>)}
+                {dayItems.slice(0, 3).map((item) => (
+                  <span
+                    key={item.id}
+                    className={`absence-calendar-event ${statusClass(item.status)} ${item.period !== 'DIA_TODO' && item.source === 'SOLICITAÇÃO' ? 'partial' : ''}`}
+                    title={`${item.employee} — ${item.title}`}
+                  >
+                    <i />
+                    {item.employee.split(' ')[0]}
+                  </span>
+                ))}
                 {dayItems.length > 3 ? <span className="absence-calendar-more">+{dayItems.length - 3} outros</span> : null}
               </span>
             </button>
@@ -212,17 +356,42 @@ export default function AbsenceCalendar({ requests, certificates, onChanged }: {
           </div>
           {selectedDay ? <span className="small-muted">{selectedItems.length} registro(s)</span> : null}
         </div>
-        {!selectedDay ? <p className="small-muted">Clique em qualquer dia para ver quem estará ausente, o motivo e o período informado.</p> : !selectedItems.length ? <p className="small-muted">Nenhuma ausência ou atestado registrado neste dia.</p> : (
+        {!selectedDay ? (
+          <p className="small-muted">Clique em qualquer dia para ver quem estará ausente, o motivo e o período informado.</p>
+        ) : !selectedItems.length ? (
+          <p className="small-muted">Nenhuma ausência, consulta ou evento registrado neste dia.</p>
+        ) : (
           <div className="absence-calendar-detail-list">
             {selectedItems.map((item) => (
               <div className="absence-calendar-detail-row" key={item.id}>
                 <span className={`calendar-dot ${statusClass(item.status)}`} />
                 <div className="absence-calendar-detail-main">
                   <strong>{item.employee}</strong>
-                  <span>{item.employeeNumber || 'Sem matrícula'} · {item.title} · {periodLabel(item)}</span>
-                  <small>{dateRange(item.start, item.end)}{item.subtitle ? ` · ${item.subtitle}` : ''}</small>
+                  <span>
+                    {item.employeeNumber || 'Sem matrícula'} · {item.title} · {periodLabel(item)}
+                  </span>
+                  <small>
+                    {dateRange(item.start, item.end)}
+                    {item.subtitle ? ` · ${item.subtitle}` : ''}
+                  </small>
                 </div>
-                <span className={`status-pill ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
+                <div className="absence-calendar-detail-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  <span className={`status-pill ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
+                  {canCancel(item) ? (
+                    <button
+                      type="button"
+                      className="danger-btn compact-btn"
+                      disabled={busyId === item.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleCancel(item);
+                      }}
+                      title="Desmarcar / cancelar este registro"
+                    >
+                      {busyId === item.id ? '…' : 'Desmarcar'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
