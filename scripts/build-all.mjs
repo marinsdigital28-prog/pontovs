@@ -1,6 +1,6 @@
 /**
- * Orquestra patches/expands do build (Vercel limita buildCommand a 256 chars).
- * Uso: node scripts/build-all.mjs
+ * Build de produção: prisma generate, sincroniza schema (opcional) e next build.
+ * O código-fonte completo agora está versionado — não há mais patches em tempo de build.
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -15,67 +15,17 @@ function run(cmd, args, { optional = false } = {}) {
   console.log(`\n>>> ${label}`);
   const r = spawnSync(cmd, args, { stdio: 'inherit', shell: false, env: process.env });
   if (r.status !== 0) {
-    if (optional) {
-      console.warn(`(opcional) falhou com código ${r.status}: ${label}`);
-      return false;
-    }
+    if (optional) { console.warn(`(opcional) falhou com código ${r.status}: ${label}`); return false; }
     console.error(`falhou com código ${r.status}: ${label}`);
     process.exit(r.status || 1);
   }
   return true;
 }
 
-function runNode(rel, opts) {
-  const full = path.join(root, rel);
-  if (!fs.existsSync(full)) {
-    if (opts?.optional) {
-      console.warn(`(opcional) script ausente: ${rel}`);
-      return false;
-    }
-    console.error(`script ausente: ${rel}`);
-    process.exit(1);
-  }
-  return run(process.execPath, [full], opts);
-}
+const v0 = path.join(root, '.v0/inject-built-with-v0.mjs');
+if (fs.existsSync(v0)) run(process.execPath, [v0], { optional: true });
 
-// 1) inject v0 (opcional)
-runNode('.v0/inject-built-with-v0.mjs', { optional: true });
-
-// 2) restaura assets + patches
-const patches = [
-  'scripts/patch-restore-certificates-route.mjs',
-  'scripts/patch-certificates-panel-payload.mjs',
-  'scripts/patch-restore-folha-assets.mjs',
-  'scripts/patch-timesheet-pdf-borders.mjs',
-  'scripts/patch-timesheet-signature-api.mjs',
-  'scripts/patch-folha-preclose.mjs',
-  'scripts/patch-folha-live-ui.mjs',
-  'scripts/patch-absence-calendar-dashboard.mjs',
-  'scripts/patch-absence-filter.mjs',
-  'scripts/patch-absence-calendar-css-import.mjs',
-  'scripts/patch-calendar-soft-ui.mjs',
-  'scripts/patch-shifts-panel-dashboard.mjs',
-  'scripts/patch-requests-calendar.mjs',
-  'scripts/patch-folha-signature.mjs',
-  'scripts/expand-employee-shell.mjs',
-  'scripts/expand-folga.mjs',
-  'scripts/patch-ponto-perf.mjs',
-  'scripts/patch-folha-print-header.mjs',
-  'scripts/patch-late-tolerance.mjs',
-  'scripts/patch-folha-day-schedule-mat.mjs',
-  // ÚLTIMO: aplica suppress Taiane + badges (depois de qualquer restore)
-  'scripts/patch-folha-visual.mjs',
-  // Mantém identidade visual da folha e mostra detalhes dos eventos justificados.
-  'scripts/patch-folha-standard-design.mjs',
-];
-
-for (const p of patches) {
-  runNode(p);
-}
-
-// 3) prisma + next
 run('npx', ['prisma', 'generate']);
 run('npx', ['prisma', 'db', 'push', '--skip-generate'], { optional: true });
 run('npx', ['next', 'build']);
-
 console.log('\n>>> build-all concluído');
