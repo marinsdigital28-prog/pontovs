@@ -64,9 +64,14 @@ function formatAddress(p?: EmployeeProfile | null) {
 export default function EmployeesPanel({
   employees: initial,
   onChanged,
+  focusId,
+  focusNonce,
 }: {
   employees: Employee[];
   onChanged?: () => void;
+  /** Quando definido, abre a ficha deste colaborador (ex.: botão Editar em Turnos). */
+  focusId?: string | null;
+  focusNonce?: number;
 }) {
   const [employees, setEmployees] = useState<Employee[]>(initial);
   const [search, setSearch] = useState('');
@@ -78,6 +83,10 @@ export default function EmployeesPanel({
   const [nameForm, setNameForm] = useState('');
   const [jobTitleForm, setJobTitleForm] = useState('');
   const [cpfForm, setCpfForm] = useState('');
+  const emptySchedule = { employeeNumber: '', workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '18:00' };
+  const [scheduleForm, setScheduleForm] = useState(emptySchedule);
+  const [creating, setCreating] = useState(false);
+  const [newForm, setNewForm] = useState({ name: '', cpf: '', jobTitle: '', ...emptySchedule });
 
   useEffect(() => { setEmployees(initial); }, [initial]);
 
@@ -110,8 +119,52 @@ export default function EmployeesPanel({
     setNameForm(employee.name);
     setJobTitleForm(employee.jobTitle || '');
     setCpfForm(employee.cpf || '');
+    setScheduleForm({ employeeNumber: employee.employeeNumber || '', workDays: employee.workDays || '', scheduleStart: employee.scheduleStart || '', scheduleEnd: employee.scheduleEnd || '' });
+    setCreating(false);
     setProfileForm({ ...emptyProfile, ...(employee.profile || {}) });
     setMessage('');
+  }
+
+  useEffect(() => {
+    if (!focusId) return;
+    const target = employees.find((e) => e.id === focusId);
+    if (target) openEmployee(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, focusNonce]);
+
+  async function saveSchedule() {
+    if (!selected) return;
+    setSaving(true);
+    setMessage('');
+    const response = await fetch('/api/admin/employees', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: selected.id, ...scheduleForm }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) setMessage(data.error || 'Não foi possível salvar a jornada.');
+    else { setMessage('Matrícula e jornada atualizadas.'); await reload(); }
+    setSaving(false);
+  }
+
+  async function createEmployee(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    const response = await fetch('/api/admin/employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newForm),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) setMessage(data.error || 'Não foi possível cadastrar.');
+    else {
+      setMessage('Colaborador cadastrado.');
+      setCreating(false);
+      setNewForm({ name: '', cpf: '', jobTitle: '', ...emptySchedule });
+      await reload();
+    }
+    setSaving(false);
   }
 
   async function reload() {
@@ -228,8 +281,9 @@ export default function EmployeesPanel({
           <div>
             <span className="eyebrow">CADASTRO OPERACIONAL</span>
             <h2>Colaboradores</h2>
-            <p className="small-muted">Contatos e documentos para comprovante por e-mail/SMS. Matrícula, dias e horários ficam na aba Turnos.</p>
+            <p className="small-muted">Contatos e documentos para comprovante por e-mail/SMS. Matrícula, dias e horários ficam no bloco Jornada da ficha.</p>
           </div>
+          <button type="button" className="ghost-btn" onClick={() => { setSelectedId(null); setCreating(true); setMessage(''); }}>Novo colaborador</button>
           <button type="button" className="primary-btn" disabled={enriching} onClick={() => void enrichFromPdf()}>
             {enriching ? 'Importando fichas...' : 'Importar fichas (PDF Alterdata)'}
           </button>
@@ -274,7 +328,30 @@ export default function EmployeesPanel({
       </div>
 
       <div className="card">
-        {!selected ? (
+        {creating && !selected ? (
+          <form onSubmit={(e) => void createEmployee(e)}>
+            <span className="eyebrow">NOVO CADASTRO</span>
+            <h2>Novo colaborador</h2>
+            <div className="form-two-col">
+              <label className="small-muted">Nome completo<input className="input" required value={newForm.name} onChange={(e) => setNewForm({ ...newForm, name: e.target.value })} /></label>
+              <label className="small-muted">Matrícula<input className="input" required value={newForm.employeeNumber} onChange={(e) => setNewForm({ ...newForm, employeeNumber: e.target.value })} /></label>
+            </div>
+            <div className="form-two-col">
+              <label className="small-muted">CPF<input className="input" value={newForm.cpf} onChange={(e) => setNewForm({ ...newForm, cpf: e.target.value })} /></label>
+              <label className="small-muted">Cargo<input className="input" value={newForm.jobTitle} onChange={(e) => setNewForm({ ...newForm, jobTitle: e.target.value })} /></label>
+            </div>
+            <label className="small-muted">Dias trabalhados<input className="input" value={newForm.workDays} onChange={(e) => setNewForm({ ...newForm, workDays: e.target.value })} /></label>
+            <div className="form-two-col">
+              <label className="small-muted">Início da jornada<input className="input" value={newForm.scheduleStart} onChange={(e) => setNewForm({ ...newForm, scheduleStart: e.target.value })} /></label>
+              <label className="small-muted">Fim da jornada<input className="input" value={newForm.scheduleEnd} onChange={(e) => setNewForm({ ...newForm, scheduleEnd: e.target.value })} /></label>
+            </div>
+            <div className="row-actions" style={{ marginTop: 16 }}>
+              <button className="primary-btn" type="submit" disabled={saving}>{saving ? 'Salvando...' : 'Cadastrar colaborador'}</button>
+              <button className="ghost-btn" type="button" onClick={() => setCreating(false)}>Cancelar</button>
+            </div>
+            {message ? <p className="status-msg">{message}</p> : null}
+          </form>
+        ) : !selected ? (
           <div>
             <span className="eyebrow">FICHA CADASTRAL</span>
             <h2>Selecione um colaborador</h2>
@@ -290,7 +367,6 @@ export default function EmployeesPanel({
                   Matrícula <strong>{selected.employeeNumber || '—'}</strong>
                   {' · '}Jornada <strong>{selected.scheduleStart || '—'} às {selected.scheduleEnd || '—'}</strong>
                   {' · '}Dias <strong>{selected.workDays || '—'}</strong>
-                  <br /><em style={{ opacity: 0.85 }}>Matrícula e jornada não são editáveis nesta tela.</em>
                 </p>
               </div>
             </div>
@@ -302,6 +378,19 @@ export default function EmployeesPanel({
             <div className="form-two-col">
               <label className="small-muted">CPF<input className="input" value={cpfForm} onChange={(e) => setCpfForm(e.target.value)} /></label>
               <label className="small-muted">Departamento<input className="input" value={profileForm.department || ''} onChange={(e) => setField('department', e.target.value)} /></label>
+            </div>
+
+            <h3 style={{ marginTop: 16, marginBottom: 8, fontSize: 15 }}>Jornada</h3>
+            <div className="form-two-col">
+              <label className="small-muted">Matrícula<input className="input" value={scheduleForm.employeeNumber} onChange={(e) => setScheduleForm({ ...scheduleForm, employeeNumber: e.target.value })} /></label>
+              <label className="small-muted">Dias trabalhados<input className="input" value={scheduleForm.workDays} onChange={(e) => setScheduleForm({ ...scheduleForm, workDays: e.target.value })} /></label>
+            </div>
+            <div className="form-two-col">
+              <label className="small-muted">Início da jornada<input className="input" value={scheduleForm.scheduleStart} onChange={(e) => setScheduleForm({ ...scheduleForm, scheduleStart: e.target.value })} /></label>
+              <label className="small-muted">Fim da jornada<input className="input" value={scheduleForm.scheduleEnd} onChange={(e) => setScheduleForm({ ...scheduleForm, scheduleEnd: e.target.value })} /></label>
+            </div>
+            <div className="row-actions">
+              <button className="ghost-btn" type="button" disabled={saving} onClick={() => void saveSchedule()}>{saving ? 'Salvando...' : 'Salvar jornada'}</button>
             </div>
 
             <h3 style={{ marginTop: 16, marginBottom: 8, fontSize: 15 }}>Contato (comprovante e-mail / SMS)</h3>
