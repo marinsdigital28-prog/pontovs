@@ -105,3 +105,96 @@ main.totem .t-fade{animation:tIn .3s ease both}
 @keyframes tDraw{to{stroke-dashoffset:0}}
 @keyframes tShrink{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 @media (prefers-reduced-motion:reduce){main.totem *{animation:none!important;transition:none!important}main.totem .t-check path{stroke-dashoffset:0}}
+
+/* ===== Encaixe sem rolagem: tudo dimensionado pela altura disponível (dvh) ===== */
+main.totem{height:100vh;height:100dvh;padding:clamp(.4rem,2dvh,1.6rem) clamp(.6rem,3vw,2.6rem) 0;padding-top:max(clamp(.4rem,2dvh,1.6rem),env(safe-area-inset-top))}
+main.totem .t-layout{min-height:0;gap:clamp(.5rem,2.4dvh,2rem) clamp(.8rem,2.6vw,2rem)}
+main.totem .t-left{gap:clamp(.3rem,1.8dvh,1.2rem);min-height:0}
+main.totem .t-logo{width:auto;height:clamp(44px,22dvh,210px);max-width:60%;object-fit:contain}
+main.totem .t-clock-card{padding:clamp(.6rem,3dvh,2.2rem) clamp(.9rem,3vw,2.2rem)}
+main.totem .t-greet{font-size:clamp(1.1rem,min(3.6vw,5dvh),2.6rem)}
+main.totem .t-time{margin:clamp(.1rem,.8dvh,.4rem) 0 clamp(.1rem,1dvh,.5rem)}
+main.totem .t-hhmm{font-size:clamp(2.4rem,min(10vw,14dvh),7.6rem)}
+main.totem .t-ss{font-size:clamp(1.2rem,min(4.6vw,6.5dvh),3.4rem)}
+main.totem .t-date{font-size:clamp(.8rem,min(1.6vw,2.6dvh),1.2rem)}
+main.totem .t-who{margin-top:clamp(.3rem,1.6dvh,1rem);gap:clamp(.2rem,.8dvh,.45rem)}
+main.totem .t-lookup,main.totem .t-register{padding:clamp(.6rem,2.8dvh,2rem) clamp(.7rem,2.6vw,2rem)}
+main.totem .t-label{font-size:clamp(1rem,min(2.4vw,3.6dvh),1.8rem);margin-bottom:clamp(.25rem,1.2dvh,.7rem)}
+main.totem .t-slots{margin-bottom:clamp(.35rem,1.8dvh,1rem)}
+main.totem .t-slot{aspect-ratio:auto;height:clamp(38px,10dvh,96px);font-size:clamp(1.3rem,min(4vw,6dvh),3rem)}
+main.totem .t-keypad{gap:clamp(.3rem,1.1dvh,.75rem)}
+main.totem .t-key{min-height:0;height:clamp(38px,8.2dvh,76px);font-size:clamp(1.1rem,min(2.6vw,4dvh),1.9rem)}
+main.totem .t-key-fn{font-size:clamp(.9rem,min(1.9vw,2.8dvh),1.25rem)}
+main.totem .t-btn{min-height:0;height:clamp(42px,8dvh,70px);margin-top:clamp(.4rem,1.8dvh,1rem);font-size:clamp(.95rem,min(2vw,3.2dvh),1.45rem)}
+main.totem .t-status{margin-top:clamp(.25rem,1dvh,.8rem);font-size:clamp(.8rem,2.2dvh,.98rem)}
+main.totem .t-camera{width:min(100%,46dvh,400px);border-width:clamp(4px,.9dvh,7px)}
+main.totem .t-hint{margin-top:clamp(.3rem,1.6dvh,1rem);font-size:clamp(.85rem,min(1.8vw,2.8dvh),1.25rem)}
+main.totem .t-footer{padding:clamp(.2rem,1dvh,.7rem) 0 max(clamp(.25rem,1.2dvh,.9rem),env(safe-area-inset-bottom));margin-top:clamp(.2rem,1.2dvh,.8rem);font-size:clamp(.7rem,1.8dvh,.92rem)}
+/* sucesso */
+main.totem.totem-step-done .t-logo{height:clamp(40px,14dvh,170px)}
+main.totem .t-receipt-card{padding:clamp(.6rem,2.4dvh,1.3rem) clamp(1rem,3vw,1.6rem)}
+main.totem .t-check svg{width:clamp(56px,14dvh,110px);height:clamp(56px,14dvh,110px)}
+main.totem .t-success-title{font-size:clamp(1.2rem,min(3.4vw,5dvh),2.2rem)}
+main.totem .t-success-name{font-size:clamp(.95rem,2.8dvh,1.2rem);margin:.1rem 0 clamp(.2rem,1.4dvh,.7rem)}
+main.totem .t-receipt{font-size:clamp(.82rem,2.4dvh,1rem);gap:clamp(.05rem,.5dvh,.25rem) 1.4rem}
+main.totem .t-nextbtn{margin-top:clamp(.4rem,1.8dvh,.9rem);font-size:clamp(.95rem,2.8dvh,1.2rem)}
+main.totem .t-countdown-label{margin-top:clamp(.2rem,1dvh,.6rem);font-size:clamp(.75rem,2dvh,.92rem)}
+
+/* retrato (celular e tablet em pé): empilhado, tudo dividido pela altura */
+@media (orientation:portrait){
+  main.totem .t-layout{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);align-content:stretch;max-width:640px}
+  main.totem.totem-step-done .t-layout{grid-template-rows:auto auto;align-content:center}
+  main.totem .t-left{align-items:center}
+  main.totem .t-logo{align-self:center;margin:0;height:clamp(40px,11dvh,190px)}
+  main.totem .t-clock-card{align-self:stretch}
+  main.totem .t-right{justify-content:flex-start;min-height:0}
+  main.totem .t-hhmm{font-size:clamp(2.4rem,min(17vw,9dvh),7rem)}
+  main.totem .t-ss{font-size:clamp(1.2rem,min(7vw,4.2dvh),3.2rem)}
+  main.totem .t-greet{font-size:clamp(1.1rem,min(6vw,3.6dvh),2.4rem)}
+  main.totem .t-slot{height:clamp(36px,7dvh,90px)}
+  main.totem .t-key{height:clamp(36px,6.2dvh,74px)}
+  main.totem .t-btn{height:clamp(40px,6.4dvh,68px)}
+  main.totem .t-camera{width:min(100%,72vw,34dvh,420px)}
+  main.totem .t-label{font-size:clamp(.95rem,min(5vw,3dvh),1.8rem)}
+}
+/* telas baixas em paisagem (celular deitado, notebook com barra do navegador) */
+@media (orientation:landscape) and (max-height:560px){
+  main.totem .t-layout{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);align-items:stretch}
+  main.totem .t-left{justify-content:center}
+  main.totem .t-logo{height:clamp(34px,14dvh,90px)}
+  main.totem .t-clock-card{padding:.5rem .9rem}
+  main.totem .t-rays-top{width:60px;top:6px;right:8px}
+  main.totem .t-right{justify-content:center}
+  main.totem .t-lookup{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"label label" "slots slots" "keys keys" "btn btn";padding:.45rem .7rem}
+  main.totem .t-label{grid-area:label;margin-bottom:.2rem}
+  main.totem .t-slots{grid-area:slots}
+  main.totem .t-keypad{grid-area:keys;grid-template-columns:repeat(6,1fr)}
+  main.totem .t-key{height:clamp(32px,11dvh,52px)}
+  main.totem .t-continue{grid-area:btn}
+  main.totem .t-slot{height:clamp(30px,10dvh,56px)}
+  main.totem .t-status,main.totem .t-notice-gold{grid-column:1/-1}
+  main.totem .t-camera{width:min(100%,52dvh)}
+  main.totem.totem-step-done .t-layout{grid-template-columns:1fr}
+  main.totem.totem-step-done .t-logo{display:none}
+}
+@media (orientation:landscape) and (max-height:430px){
+  main.totem .t-footer{display:none}
+  main.totem .t-greet{display:none}
+}
+
+/* convite de instalação */
+main.totem .t-install-banner{position:fixed;z-index:20;left:0;right:0;margin:0 auto;bottom:max(.8rem,env(safe-area-inset-bottom));width:min(94vw,560px);display:flex;align-items:center;gap:.8rem;padding:.75rem .9rem;background:#fff;border:2px solid var(--sand);border-radius:18px;box-shadow:0 18px 40px rgba(60,40,10,.25);animation:tIn .35s ease both}
+main.totem .t-install-banner img{width:48px;height:48px;border-radius:50%;flex:none}
+main.totem .t-ib-text{display:grid;gap:.15rem;min-width:0;color:var(--ink);font-size:.9rem;line-height:1.3}
+main.totem .t-ib-text strong{color:var(--g);font-size:1.05rem}
+main.totem .t-ib-actions{display:flex;flex-direction:column;gap:.35rem;margin-left:auto;flex:none}
+main.totem .t-ib-install{border:0;border-radius:999px;background:var(--g);color:#fff;font-weight:800;padding:.6rem 1.1rem;min-height:44px;cursor:pointer}
+main.totem .t-ib-close{border:0;background:none;color:var(--muted);font-weight:600;padding:.35rem;min-height:36px;cursor:pointer}
+@media (orientation:portrait) and (max-height:700px){
+  main.totem .t-camera{width:min(100%,64vw,30dvh)}
+  main.totem .t-who{margin-top:.25rem}
+  main.totem .t-clock-card{padding:.5rem .8rem}
+}
+/* aviso "Jornada encerrada" sobrepõe o topo do cartão (é temporário) para não empurrar o teclado */
+main.totem .t-lookup{position:relative}
+main.totem .t-lookup .t-notice-gold{position:absolute;z-index:3;top:clamp(.4rem,1.6dvh,1rem);left:clamp(.5rem,2vw,1.4rem);right:clamp(.5rem,2vw,1.4rem);margin:0;box-shadow:0 10px 24px rgba(80,60,20,.18)}
