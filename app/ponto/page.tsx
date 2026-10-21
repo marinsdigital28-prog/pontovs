@@ -41,6 +41,30 @@ function tone(freq: number, start: number, dur: number, peak: number, type: Osci
   osc.start(t0);
   osc.stop(t0 + dur + 0.02);
 }
+/* Clique de tecla: tique curto e baixo; corta o anterior para não acumular. */
+let lastClick: OscillatorNode | null = null;
+function keyClick(soft: boolean) {
+  const ctx = audioCtx;
+  if (!ctx || ctx.state !== 'running') return;
+  try {
+    if (lastClick) { try { lastClick.stop(); } catch { /* já parou */ } lastClick = null; }
+    const t0 = ctx.currentTime;
+    const dur = soft ? 0.032 : 0.026;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = soft ? 'sine' : 'triangle';
+    osc.frequency.setValueAtTime(soft ? 520 : 1250, t0);
+    osc.frequency.exponentialRampToValueAtTime(soft ? 380 : 900, t0 + dur);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(soft ? 0.05 : 0.07, t0 + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.onended = () => { osc.disconnect(); gain.disconnect(); if (lastClick === osc) lastClick = null; };
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.005);
+    lastClick = osc;
+  } catch { /* sem áudio */ }
+}
 function playSuccess() {
   try { (navigator as any).vibrate?.([80, 60, 120]); } catch { /* sem vibração */ }
   try { unlockAudio(); tone(659.25, 0, 0.22, 0.18); tone(987.77, 0.14, 0.28, 0.16); } catch { /* sem áudio */ }
@@ -53,6 +77,7 @@ function playError() {
 function keyFx(btn: HTMLElement | null, x?: number, y?: number) {
   if (!btn) return;
   unlockAudio();
+  keyClick(btn.classList.contains('t-key-fn'));
   try { (navigator as any).vibrate?.(10); } catch { /* sem vibração */ }
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
   // lê a geometria agora (antes de qualquer escrita) e aplica o efeito no próximo quadro
