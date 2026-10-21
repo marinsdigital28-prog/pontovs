@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadHolidayOverrides } from '@/lib/holiday-store';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
           const [punches, certificates, requests] = await Promise.all([
             prisma.punch.findMany({
               where: { userId: emp.id, status: 'VALID', timestamp: { gte: from, lt: to } },
-              select: { type: true, timestamp: true },
+              select: { type: true, timestamp: true, origin: true },
               orderBy: { timestamp: 'asc' },
             }),
             prisma.medicalCertificate.findMany({
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
         }),
       );
 
+      await loadHolidayOverrides();
       const signedPdf = await createSignedTimesheetPdfBatch({
         items: batches,
         month,
@@ -169,7 +171,7 @@ export async function POST(request: Request) {
     const [punches, certificates, requests] = await Promise.all([
       prisma.punch.findMany({
         where: { userId: employeeId, status: 'VALID', timestamp: { gte: from, lt: to } },
-        select: { type: true, timestamp: true },
+        select: { type: true, timestamp: true, origin: true },
         orderBy: { timestamp: 'asc' },
       }),
       prisma.medicalCertificate.findMany({
@@ -200,6 +202,7 @@ export async function POST(request: Request) {
       }),
     ]);
 
+    await loadHolidayOverrides();
     const signedPdf = await createSignedTimesheetPdf({
       employee: { ...employee, unit: employee.unit?.name || null },
       punches,

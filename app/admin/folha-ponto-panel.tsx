@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
 import { resolveDaySchedule } from '@/lib/day-schedule';
+import { setHolidayOverrides } from '@/lib/holidays';
 import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay, shouldSuppressAbono } from '@/lib/operational-abonos';
 import { filterPunchesOutsideCertificates } from '@/lib/certificate-conflicts';
 import { brazilDateKey } from '@/lib/brazil-time';
@@ -271,6 +272,16 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     return () => window.clearInterval(id);
   }, [load]);
 
+  // Feriados automáticos + ajustes locais do gestor entram no cálculo de horas.
+  const [holidayTick, setHolidayTick] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    const load = () => fetch(`/api/admin/holidays?year=${month.slice(0, 4)}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((json) => { if (alive && json?.overrides) { setHolidayOverrides(json.overrides); setHolidayTick((t) => t + 1); } }).catch(() => {});
+    void load();
+    window.addEventListener('holidays-changed', load);
+    return () => { alive = false; window.removeEventListener('holidays-changed', load); };
+  }, [month]);
+
   const visibleEmployees = useMemo(() => {
     if (!employeeId || employeeId === allEmployeesValue) return employees;
     return employees.filter((e) => e.id === employeeId);
@@ -278,7 +289,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
 
   const dayRowsByEmployee = useMemo(
     () => new Map(visibleEmployees.map((employee) => [employee.id, buildDayRows(employee, records, month, certificates, requests)])),
-    [month, records, certificates, requests, visibleEmployees],
+    [month, records, certificates, requests, visibleEmployees, holidayTick],
   );
 
   const preCloseAudit = useMemo(() => {
@@ -511,7 +522,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                         <td className="folha-col-date"><b>{row.date.slice(8)}</b><span>{row.weekday}</span></td>
                         <td className="folha-col-scale">{row.schedule}</td>
                         <td className="folha-col-marks">{row.punches.length ? row.punches.map((punch) => (
-                          <span key={punch.id} className="folha-mark">{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}</span>
+                          <span key={punch.id} className={punch.origin === 'ADJUSTED' ? 'folha-mark folha-mark-manual' : 'folha-mark'} title={punch.origin === 'ADJUSTED' ? 'Marcação incluída ou ajustada pelo gestor' : undefined}>{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}{punch.origin === 'ADJUSTED' ? '*' : ''}</span>
                         )) : '—'}</td>
                         <td>{formatMinutes(row.creditedWorked)}</td>
                         <td>{formatMinutes(row.expected)}</td>
@@ -548,6 +559,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                   );
                 })()}
               </table>
+              <p className="small-muted folha-legend-manual">* Marcação incluída ou ajustada pelo gestor (registro original preservado, com justificativa na auditoria).</p>
               {(() => {
                 const totalWorked = rows.reduce((total, row) => total + (row.creditedWorked ?? 0), 0);
                 const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);

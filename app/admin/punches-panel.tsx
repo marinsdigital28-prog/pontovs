@@ -381,6 +381,7 @@ export default function PunchesPanel({ employees }: { employees: Employee[] }) {
                   onChange={(event) => setActionTimestamp(event.target.value)}
                 />
               </label>
+              <div className="status-msg" style={{ gridColumn: '1 / -1' }}>Portaria 671: a marcação original será preservada (cancelada) e uma nova marcação manual será incluída, com o motivo na auditoria.</div>
             </div>
           ) : (
             <div className="status-msg">O registro original será preservado e ficará com status “Rejeitado”.</div>
