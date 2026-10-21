@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           const [punches, certificates, requests] = await Promise.all([
             prisma.punch.findMany({
               where: { userId: emp.id, status: 'VALID', timestamp: { gte: from, lt: to } },
-              select: { type: true, timestamp: true },
+              select: { type: true, timestamp: true, origin: true },
               orderBy: { timestamp: 'asc' },
             }),
             prisma.medicalCertificate.findMany({
@@ -169,7 +169,7 @@ export async function POST(request: Request) {
     const [punches, certificates, requests] = await Promise.all([
       prisma.punch.findMany({
         where: { userId: employeeId, status: 'VALID', timestamp: { gte: from, lt: to } },
-        select: { type: true, timestamp: true },
+        select: { type: true, timestamp: true, origin: true },
         orderBy: { timestamp: 'asc' },
       }),
       prisma.medicalCertificate.findMany({

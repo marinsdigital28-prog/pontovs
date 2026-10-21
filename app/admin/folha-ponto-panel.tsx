@@ -511,7 +511,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                         <td className="folha-col-date"><b>{row.date.slice(8)}</b><span>{row.weekday}</span></td>
                         <td className="folha-col-scale">{row.schedule}</td>
                         <td className="folha-col-marks">{row.punches.length ? row.punches.map((punch) => (
-                          <span key={punch.id} className="folha-mark">{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}</span>
+                          <span key={punch.id} className={punch.origin === 'ADJUSTED' ? 'folha-mark folha-mark-manual' : 'folha-mark'} title={punch.origin === 'ADJUSTED' ? 'Marcação incluída ou ajustada pelo gestor' : undefined}>{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}{punch.origin === 'ADJUSTED' ? '*' : ''}</span>
                         )) : '—'}</td>
                         <td>{formatMinutes(row.creditedWorked)}</td>
                         <td>{formatMinutes(row.expected)}</td>
@@ -548,6 +548,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                   );
                 })()}
               </table>
+              <p className="small-muted folha-legend-manual">* Marcação incluída ou ajustada pelo gestor (registro original preservado, com justificativa na auditoria).</p>
               {(() => {
                 const totalWorked = rows.reduce((total, row) => total + (row.creditedWorked ?? 0), 0);
                 const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);

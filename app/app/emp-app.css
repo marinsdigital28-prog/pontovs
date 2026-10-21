@@ -278,3 +278,17 @@
 @media (min-width: 481px) {
   .emp-app { border-left: 1px solid var(--emp-border); border-right: 1px solid var(--emp-border); }
 }
+
+/* Confirmar horário (pedido do gestor) */
+.emp-req-confirm { align-items: flex-start; }
+.emp-req-confirm > div { flex: 1; }
+.emp-confirm { margin-top: 0.5rem; padding: 0.65rem 0.75rem; border-radius: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; }
+.emp-confirm p { margin: 0 0 0.35rem; font-size: 0.9rem; }
+.emp-confirm ul { margin: 0 0 0.5rem; padding-left: 1.1rem; }
+.emp-req-list .emp-confirm li { display: list-item; padding: 0.1rem 0; border: 0; }
+.emp-confirm-fix { display: grid; gap: 0.4rem; margin-bottom: 0.5rem; }
+.emp-confirm-fix label { display: grid; gap: 0.15rem; font-size: 0.8rem; font-weight: 600; }
+.emp-confirm-fix input { padding: 0.45rem 0.6rem; border-radius: 10px; border: 1px solid #d1d5db; font-size: 1rem; }
+.emp-confirm-actions { display: flex; gap: 0.5rem; }
+.emp-confirm-actions .emp-btn { flex: 1; padding: 0.6rem 0.8rem; font-size: 0.95rem; }
+.emp-confirm-actions .emp-btn:not(.primary) { background: #fff; border: 1px solid #d1d5db; color: #111827; }

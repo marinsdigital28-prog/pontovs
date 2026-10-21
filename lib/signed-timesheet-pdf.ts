@@ -20,7 +20,10 @@ export type TimesheetEmployee = {
   unit?: string | null;
 };
 
-export type TimesheetPunch = { type: string; timestamp: Date };
+export type TimesheetPunch = { type: string; timestamp: Date; origin?: string | null };
+
+/** Marcação incluída/ajustada pelo gestor (Portaria 671: sinalizar inclusões manuais). */
+export function isManualInclusion(p: { origin?: string | null }) { return p.origin === 'ADJUSTED'; }
 export type TimesheetCertificate = {
   type?: string | null; startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null;
   hoursPerDayMinutes?: number | null; status: string;
@@ -213,9 +216,9 @@ async function buildTimesheetDocument({
           userId: '', startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status,
         }));
     const dayPunches = filterPunchesOutsideCertificates(
-      rawDayPunches.map((p, i) => ({ id: String(i), userId: '', type: p.type, timestamp: p.timestamp, status: 'VALID' })),
+      rawDayPunches.map((p, i) => ({ id: String(i), userId: '', type: p.type, timestamp: p.timestamp, status: 'VALID', origin: p.origin ?? null })),
       dayCerts as any,
-    ).map((p) => ({ type: p.type, timestamp: p.timestamp }));
+    ).map((p: any) => ({ type: p.type, timestamp: p.timestamp, origin: p.origin ?? null }));
 
     const weekday = date.getDay();
     const scheduled = isScheduledDay(workDays, weekdayCodes[weekday]);
@@ -277,7 +280,7 @@ async function buildTimesheetDocument({
     }
 
     const marks = dayPunches.length
-      ? dayPunches.map((p) => `${formatTime(p.timestamp)}${shortType(p.type)}`).join(' ')
+      ? dayPunches.map((p) => `${formatTime(p.timestamp)}${shortType(p.type)}${isManualInclusion(p) ? '*' : ''}`).join(' ')
       : '';
     let justificativa = '';
     if (cert) justificativa = certificateEventText(cert);
@@ -328,7 +331,7 @@ async function buildTimesheetDocument({
   page.drawText(`Justificado ${formatMinutes(totalJustified)}`, { x: cols[5] + 3, y: sumY, size: 6.8, font: regular, color: muted });
   page.drawText(`Saldo ${formatSignedMinutes(totalBalance)}`, { x: cols[6] + 3, y: sumY, size: 7.2, font: bold, color: green });
   page.drawText(`Faltas ${absences}`, { x: cols[7] + 3, y: sumY, size: 6.8, font: regular, color: muted });
-  page.drawText('Legenda: Trab. cred. = marcações + abonos (feriado conta como trabalhado) · Prev. = jornada prevista · Saldo = Trab. cred. − Prev.', {
+  page.drawText('Legenda: Trab. cred. = marcações + abonos (feriado conta como trabalhado) · Prev. = jornada prevista · Saldo = Trab. cred. − Prev. · * = marcação incluída ou ajustada pelo gestor', {
     x: MX, y: sumY - 10, size: 6.8, font: regular, color: muted, maxWidth: right - MX,
   });
 
