@@ -22,6 +22,7 @@ import OverviewExitWatch from './overview-exit-watch';
 import ShiftsPanel from './shifts-panel';
 import InconsistenciesPanel from './inconsistencies-panel';
 import ForgottenQueue from './forgotten-queue';
+import InconsistenciasCenter, { InconsistenciasBell } from './inconsistencias-center';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -56,6 +57,9 @@ const navHints: Record<string, string> = {
 
 export default function AdminDashboard({ employees: initialEmployees, stats, degraded = false, managerName = '' }: { employees: Employee[]; stats: { employeeCount: number; punchesToday: number; openInconsistencies: number }; degraded?: boolean; managerName?: string }) {
   const [tab, setTab] = useState('hoje');
+  const [incCount, setIncCount] = useState(0);
+  const onIncCount = useCallback((n: number) => { setIncCount(n); window.dispatchEvent(new CustomEvent('inconsistencias:count', { detail: n })); }, []);
+  const openInconsistencias = () => { setTab('ponto'); window.setTimeout(() => document.getElementById('inconsistencias')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80); };
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [focusEmployee, setFocusEmployee] = useState<{ id: string; nonce: number } | null>(null);
   const [message, setMessage] = useState('');
@@ -94,7 +98,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         <img src="/ponto-progredir-icon-circular.png" alt="" width={40} height={40} />
         <div><strong>Ponto Progredir</strong><span>Central administrativa</span></div>
       </div>
-      <nav className="admin-tabs" aria-label="Seções administrativas">{[['hoje', 'Hoje'], ['pessoas', 'Pessoas'], ['ponto', 'Ponto'], ['ausencias', 'Ausências'], ['folha', 'Folha e relatórios'], ['config', 'Configurações']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}><svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{navIcons[key]}</svg><span>{label}</span></button>)}</nav>
+      <nav className="admin-tabs" aria-label="Seções administrativas">{[['hoje', 'Hoje'], ['pessoas', 'Pessoas'], ['ponto', 'Ponto'], ['ausencias', 'Ausências'], ['folha', 'Folha e relatórios'], ['config', 'Configurações']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}><svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{navIcons[key]}</svg><span>{label}</span>{key === 'ponto' && incCount ? <span className="nav-badge" aria-label={`${incCount} inconsistências`}>{incCount > 99 ? '99+' : incCount}</span> : null}</button>)}</nav>
       <div className="admin-sidebar-footer">
         {managerName ? <div className="admin-user"><span className="admin-avatar">{managerName.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}</span><div><strong>{managerName}</strong><span>Gestor</span></div></div> : null}
         <a className="ghost-btn admin-open-ponto" href="/ponto">Abrir ponto</a>
@@ -103,7 +107,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     <main className="admin-main">
     <header className="admin-topbar">
       <div><span className="eyebrow">PONTO PROGREDIR</span><h1>{({ hoje: 'Hoje', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', folha: 'Folha e relatórios', config: 'Configurações' } as Record<string, string>)[tab]}</h1><p className="small-muted">{navHints[tab]}</p></div>
-      <div className="admin-topbar-date">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><InconsistenciasBell onOpen={openInconsistencias} onCount={setIncCount} /><div className="admin-topbar-date">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div></div>
     </header>
     {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
@@ -181,6 +185,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       </div>
     </section> : null}
     {tab === 'ponto' ? <section>
+      <div style={{ marginBottom: 20 }}><InconsistenciasCenter onCount={onIncCount} /></div>
       <div style={{ marginBottom: 20 }}><ForgottenQueue onOpenAbsences={() => setTab('ausencias')} /></div>
       <PunchesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} />
       <div style={{ marginTop: 20 }}><InconsistenciesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} onOpenPunches={() => window.scrollTo({ top: 0, behavior: 'smooth' })} /></div>
