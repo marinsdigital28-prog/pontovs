@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../../lib/security-controls';
 import { isPeriodClosed, periodFromDate } from '../../../../../lib/period-closure';
 import { evaluateLocation } from '../../../../../lib/punch-integrity';
+import { applyPunchCorrection, planPunchCorrection } from '../../../../../lib/punch-correction';
 
 export const dynamic = 'force-dynamic';
 const allowedTypes = new Set(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
@@ -46,29 +47,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = await request.json().catch(() => null);
   const reason = String(body?.reason ?? '').trim();
   if (reason.length < 5) return NextResponse.json({ error: 'Informe um motivo com pelo menos 5 caracteres.' }, { status: 400 });
-  const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true, userId: true } });
+  const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true, userId: true, unitId: true } });
   if (!existing) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
-  if (existing.status === 'REJECTED') return NextResponse.json({ error: 'Uma marcação cancelada não pode ser editada.' }, { status: 409 });
   if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de editar.' }, { status: 423 });
 
   const nextType = body?.type === undefined ? existing.type : String(body.type).trim().toUpperCase();
   const nextTimestamp = body?.timestamp === undefined ? existing.timestamp : parseTimestamp(body.timestamp);
   if (!allowedTypes.has(nextType) || !nextTimestamp) return NextResponse.json({ error: 'Tipo ou data/hora inválidos.' }, { status: 400 });
-  const changes: Array<{ field: string; oldValue: string; newValue: string }> = [];
-  if (nextType !== existing.type) changes.push({ field: 'type', oldValue: existing.type, newValue: nextType });
-  if (nextTimestamp.getTime() !== existing.timestamp.getTime()) changes.push({ field: 'timestamp', oldValue: existing.timestamp.toISOString(), newValue: nextTimestamp.toISOString() });
-  if (!changes.length) return NextResponse.json({ error: 'Nenhuma alteração foi informada.' }, { status: 400 });
+  if (await isPeriodClosed(periodFromDate(nextTimestamp))) return NextResponse.json({ error: 'A competência da nova data está fechada.' }, { status: 423 });
+  const plan = planPunchCorrection(existing, nextType, nextTimestamp);
+  if (!plan.ok) return NextResponse.json({ error: plan.error }, { status: plan.status });
 
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      const punch = await tx.punch.update({ where: { id }, data: { type: nextType, timestamp: nextTimestamp, origin: 'ADJUSTED' }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });
-      for (const change of changes) await tx.punchAudit.create({ data: { id: crypto.randomUUID(), punchId: id, changedById: manager.id, field: change.field, oldValue: change.oldValue, newValue: change.newValue, reason } });
-      return punch;
-    });
-    await appendAuditEvent({ action: 'PUNCH_EDITED', actorId: manager.id, resource: 'Punch', resourceId: id, metadata: { reason, changes } });
-    return NextResponse.json({ punch: updated });
-  } catch {
-    return NextResponse.json({ error: 'Não foi possível editar a marcação.' }, { status: 500 });
+    // Portaria 671: a original é preservada (cancelada) e uma nova marcação manual é incluída.
+    const created = await prisma.$transaction(async (tx) => applyPunchCorrection(tx, plan, { managerId: manager.id, reason, unitId: existing.unitId }));
+    await appendAuditEvent({ action: 'PUNCH_CORRECTED', actorId: manager.id, resource: 'Punch', resourceId: created.id, metadata: { reason, changes: plan.changes, originalPunchId: id } });
+    return NextResponse.json({ punch: created, originalPunchId: id });
+  } catch (error) {
+    if (error instanceof Error && error.message === 'DUPLICATE_PUNCH') return NextResponse.json({ error: 'Já existe uma marcação manual igual para este colaborador, data, horário e tipo.' }, { status: 409 });
+    return NextResponse.json({ error: 'Não foi possível corrigir a marcação.' }, { status: 500 });
   }
 }
 
@@ -88,7 +85,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de cancelar.' }, { status: 423 });
   try {
     const updated = await prisma.$transaction(async (tx) => {
-      const punch = await tx.punch.update({ where: { id }, data: { status: 'REJECTED', origin: 'ADJUSTED' }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });
+      const punch = await tx.punch.update({ where: { id }, data: { status: 'REJECTED' }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });
       await tx.punchAudit.create({ data: { id: crypto.randomUUID(), punchId: id, changedById: manager.id, field: 'status', oldValue: existing.status, newValue: 'REJECTED', reason } });
       return punch;
     });
