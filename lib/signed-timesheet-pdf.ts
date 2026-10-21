@@ -90,6 +90,7 @@ function certificateEventText(certificate: TimesheetCertificate) {
 }
 function conciseOperationalReason(reason: string) {
   if (/independ[eê]ncia/i.test(reason)) return 'Feriado nacional';
+  if (/^(Feriado|Ponto facultativo)[^—]*—\s*/i.test(reason)) return `Feriado · ${reason.split('—').slice(1).join('—').trim()}`;
   if (/curso jovem aprendiz/i.test(reason)) return 'Curso jovem aprendiz';
   if (/mesa brasil/i.test(reason)) return 'Trabalho externo · Mesa Brasil';
   if (/trabalho externo/i.test(reason)) return 'Trabalho externo';

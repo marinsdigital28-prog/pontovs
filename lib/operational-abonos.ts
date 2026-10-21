@@ -1,4 +1,5 @@
 import { brazilDateKey } from './brazil-time';
+import { resolveHoliday, SCOPE_LABEL } from './holidays';
 
 /** Matrículas */
 export const MAT_KAIO = '0803';
@@ -47,7 +48,7 @@ export function isLastFridayOfMonth(dateKey: string): boolean {
 }
 
 export function isNationalHoliday(dateKey: string): boolean {
-  return Boolean(NATIONAL_HOLIDAYS[dateKey]);
+  return Boolean(NATIONAL_HOLIDAYS[dateKey] || resolveHoliday(dateKey));
 }
 
 /**
@@ -79,7 +80,9 @@ export function getOperationalAbono(
   }
 
   // Feriado nacional — abono integral para quem é do dia (escala)
-  const holidayReason = NATIONAL_HOLIDAYS[dateKey];
+  // Feriados automáticos (nacional/SP/capital, móveis pela Páscoa) + ajustes locais do gestor
+  const holiday = resolveHoliday(dateKey);
+  const holidayReason = holiday ? `${SCOPE_LABEL[holiday.scope]} — ${holiday.name}` : NATIONAL_HOLIDAYS[dateKey];
   if (holidayReason) {
     return {
       kind: 'FULL_DAY',
@@ -172,7 +175,7 @@ export function operationalJustifiedMinutes(
 /** True se a data é feriado nacional cadastrado (crédito integral como trabalhado). */
 export function isHolidayAbono(abono: OperationalAbono | null | undefined): boolean {
   if (!abono) return false;
-  return abono.kind === 'FULL_DAY' && /feriado/i.test(abono.reason || '');
+  return abono.kind === 'FULL_DAY' && /feriado|ponto facultativo/i.test(abono.reason || '');
 }
 
 export function shouldHidePunchesForDay(
