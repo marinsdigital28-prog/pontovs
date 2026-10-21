@@ -2,6 +2,19 @@
 
 import React, { useEffect, useState } from 'react';
 import InstallAppButton from '../../components/InstallAppButton';
+import './totem.css';
+
+const ArrowIcon = () => <svg viewBox="0 0 24 24" aria-hidden className="t-ico"><path d="M4 12h15M13 6l6 6-6 6" /></svg>;
+const BackspaceIcon = () => <svg viewBox="0 0 32 24" aria-hidden className="t-ico t-ico-bs"><path d="M10 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H10L2 12z" /><path d="M15 8l8 8M23 8l-8 8" /></svg>;
+const CameraIcon = () => <svg viewBox="0 0 24 24" aria-hidden className="t-ico"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.8" /></svg>;
+const Rays = ({ className }: { className: string }) => <svg viewBox="0 0 120 70" aria-hidden className={className}><path d="M20 66a40 40 0 0 1 80 0" /><path d="M60 18V2M38 24 30 10M82 24l8-14M24 38 10 30M96 38l14-8" /></svg>;
+
+const TZ = 'America/Sao_Paulo';
+/** Tempo que a tela de sucesso fica visível antes de voltar sozinha para a próxima matrícula. */
+const SUCCESS_SCREEN_MS = 4000;
+const TYPE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Saída para intervalo', RETORNO: 'Retorno do intervalo', SAIDA: 'Saída', PENDENTE: 'Salva no aparelho' };
+const TYPE_ICON: Record<string, string> = { ENTRADA: '→', INTERVALO: '☕', RETORNO: '↩', SAIDA: '←', PENDENTE: '⟳' };
+function greeting(date: Date | null) { const h = date ? Number(date.toLocaleString('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: TZ })) : 8; return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 
 export default function Page() {
   const [loading, setLoading] = useState(false);
@@ -12,7 +25,7 @@ export default function Page() {
   const [employee, setEmployee] = useState<any>(null);
   const [nextType, setNextType] = useState<'ENTRADA' | 'SAIDA' | 'INTERVALO' | 'RETORNO' | null>('ENTRADA');
   const [photo, setPhoto] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<{ type: string; timestamp: string; location?: { lat: number; lng: number } | null } | null>(null);
+  const [confirmation, setConfirmation] = useState<{ type: string; timestamp: string; location?: { lat: number; lng: number } | null; id?: string; duplicate?: boolean } | null>(null);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const streamRef = React.useRef<MediaStream | null>(null);
   const autoLookupRef = React.useRef('');
@@ -119,7 +132,7 @@ export default function Page() {
     setConfirmation({ type: 'PENDENTE', timestamp: payload.clientTimestamp });
     setStatusMsg(reason);
     setLoading(false);
-    window.setTimeout(() => resetForNextCollaborator(), 1400);
+    window.setTimeout(() => resetForNextCollaborator(), SUCCESS_SCREEN_MS);
   }
 
   async function readCurrentLocation() {
@@ -180,10 +193,12 @@ export default function Page() {
       setConfirmation({
         type: json.type,
         timestamp: json.timestamp,
+        id: typeof json.id === 'string' ? json.id : undefined,
+        duplicate: Boolean(json.duplicate),
       });
       if (json.duplicate) {
         setStatusMsg('Marcação já registrada há pouco. Evitando duplicidade.');
-        window.setTimeout(() => resetForNextCollaborator(), 1400);
+        window.setTimeout(() => resetForNextCollaborator(), SUCCESS_SCREEN_MS);
         return;
       }
       const receiptStatus = json.receiptEmail?.status;
@@ -194,7 +209,7 @@ export default function Page() {
           : receiptStatus === 'failed'
             ? 'Ponto registrado. Não foi possível enviar o comprovante por email.'
             : 'Ponto registrado e sincronizado. Preparando a próxima matrícula...');
-      window.setTimeout(() => resetForNextCollaborator(), 1400);
+      window.setTimeout(() => resetForNextCollaborator(), SUCCESS_SCREEN_MS);
     } catch (err: any) {
       const errorMessage = err?.message || 'Não foi possível registrar a marcação. Tente novamente.';
       if (err?.code === 'DATABASE_QUOTA_EXCEEDED') {
@@ -268,8 +283,9 @@ export default function Page() {
     };
   }, []);
 
-  const dayString = now ? now.toLocaleDateString(undefined, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) : '';
-  const timeString = now ? now.toLocaleTimeString() : '--:--:--';
+  const dayString = now ? now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ }) : '';
+  const timeString = now ? now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: TZ }) : '--:--:--';
+  const [hhmm, ss] = [timeString.slice(0, 5), timeString.slice(6, 8)];
 
   function resetForNextCollaborator() {
     closeCamera();
@@ -348,103 +364,159 @@ export default function Page() {
     await handlePunch(capturedPhoto);
   }
 
+  // Teclado físico: números, Backspace, Esc (limpar), Enter (Continuar / Marcar ponto / próximo).
+  const keyHandlerRef = React.useRef<(e: KeyboardEvent) => void>(() => undefined);
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (confirmation) { if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') { e.preventDefault(); resetForNextCollaborator(); } return; }
+    if (step === 'lookup') {
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); appendDigit(e.key); }
+      else if (e.key === 'Backspace') { e.preventDefault(); appendDigit('⌫'); }
+      else if (e.key === 'Escape' || e.key === 'Delete') { e.preventDefault(); appendDigit('C'); }
+      else if (e.key === 'Enter' && matricula.trim() && !loading) { e.preventDefault(); void handleLookup(); }
+      return;
+    }
+    if (step === 'register') {
+      if ((e.key === 'Enter' || e.key === ' ') && cameraOpen && !loading) { e.preventDefault(); void capturePhoto(); }
+    }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const typeLabel = (type: string) => TYPE_LABEL[type] || type;
+  const confirmedAt = confirmation ? new Date(confirmation.timestamp) : null;
+  const digits = matricula.replace(/\D/g, '');
+  const slotCount = Math.min(8, Math.max(4, digits.length + (digits.length < 8 ? 1 : 0)));
+  const done = Boolean(confirmation);
+
   return (
-    <main className="container ponto-kiosk-container">
-      <div className="header-row">
-        <div>
-          <div className="header-brand">Ponto Progredir</div>
-          <div className="header-greeting">{employee ? `Bom dia, ${employee.name}` : 'Identificação do funcionário'}</div>
-        </div>
-        <div className="ponto-header-actions"><InstallAppButton compact /><div className="avatar" aria-hidden /></div>
-      </div>
-
-      <div className={`card ponto-kiosk-card ${step === 'register' ? 'ponto-register-card' : 'ponto-lookup-card'}`}>
-        <section className="ponto-info-panel">
-        <div className="clock">
-          <div className="time">{timeString}</div>
-          <div className="date">{dayString}</div>
-        </div>
-        <div className="ponto-info-divider" />
-        <div className="ponto-reference-hint">👆 <strong>Digite seu número de matrícula</strong></div>
-        <div className="ponto-info-meta">Ponto Eletrônico Homologado · Portaria 671 MTE</div>
+    <main className={`ponto-kiosk-container totem totem-step-${done ? 'done' : step}`}>
+      <div className="t-install"><InstallAppButton compact /></div>
+      <div className="t-layout">
+        <section className="ponto-info-panel t-left" aria-label="Data e hora">
+          <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo" width={497} height={419} />
+          {!done ? (
+            <div className="t-card t-clock-card">
+              <Rays className="t-rays t-rays-top" />
+              <div className="t-greet">{greeting(now)}!</div>
+              <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
+              <div className="t-date">{dayString}</div>
+              {step === 'register' && employee ? (
+                <div className="t-who" key={employee.employeeNumber}>
+                  <span className="t-chip t-chip-strong">Matrícula {employee.employeeNumber}</span>
+                  <strong className="t-who-name">{employee.name}</strong>
+                  {nextType ? <span className="t-chip">Próxima marcação: {typeLabel(nextType)}</span> : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
-        <section className="ponto-input-panel">
 
+        <section className="ponto-input-panel t-right">
         {step === 'lookup' && (
-          <div className="lookup-stage">
+          <div className="t-card t-lookup t-fade" aria-label="Digite seu número de matrícula">
             {journeyClosed && statusMsg && (
-              <div className="journey-closed-notice" role="status">
+              <div className="t-notice t-notice-gold" role="status">
                 <strong>Jornada encerrada</strong>
                 <span>{statusMsg}</span>
               </div>
             )}
-            <div className="small-muted" style={{ marginBottom: 10, fontWeight: 700 }}>Digite sua matrícula</div>
-            <div className="matricula-shell">
-              <div className="matricula-label">MATRÍCULA</div>
-              <div className="matricula-display">{matricula || '—'}</div>
+            <div className="t-label" id="totem-mat-label">MATRÍCULA</div>
+            <div className={`t-slots ${loading ? 'is-loading' : ''}`} style={{ ['--slots' as any]: slotCount }} aria-labelledby="totem-mat-label" aria-live="polite" aria-label={digits ? `Matrícula ${digits.split('').join(' ')}` : 'Digite seu número de matrícula'}>
+              {Array.from({ length: slotCount }, (_, i) => (
+                <span key={i} className={`t-slot ${digits[i] ? 'is-filled' : i === digits.length ? 'is-active' : 'is-empty'}`}>{digits[i] ?? ''}</span>
+              ))}
             </div>
 
-            <div className="keypad-grid">
+            <div className="t-keypad" role="group" aria-label="Teclado numérico">
               {keypadNumbers.map((key) => (
                 <button
                   key={key}
                   type="button"
-                  className="keypad-btn"
+                  className={`t-key ${key === 'C' || key === '⌫' ? 't-key-fn' : ''}`}
                   onClick={() => appendDigit(key)}
                   aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
                 >
-                  {key}
+                  {key === 'C' ? 'Limpar' : key === '⌫' ? <BackspaceIcon /> : key}
                 </button>
               ))}
             </div>
 
-            <button className="primary-btn" style={{ marginTop: 18 }} onClick={handleLookup} disabled={loading || !matricula.trim()}>
-              {loading ? 'Buscando...' : 'Continuar'}
+            <button type="button" className="t-btn t-continue" onClick={handleLookup} disabled={loading || !matricula.trim()}>
+              <span>{loading ? 'Buscando...' : 'Continuar'}</span>{loading ? <span className="t-spinner" aria-hidden /> : <ArrowIcon />}
             </button>
-            {statusMsg && !journeyClosed && <div className="status-msg">{statusMsg}</div>}
+            {statusMsg && !journeyClosed && <div className="t-status" role="status">{statusMsg}</div>}
           </div>
         )}
 
-        {step === 'register' && employee && (
-          <div className="register-stage register-stage-minimal">
-            {!confirmation ? (
+        {step === 'register' && employee && !done && (
+          <div className="t-card t-register t-fade">
+            {cameraOpen ? (
               <>
-                {cameraOpen ? (
-                  <div className="camera-stage camera-stage-minimal">
-                    <div className="camera-preview-large camera-preview-minimal">
-                      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
-                    </div>
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void capturePhoto()} disabled={loading}>
-                      {loading ? 'Registrando...' : 'Marcar ponto'}
-                    </button>
-                  </div>
-                ) : photo ? (
-                  <div className="camera-stage camera-stage-minimal photo-retry-stage">
-                    <img src={photo} alt="Foto capturada" className="camera-preview-large camera-preview-minimal" />
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePunch(photo)} disabled={loading}>
-                      {loading ? 'Registrando...' : 'Tentar registrar novamente'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="camera-stage camera-stage-minimal">
-                    <div className="status-msg">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePhotoSelection()} disabled={loading}>Abrir câmera</button>
-                  </div>
-                )}
+                <div className="t-camera">
+                  <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                  <span className="t-face-guide" aria-hidden />
+                </div>
+                <p className="t-hint">Posicione o rosto e toque em Marcar ponto</p>
+                <button type="button" className="t-btn t-mark" onClick={() => void capturePhoto()} disabled={loading}>
+                  <CameraIcon /><span>{loading ? 'Registrando...' : 'Marcar ponto'}</span>
+                </button>
+              </>
+            ) : photo ? (
+              <>
+                <div className="t-camera"><img src={photo} alt="Foto capturada" /></div>
+                <button type="button" className="t-btn t-mark" onClick={() => void handlePunch(photo)} disabled={loading}>
+                  <span>{loading ? 'Registrando...' : 'Tentar registrar novamente'}</span>
+                </button>
               </>
             ) : (
-              <div className="summary confirmation-summary confirmation-summary-minimal">
-                <div className="confirmation-check">✓</div>
-                <div className="confirmation-title">Ponto registrado</div>
-                <div className="confirmation-type">{confirmation.type}</div>
-                <div className="confirmation-time">{new Date(confirmation.timestamp).toLocaleTimeString()}</div>
-              </div>
+              <>
+                <div className="t-camera t-camera-off"><CameraIcon /></div>
+                <div className="t-notice">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
+                <button type="button" className="t-btn t-mark" onClick={() => void handlePhotoSelection()} disabled={loading}><CameraIcon /><span>Abrir câmera</span></button>
+              </>
             )}
-            {statusMsg && <div className="status-msg">{statusMsg}</div>}
+            {statusMsg && (cameraOpen || photo) && !statusMsg.startsWith('Câmera pronta') && <div className="t-status" role="status">{statusMsg}</div>}
+          </div>
+        )}
+
+        {step === 'register' && employee && confirmation && (
+          <div className={`t-success t-type-${confirmation.type}`} role="status" aria-live="assertive">
+            <div className="t-card t-receipt-card">
+              <div className="confirmation-check t-check" aria-hidden>
+                <svg viewBox="0 0 120 120"><g className="t-sunrays">{Array.from({ length: 12 }, (_, i) => <line key={i} x1="60" y1="6" x2="60" y2="18" transform={`rotate(${i * 30} 60 60)`} />)}</g><circle cx="60" cy="60" r="34" /><path d="M44 61l11 11 22-24" /></svg>
+              </div>
+              <div className="t-success-title">{confirmation.type === 'PENDENTE' ? 'Marcação salva!' : confirmation.duplicate ? 'Já registrado!' : 'Ponto registrado!'}</div>
+              <div className="t-success-name">{employee.name}</div>
+              <dl className="t-receipt">
+                <dt>Tipo:</dt><dd>{typeLabel(confirmation.type)}</dd>
+                <dt>Horário:</dt><dd>{confirmedAt ? confirmedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TZ }) : '—'}</dd>
+                <dt>Data:</dt><dd>{confirmedAt ? confirmedAt.toLocaleDateString('pt-BR', { timeZone: TZ }) : '—'}</dd>
+                {confirmation.id ? <><dt>Registro:</dt><dd className="t-mono">…{confirmation.id.slice(-10).toUpperCase()}</dd></> : null}
+              </dl>
+              {statusMsg ? <div className="t-status t-status-in">{statusMsg}</div> : null}
+            </div>
+            <button type="button" className="t-btn t-nextbtn" onClick={() => resetForNextCollaborator()}><span>Próximo colaborador</span><ArrowIcon /></button>
+            <div className="t-countdown-label"><Countdown ms={SUCCESS_SCREEN_MS} /></div>
+            <div className="t-countdown"><span style={{ animationDuration: `${SUCCESS_SCREEN_MS}ms` }} /></div>
           </div>
         )}
         </section>
       </div>
+      <footer className="t-footer">Ponto eletrônico • Portaria 671 MTE</footer>
     </main>
   );
+}
+
+function Countdown({ ms }: { ms: number }) {
+  const [left, setLeft] = useState(Math.ceil(ms / 1000));
+  useEffect(() => {
+    const start = Date.now();
+    const t = window.setInterval(() => setLeft(Math.max(0, Math.ceil((ms - (Date.now() - start)) / 1000))), 200);
+    return () => window.clearInterval(t);
+  }, [ms]);
+  return <>Voltando ao início em {left}s</>;
 }
