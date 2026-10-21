@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import InstallAppButton from '../../components/InstallAppButton';
 import './totem.css';
 import InstallBanner from './InstallBanner';
@@ -55,26 +55,45 @@ function keyFx(btn: HTMLElement | null, x?: number, y?: number) {
   unlockAudio();
   try { (navigator as any).vibrate?.(10); } catch { /* sem vibração */ }
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  // lê a geometria agora (antes de qualquer escrita) e aplica o efeito no próximo quadro
   const r = btn.getBoundingClientRect();
-  const size = Math.max(r.width, r.height) * 2.2;
-  const dot = document.createElement('span');
-  dot.className = 't-ripple';
-  dot.style.width = dot.style.height = `${size}px`;
-  dot.style.left = `${(x ?? r.left + r.width / 2) - r.left - size / 2}px`;
-  dot.style.top = `${(y ?? r.top + r.height / 2) - r.top - size / 2}px`;
-  btn.appendChild(dot);
-  btn.classList.remove('is-fx'); void btn.offsetWidth; btn.classList.add('is-fx');
-  window.setTimeout(() => { dot.remove(); btn.classList.remove('is-fx'); }, 520);
+  requestAnimationFrame(() => {
+    const size = Math.max(r.width, r.height) * 2.2;
+    const dot = document.createElement('span');
+    dot.className = 't-ripple';
+    dot.style.cssText = `width:${size}px;height:${size}px;left:${(x ?? r.left + r.width / 2) - r.left - size / 2}px;top:${(y ?? r.top + r.height / 2) - r.top - size / 2}px`;
+    btn.appendChild(dot);
+    btn.classList.add('is-fx');
+    window.setTimeout(() => { dot.remove(); btn.classList.remove('is-fx'); }, 200);
+  });
 }
 function keyFxFor(key: string) {
   const label = key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`;
   keyFx(document.querySelector(`button[aria-label="${label}"]`) as HTMLElement | null);
 }
 
+const TotemClock = memo(function TotemClock() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const dayString = now ? now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ }) : '';
+  const timeString = now ? now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: TZ }) : '--:--:--';
+  const [hhmm, ss] = [timeString.slice(0, 5), timeString.slice(6, 8)];
+  return (
+    <div className="t-clock-text">
+      <div className="t-greet">{greeting(now)}!</div>
+      <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
+      <div className="t-date">{dayString}</div>
+    </div>
+  );
+});
+
 export default function Page() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [now, setNow] = useState<Date | null>(null);
   const [step, setStep] = useState<'lookup' | 'register'>('lookup');
   const [matricula, setMatricula] = useState('');
   const [employee, setEmployee] = useState<any>(null);
@@ -106,12 +125,6 @@ export default function Page() {
   }
 
   useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
     if (step !== 'register' || !employee || cameraOpen || photo || confirmation || loading) return;
     void handlePhotoSelection();
   }, [step, employee, cameraOpen, photo, confirmation, loading]);
@@ -126,7 +139,7 @@ export default function Page() {
     const timer = window.setTimeout(() => {
       autoLookupRef.current = value;
       void handleLookup();
-    }, 450);
+    }, 200);
     return () => window.clearTimeout(timer);
   }, [matricula, step, loading]);
 
@@ -340,9 +353,6 @@ export default function Page() {
     };
   }, []);
 
-  const dayString = now ? now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: TZ }) : '';
-  const timeString = now ? now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: TZ }) : '--:--:--';
-  const [hhmm, ss] = [timeString.slice(0, 5), timeString.slice(6, 8)];
 
   function resetForNextCollaborator() {
     closeCamera();
@@ -464,11 +474,7 @@ export default function Page() {
               <Rays className="t-rays t-rays-top" />
               <div className="t-clock-row">
                 <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo t-logo-inline" width={497} height={419} />
-                <div className="t-clock-text">
-                  <div className="t-greet">{greeting(now)}!</div>
-                  <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
-                  <div className="t-date">{dayString}</div>
-                </div>
+                <TotemClock />
               </div>
               {step === 'register' && employee ? (
                 <div className="t-who" key={employee.employeeNumber}>
@@ -503,8 +509,8 @@ export default function Page() {
                   key={key}
                   type="button"
                   className={`t-key ${key === 'C' || key === '⌫' ? 't-key-fn' : ''}`}
-                  onPointerDown={(ev) => keyFx(ev.currentTarget, ev.clientX, ev.clientY)}
-                  onClick={() => appendDigit(key)}
+                  onPointerDown={(ev) => { if (ev.button > 0) return; appendDigit(key); keyFx(ev.currentTarget, ev.clientX, ev.clientY); }}
+                  onClick={(ev) => { if (ev.detail === 0) { appendDigit(key); keyFx(ev.currentTarget); } }}
                   aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
                 >
                   {key === 'C' ? 'Limpar' : key === '⌫' ? <BackspaceIcon /> : key}
