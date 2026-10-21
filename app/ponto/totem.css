@@ -1,0 +1,133 @@
+/* Totem /ponto — refinamento visual. Tudo escopado em main.totem; não altera fluxo. */
+main.totem {
+  --t-bg: #04120c; --t-panel: #0a2018; --t-panel-2: #0e2a20; --t-line: rgba(255,255,255,.08);
+  --t-gold: #d9b44a; --t-gold-2: #f1d27a; --t-text: #f3f7f4; --t-muted: #a9bfb4; --t-ok: #3ddc97; --t-warn: #f5c451;
+  --t-radius: 22px; --t-ease: cubic-bezier(.2,.8,.2,1);
+  max-width: 1280px; margin: 0 auto; min-height: 100dvh; padding: clamp(.6rem, 1.6vw, 1.25rem);
+  display: flex; flex-direction: column; gap: clamp(.5rem, 1.2vw, .9rem);
+  color: var(--t-text); font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+html:has(main.totem), body:has(main.totem) { background: radial-gradient(1200px 700px at 15% -10%, #12402e 0%, transparent 60%), radial-gradient(900px 600px at 110% 110%, #2a2508 0%, transparent 55%), var(--t-bg, #04120c); }
+main.totem .totem-header { margin: 0; padding: 0 .25rem; align-items: center; }
+main.totem .header-brand { color: var(--t-gold); letter-spacing: .22em; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+main.totem .header-greeting { color: var(--t-text); font-size: clamp(1.05rem, 2.2vw, 1.35rem); font-weight: 700; margin-top: 2px; }
+
+main.totem .ponto-kiosk-card {
+  flex: 1; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(380px, .95fr); gap: clamp(.6rem, 1.4vw, 1rem);
+  height: auto; min-height: 0; max-height: none; padding: clamp(.6rem, 1.4vw, 1rem); margin: 0;
+  background: linear-gradient(160deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); border: 1px solid rgba(217,180,74,.18);
+  border-radius: calc(var(--t-radius) + 6px); box-shadow: 0 30px 80px -30px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.04);
+}
+main.totem .ponto-info-panel, main.totem .ponto-input-panel {
+  background: linear-gradient(180deg, var(--t-panel-2), var(--t-panel)); border: 1px solid var(--t-line); border-radius: var(--t-radius);
+  padding: clamp(1rem, 2.4vw, 2rem); min-height: 0; color: var(--t-text);
+}
+main.totem .ponto-info-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; position: relative; overflow: hidden; }
+main.totem .ponto-info-panel::after { content: ''; position: absolute; inset: auto -20% -40% -20%; height: 60%; background: radial-gradient(closest-side, rgba(217,180,74,.10), transparent); pointer-events: none; }
+main.totem .totem-clock { padding: 0; }
+main.totem .totem-clock .time { display: flex; align-items: baseline; justify-content: center; gap: .15em; color: var(--t-text); letter-spacing: -.04em; line-height: .95; font-weight: 800; font-size: clamp(4.2rem, 11vw, 8.5rem); text-shadow: 0 10px 40px rgba(0,0,0,.35); }
+main.totem .totem-ss { font-size: .34em; color: var(--t-gold); font-weight: 700; letter-spacing: 0; min-width: 1.4em; text-align: left; }
+main.totem .totem-clock .date { letter-spacing: 0; word-spacing: normal; margin-top: .9rem; color: var(--t-muted); font-size: clamp(1rem, 1.8vw, 1.25rem); font-weight: 600; }
+main.totem .totem-clock .date::first-letter { text-transform: uppercase; }
+main.totem .ponto-info-divider { width: min(320px, 70%); height: 2px; margin: clamp(1rem, 3vh, 2rem) auto; background: linear-gradient(90deg, transparent, var(--t-gold), transparent); border: 0; opacity: .8; }
+main.totem .ponto-reference-hint { display: grid; gap: .45rem; color: var(--t-text); font-size: clamp(1rem, 1.8vw, 1.2rem); }
+main.totem .totem-kbd-hint { color: var(--t-muted); font-size: .82rem; font-weight: 500; }
+main.totem .ponto-info-meta { margin-top: auto; padding-top: 1.5rem; color: rgba(169,191,180,.75); font-size: .74rem; letter-spacing: .04em; }
+main.totem .totem-who { display: grid; gap: .5rem; justify-items: center; animation: totem-rise .45s var(--t-ease) both; }
+main.totem .totem-who-label { color: var(--t-gold); font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 800; }
+main.totem .totem-who-name { font-size: clamp(1.4rem, 3vw, 2.1rem); line-height: 1.15; }
+main.totem .totem-next { display: inline-flex; gap: .5rem; align-items: center; padding: .55rem 1rem; border-radius: 999px; background: rgba(217,180,74,.12); border: 1px solid rgba(217,180,74,.35); color: var(--t-gold-2); font-weight: 700; }
+
+main.totem .ponto-input-panel { display: flex; flex-direction: column; justify-content: center; }
+main.totem .lookup-stage { display: flex; flex-direction: column; gap: clamp(.55rem, 1.4vh, .85rem); }
+main.totem .totem-label { margin: 0 !important; color: var(--t-muted); text-transform: uppercase; letter-spacing: .12em; font-size: .74rem; font-weight: 800 !important; }
+main.totem .matricula-shell { position: relative; border-radius: 18px; padding: .8rem 1.1rem; background: rgba(0,0,0,.25); border: 1.5px solid rgba(217,180,74,.35); transition: border-color .2s, box-shadow .2s; }
+main.totem .matricula-shell.has-value { border-color: var(--t-gold); box-shadow: 0 0 0 4px rgba(217,180,74,.12); }
+main.totem .matricula-label { color: var(--t-gold); font-size: .68rem; letter-spacing: .18em; font-weight: 800; }
+main.totem .matricula-display { display: flex; justify-content: center; align-items: center; gap: .12em; min-height: clamp(2.6rem, 7vh, 3.6rem); font-size: clamp(2.2rem, 5.4vw, 3.4rem); font-weight: 800; color: var(--t-text); letter-spacing: .1em; margin: 0; }
+main.totem .totem-digit { display: inline-block; animation: totem-pop .22s var(--t-ease) both; }
+main.totem .totem-placeholder { color: rgba(255,255,255,.25); }
+main.totem .totem-spinner { width: 22px; height: 22px; margin-left: .6rem; border-radius: 50%; border: 3px solid rgba(217,180,74,.25); border-top-color: var(--t-gold); animation: totem-spin .8s linear infinite; }
+main.totem .keypad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(.45rem, 1.1vw, .7rem); margin: 0; }
+main.totem .keypad-btn {
+  min-height: clamp(64px, 10.5vh, 92px); border-radius: 18px; font-size: clamp(1.7rem, 3.4vw, 2.3rem); font-weight: 750; color: var(--t-text);
+  background: linear-gradient(180deg, #0f3a2b, #0a2c20); border: 1px solid rgba(217,180,74,.22);
+  box-shadow: 0 6px 0 rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.06);
+  transition: transform .08s var(--t-ease), box-shadow .08s, background .15s, border-color .15s; touch-action: manipulation;
+}
+main.totem .keypad-btn:hover { background: linear-gradient(180deg, #134634, #0c3326); border-color: rgba(217,180,74,.5); }
+main.totem .keypad-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04); }
+main.totem .keypad-btn:focus-visible, main.totem .primary-btn:focus-visible, main.totem .ghost-btn:focus-visible { outline: 3px solid var(--t-gold-2); outline-offset: 3px; }
+main.totem .keypad-btn-fn { font-size: clamp(1.3rem, 2.6vw, 1.7rem); color: var(--t-gold-2); background: linear-gradient(180deg, #0b2a20, #08221a); }
+main.totem .primary-btn { width: 100%; min-height: clamp(62px, 9vh, 78px); border-radius: 18px; border: 0; font-size: clamp(1.15rem, 2.2vw, 1.35rem); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #1d1600; background: linear-gradient(180deg, var(--t-gold-2), var(--t-gold)); box-shadow: 0 10px 30px -10px rgba(217,180,74,.6), inset 0 1px 0 rgba(255,255,255,.4); transition: transform .1s var(--t-ease), filter .2s, opacity .2s; }
+main.totem .primary-btn:active { transform: scale(.985); }
+main.totem .primary-btn:disabled { opacity: .45; filter: saturate(.6); box-shadow: none; }
+main.totem .totem-continue { margin-top: .25rem !important; }
+main.totem .status-msg { margin-top: .6rem; text-align: center; color: var(--t-muted); font-size: .95rem; animation: totem-rise .3s var(--t-ease) both; }
+main.totem .journey-closed-notice { display: grid; gap: .25rem; padding: .9rem 1rem; border-radius: 16px; background: rgba(245,196,81,.12); border: 1px solid rgba(245,196,81,.4); color: var(--t-warn); animation: totem-rise .35s var(--t-ease) both; }
+
+/* Câmera */
+main.totem .register-stage-minimal { min-height: 0; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+main.totem .camera-stage-minimal { gap: 1rem; }
+main.totem .totem-camera { position: relative; width: min(100%, 52vh, 420px) !important; height: min(100%, 52vh, 420px) !important; aspect-ratio: 1; border-radius: 50% !important; overflow: hidden; border: 0 !important; box-shadow: 0 0 0 6px rgba(217,180,74,.18), 0 25px 60px -20px rgba(0,0,0,.7); }
+main.totem .totem-camera-ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--t-gold); animation: totem-breathe 2.4s ease-in-out infinite; pointer-events: none; }
+main.totem .photo-action-btn { width: min(100%, 420px) !important; }
+
+/* Sucesso */
+main.totem .totem-success { width: min(100%, 460px); margin: 0 auto; display: grid; justify-items: center; gap: .9rem; padding: clamp(1.2rem, 3vw, 2rem); border-radius: var(--t-radius); background: linear-gradient(180deg, rgba(61,220,151,.10), rgba(61,220,151,.03)); border: 1px solid rgba(61,220,151,.35); animation: totem-rise .4s var(--t-ease) both; }
+main.totem .totem-success .confirmation-check { width: clamp(84px, 14vh, 112px); height: clamp(84px, 14vh, 112px); background: none; border: 0; box-shadow: none; display: block; animation: none; }
+main.totem .totem-success .confirmation-check svg { width: 100%; height: 100%; }
+main.totem .totem-success .confirmation-check circle { fill: rgba(61,220,151,.14); stroke: var(--t-ok); stroke-width: 2.5; stroke-dasharray: 152; stroke-dashoffset: 152; animation: totem-draw .6s var(--t-ease) forwards; }
+main.totem .totem-success .confirmation-check path { fill: none; stroke: var(--t-ok); stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; animation: totem-draw .35s .45s var(--t-ease) forwards; }
+main.totem .totem-success .confirmation-title { font-size: clamp(1.7rem, 3.6vw, 2.3rem); font-weight: 800; color: var(--t-ok); letter-spacing: -.01em; }
+main.totem .totem-type-PENDENTE .confirmation-title { color: var(--t-warn); }
+main.totem .totem-receipt { width: 100%; display: grid; border-radius: 16px; overflow: hidden; border: 1px solid var(--t-line); background: rgba(0,0,0,.2); }
+main.totem .totem-receipt > div { display: flex; justify-content: space-between; gap: 1rem; padding: .7rem 1rem; border-top: 1px solid var(--t-line); }
+main.totem .totem-receipt > div:first-child { border-top: 0; }
+main.totem .totem-receipt span { color: var(--t-muted); font-size: .9rem; }
+main.totem .totem-receipt strong { color: var(--t-text); font-size: 1.05rem; text-align: right; }
+main.totem .totem-receipt .confirmation-time { font-size: 1.35rem; color: var(--t-gold-2); }
+main.totem .totem-receipt .confirmation-type { color: var(--t-text); font-size: 1.05rem; letter-spacing: 0; }
+main.totem .totem-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; }
+main.totem .totem-next-btn { position: relative; overflow: hidden; width: 100%; min-height: 58px; border-radius: 16px; background: rgba(255,255,255,.04); border: 1px solid var(--t-line); color: var(--t-text); font-weight: 700; font-size: 1.05rem; }
+main.totem .totem-countdown { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: var(--t-ok); transform-origin: left; animation: totem-countdown linear forwards; }
+
+main.totem .totem-fade { animation: totem-rise .35s var(--t-ease) both; }
+@keyframes totem-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes totem-pop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes totem-spin { to { transform: rotate(360deg); } }
+@keyframes totem-breathe { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(.985); } }
+@keyframes totem-draw { to { stroke-dashoffset: 0; } }
+@keyframes totem-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* Tablet retrato e celular: uma coluna, relógio compacto no topo */
+@media (max-width: 900px), (orientation: portrait) {
+  main.totem .ponto-kiosk-card { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  main.totem .ponto-info-panel { padding: clamp(.9rem, 2.4vh, 1.6rem); }
+  main.totem .totem-clock .time { font-size: clamp(3.4rem, 13vw, 7rem); }
+  main.totem .totem-clock .date { margin-top: .5rem; }
+  main.totem .ponto-info-divider { margin: clamp(.6rem, 1.6vh, 1.1rem) auto; }
+  main.totem .ponto-info-meta { margin-top: .8rem; padding-top: 0; }
+  main.totem .ponto-info-panel::after { display: none; }
+}
+@media (max-width: 520px) {
+  main.totem { padding: .5rem; gap: .4rem; }
+  main.totem .ponto-kiosk-card { padding: .45rem; border-radius: 20px; gap: .45rem; }
+  main.totem .ponto-info-panel, main.totem .ponto-input-panel { padding: .8rem; border-radius: 16px; }
+  main.totem .totem-clock .time { font-size: clamp(2.8rem, 15vw, 3.6rem); }
+  main.totem .totem-clock .date { font-size: .9rem; }
+  main.totem .ponto-reference-hint, main.totem .ponto-info-divider, main.totem .ponto-info-meta { display: none; }
+  main.totem.totem-step-register .ponto-info-divider { display: block; }
+  main.totem .keypad-btn { min-height: clamp(56px, 8.4vh, 72px); border-radius: 14px; }
+  main.totem .primary-btn { min-height: 58px; }
+  main.totem .totem-camera { width: min(78vw, 42vh) !important; height: min(78vw, 42vh) !important; }
+}
+@media (max-height: 640px) and (orientation: landscape) {
+  main.totem .keypad-btn { min-height: 52px; }
+  main.totem .totem-clock .time { font-size: 4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  main.totem *, main.totem *::before, main.totem *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
+  main.totem .totem-countdown { animation-duration: 4s !important; }
+}
