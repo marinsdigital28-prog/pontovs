@@ -16,6 +16,7 @@ import EmployeesPanel from './employees-panel';
 import BackupPanel from './backup-panel';
 import PeriodClosureCard from './period-closure-card';
 import './overview-layout.css';
+import './admin-redesign.css';
 import OverviewInbox from './overview-inbox';
 import OverviewExitWatch from './overview-exit-watch';
 import ShiftsPanel from './shifts-panel';
@@ -35,7 +36,24 @@ type Employee = {
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
 type PresenceEmployee = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; status: 'PRESENTE' | 'NAO_MARCOU' | 'PENDENTE' | 'SAIU' | 'FOLGA'; scheduled: boolean; latestPunch: { id: string; type: string; timestamp: string; status: string; hasPhoto: boolean } | null };
 
-export default function AdminDashboard({ employees: initialEmployees, stats, degraded = false }: { employees: Employee[]; stats: { employeeCount: number; punchesToday: number; openInconsistencies: number }; degraded?: boolean }) {
+const navIcons: Record<string, React.ReactNode> = {
+  hoje: <path d="M3 12h4l3-8 4 16 3-8h4" />,
+  pessoas: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5" /><circle cx="17" cy="9" r="2.4" /><path d="M16 14.2c2.2.2 3.8 1.8 4.5 4.8" /></>,
+  ponto: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></>,
+  ausencias: <><rect x="3.5" y="5" width="17" height="15" rx="2.5" /><path d="M3.5 10h17M8 3v4M16 3v4" /></>,
+  folha: <><path d="M7 3.5h7l4.5 4.5v12.5H7z" /><path d="M14 3.5V8h4.5M9.5 13h6M9.5 16.5h6" /></>,
+  config: <><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></>,
+};
+const navHints: Record<string, string> = {
+  hoje: 'Presença, pendências e alertas do dia',
+  pessoas: 'Fichas cadastrais, jornadas e turnos',
+  ponto: 'Marcações e inconsistências',
+  ausencias: 'Solicitações, atestados e calendário',
+  folha: 'Espelho mensal, fechamento, backup e análises',
+  config: 'Importações, assinatura, notificações e auditoria',
+};
+
+export default function AdminDashboard({ employees: initialEmployees, stats, degraded = false, managerName = '' }: { employees: Employee[]; stats: { employeeCount: number; punchesToday: number; openInconsistencies: number }; degraded?: boolean; managerName?: string }) {
   const [tab, setTab] = useState('hoje');
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [focusEmployee, setFocusEmployee] = useState<{ id: string; nonce: number } | null>(null);
@@ -69,7 +87,23 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   };
 
   return <>
-    <nav className="admin-tabs" aria-label="Seções administrativas">{[['hoje', 'Hoje'], ['pessoas', 'Pessoas'], ['ponto', 'Ponto'], ['ausencias', 'Ausências'], ['folha', 'Folha e relatórios'], ['config', 'Configurações']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}>{label}</button>)}</nav>
+    <div className="admin-shell">
+    <aside className="admin-sidebar">
+      <div className="admin-brand">
+        <img src="/ponto-progredir-icon-circular.png" alt="" width={40} height={40} />
+        <div><strong>Ponto Progredir</strong><span>Central administrativa</span></div>
+      </div>
+      <nav className="admin-tabs" aria-label="Seções administrativas">{[['hoje', 'Hoje'], ['pessoas', 'Pessoas'], ['ponto', 'Ponto'], ['ausencias', 'Ausências'], ['folha', 'Folha e relatórios'], ['config', 'Configurações']].map(([key, label]) => <button key={key} type="button" className={tab === key ? 'active' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => setTab(key)}><svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">{navIcons[key]}</svg><span>{label}</span></button>)}</nav>
+      <div className="admin-sidebar-footer">
+        {managerName ? <div className="admin-user"><span className="admin-avatar">{managerName.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase()}</span><div><strong>{managerName}</strong><span>Gestor</span></div></div> : null}
+        <a className="ghost-btn admin-open-ponto" href="/ponto">Abrir ponto</a>
+      </div>
+    </aside>
+    <main className="admin-main">
+    <header className="admin-topbar">
+      <div><span className="eyebrow">PONTO PROGREDIR</span><h1>{({ hoje: 'Hoje', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', folha: 'Folha e relatórios', config: 'Configurações' } as Record<string, string>)[tab]}</h1><p className="small-muted">{navHints[tab]}</p></div>
+      <div className="admin-topbar-date">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+    </header>
     {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
@@ -168,5 +202,8 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         <section className="card"><div className="section-heading"><div><span className="eyebrow">CONTROLES</span><h2>Segurança e auditoria</h2></div><button className="ghost-btn" onClick={() => void loadAudit()}>Atualizar</button></div>{audit ? <div className="employee-list">{audit.events.map((event) => <div className="employee-row" key={event.id}><div><strong>{event.action}</strong><div className="small-muted">{event.resource || '—'} · {new Date(event.createdAt).toLocaleString('pt-BR')}</div></div></div>)}</div> : <p className="small-muted">Carregando...</p>}</section>
       </div>
     </section> : null}
+    <footer className="admin-footer">Desenvolvido por Marins Digital</footer>
+    </main>
+    </div>
   </>;
 }
