@@ -1,6 +1,7 @@
 'use client';
 
 import './emp-app.css';
+import ConfirmHorarioCard from './confirm-horario-card';
 import './emp-radar.css';
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signIn, signOut, useSession } from 'next-auth/react';
@@ -139,6 +140,8 @@ export default function EmployeeAppPage() {
     if (requestsReady.current) {
       for (const r of list) {
         const prev = knownRequestStatus.current.get(r.id);
+        if (!prev && r.type === 'CONFIRMAR_HORARIO' && r.status === 'PENDENTE') notifyPopup('Espaço Progredir', 'A administração pediu para você confirmar um horário em Minhas solicitações.', `req-${r.id}-confirm`);
+        if (r.type === 'CONFIRMAR_HORARIO') continue;
         if (prev && prev !== r.status && (r.status === 'APROVADO' || r.status === 'REJEITADO')) {
           const tipo = r.type === 'AUSENCIA' ? 'Aviso de ausência' : r.type === 'ESQUECI_PONTO' ? 'Ponto esquecido' : r.type === 'AVISO_ATRASO' ? 'Aviso de atraso' : r.type === 'TROCA_DIA' ? 'Troca de dia' : 'Solicitação';
           const decision = r.status === 'APROVADO' ? 'aprovada ✅' : 'rejeitada ❌';
@@ -822,7 +825,16 @@ export default function EmployeeAppPage() {
               <h2>Minhas solicitações</h2>
               {!requests.length ? <p className="emp-muted">Nenhuma solicitação ainda.</p> : (
                 <ul className="emp-req-list">
-                  {requests.slice(0, 20).map((r) => (
+                  {requests.filter((r) => r.status !== 'SUBSTITUIDO').slice(0, 20).map((r) => r.type === 'CONFIRMAR_HORARIO' ? (
+                    <li key={r.id} className="emp-req-confirm">
+                      <div>
+                        <strong>Confirmar horário · {shortDate.format(new Date(r.startDate))}</strong>
+                        <small>{r.reason}</small>
+                        <ConfirmHorarioCard id={r.id} details={r.details} status={r.status} onDone={loadRequests} />
+                      </div>
+                      <span className={`emp-pill ${r.status === 'APROVADO' ? 'ok' : 'warn'}`}>{r.status === 'PENDENTE' ? 'AGUARDA VOCÊ' : r.status === 'APROVADO' ? 'CONFIRMADO' : r.status}</span>
+                    </li>
+                  ) : (
                     <li key={r.id}>
                       <div>
                         <strong>{r.reason}</strong>
