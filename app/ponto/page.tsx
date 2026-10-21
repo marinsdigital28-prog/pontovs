@@ -395,16 +395,20 @@ export default function Page() {
 
   return (
     <main className={`ponto-kiosk-container totem totem-step-${done ? 'done' : step}`}>
-      <div className="t-install"><InstallAppButton compact /></div>
       <div className="t-layout">
         <section className="ponto-info-panel t-left" aria-label="Data e hora">
-          <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo" width={497} height={419} />
+          {done ? <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo" width={497} height={419} /> : null}
           {!done ? (
             <div className="t-card t-clock-card">
               <Rays className="t-rays t-rays-top" />
-              <div className="t-greet">{greeting(now)}!</div>
-              <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
-              <div className="t-date">{dayString}</div>
+              <div className="t-clock-row">
+                <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo t-logo-inline" width={497} height={419} />
+                <div className="t-clock-text">
+                  <div className="t-greet">{greeting(now)}!</div>
+                  <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
+                  <div className="t-date">{dayString}</div>
+                </div>
+              </div>
               {step === 'register' && employee ? (
                 <div className="t-who" key={employee.employeeNumber}>
                   <span className="t-chip t-chip-strong">Matrícula {employee.employeeNumber}</span>
@@ -508,7 +512,7 @@ export default function Page() {
         </section>
       </div>
       {step === 'lookup' && !done ? <InstallBanner /> : null}
-      <footer className="t-footer">Ponto eletrônico • Portaria 671 MTE</footer>
+      <footer className="t-footer"><span>Ponto eletrônico • Portaria 671 MTE</span><div className="t-install"><InstallAppButton compact /></div></footer>
     </main>
   );
 }
