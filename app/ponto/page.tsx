@@ -4,6 +4,11 @@ import React, { useEffect, useState } from 'react';
 import InstallAppButton from '../../components/InstallAppButton';
 import './totem.css';
 
+const ArrowIcon = () => <svg viewBox="0 0 24 24" aria-hidden className="t-ico"><path d="M4 12h15M13 6l6 6-6 6" /></svg>;
+const BackspaceIcon = () => <svg viewBox="0 0 32 24" aria-hidden className="t-ico t-ico-bs"><path d="M10 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H10L2 12z" /><path d="M15 8l8 8M23 8l-8 8" /></svg>;
+const CameraIcon = () => <svg viewBox="0 0 24 24" aria-hidden className="t-ico"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z" /><circle cx="12" cy="13.5" r="3.8" /></svg>;
+const Rays = ({ className }: { className: string }) => <svg viewBox="0 0 120 70" aria-hidden className={className}><path d="M20 66a40 40 0 0 1 80 0" /><path d="M60 18V2M38 24 30 10M82 24l8-14M24 38 10 30M96 38l14-8" /></svg>;
+
 const TZ = 'America/Sao_Paulo';
 /** Tempo que a tela de sucesso fica visível antes de voltar sozinha para a próxima matrícula. */
 const SUCCESS_SCREEN_MS = 4000;
@@ -383,127 +388,135 @@ export default function Page() {
 
   const typeLabel = (type: string) => TYPE_LABEL[type] || type;
   const confirmedAt = confirmation ? new Date(confirmation.timestamp) : null;
+  const digits = matricula.replace(/\D/g, '');
+  const slotCount = Math.min(8, Math.max(4, digits.length + (digits.length < 8 ? 1 : 0)));
+  const done = Boolean(confirmation);
 
   return (
-    <main className={`container ponto-kiosk-container totem totem-step-${confirmation ? 'done' : step}`}>
-      <div className="header-row totem-header">
-        <div>
-          <div className="header-brand">Ponto Progredir</div>
-          <div className="header-greeting">{employee ? `${greeting(now)}, ${employee.name}` : 'Identificação do funcionário'}</div>
-        </div>
-        <div className="ponto-header-actions"><InstallAppButton compact /><div className="avatar" aria-hidden /></div>
-      </div>
-
-      <div className={`card ponto-kiosk-card ${step === 'register' ? 'ponto-register-card' : 'ponto-lookup-card'}`}>
-        <section className="ponto-info-panel" aria-label="Data e hora">
-          <div className="clock totem-clock">
-            <div className="time" aria-live="off"><span className="totem-hhmm">{hhmm}</span><span className="totem-ss">{ss}</span></div>
-            <div className="date">{dayString}</div>
-          </div>
-          <div className="ponto-info-divider" />
-          {step === 'register' && employee ? (
-            <div className="totem-who" key={employee.employeeNumber}>
-              <span className="totem-who-label">Matrícula {employee.employeeNumber}</span>
-              <strong className="totem-who-name">{employee.name}</strong>
-              {nextType && !confirmation ? <span className={`totem-next totem-type-${nextType}`}><span aria-hidden>{TYPE_ICON[nextType]}</span> Próxima marcação: {typeLabel(nextType)}</span> : null}
+    <main className={`ponto-kiosk-container totem totem-step-${done ? 'done' : step}`}>
+      <div className="t-install"><InstallAppButton compact /></div>
+      <div className="t-layout">
+        <section className="ponto-info-panel t-left" aria-label="Data e hora">
+          <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo" width={497} height={419} />
+          {!done ? (
+            <div className="t-card t-clock-card">
+              <Rays className="t-rays t-rays-top" />
+              <div className="t-greet">{greeting(now)}!</div>
+              <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
+              <div className="t-date">{dayString}</div>
+              {step === 'register' && employee ? (
+                <div className="t-who" key={employee.employeeNumber}>
+                  <span className="t-chip t-chip-strong">Matrícula {employee.employeeNumber}</span>
+                  <strong className="t-who-name">{employee.name}</strong>
+                  {nextType ? <span className="t-chip">Próxima marcação: {typeLabel(nextType)}</span> : null}
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <div className="ponto-reference-hint"><span aria-hidden>👆</span> <strong>Digite seu número de matrícula</strong><small className="totem-kbd-hint">Toque nos números ou use o teclado · Enter para continuar</small></div>
-          )}
-          <div className="ponto-info-meta">Ponto Eletrônico Homologado · Portaria 671 MTE</div>
+          ) : null}
         </section>
-        <section className="ponto-input-panel">
 
+        <section className="ponto-input-panel t-right">
         {step === 'lookup' && (
-          <div className="lookup-stage totem-fade">
+          <div className="t-card t-lookup t-fade" aria-label="Digite seu número de matrícula">
             {journeyClosed && statusMsg && (
-              <div className="journey-closed-notice" role="status">
+              <div className="t-notice t-notice-gold" role="status">
                 <strong>Jornada encerrada</strong>
                 <span>{statusMsg}</span>
               </div>
             )}
-            <div className="small-muted totem-label" id="totem-mat-label">Digite sua matrícula</div>
-            <div className={`matricula-shell ${matricula ? 'has-value' : ''} ${loading ? 'is-loading' : ''}`} aria-labelledby="totem-mat-label">
-              <div className="matricula-label">MATRÍCULA</div>
-              <div className="matricula-display" aria-live="polite" aria-label={matricula ? `Matrícula ${matricula.split('').join(' ')}` : 'Nenhum dígito'}>
-                {matricula ? matricula.split('').map((d, i) => <span key={`${i}-${d}`} className="totem-digit">{d}</span>) : <span className="totem-placeholder">—</span>}
-                {loading ? <span className="totem-spinner" aria-hidden /> : null}
-              </div>
+            <div className="t-label" id="totem-mat-label">MATRÍCULA</div>
+            <div className={`t-slots ${loading ? 'is-loading' : ''}`} style={{ ['--slots' as any]: slotCount }} aria-labelledby="totem-mat-label" aria-live="polite" aria-label={digits ? `Matrícula ${digits.split('').join(' ')}` : 'Digite seu número de matrícula'}>
+              {Array.from({ length: slotCount }, (_, i) => (
+                <span key={i} className={`t-slot ${digits[i] ? 'is-filled' : i === digits.length ? 'is-active' : 'is-empty'}`}>{digits[i] ?? ''}</span>
+              ))}
             </div>
 
-            <div className="keypad-grid" role="group" aria-label="Teclado numérico">
+            <div className="t-keypad" role="group" aria-label="Teclado numérico">
               {keypadNumbers.map((key) => (
                 <button
                   key={key}
                   type="button"
-                  className={`keypad-btn ${key === 'C' || key === '⌫' ? 'keypad-btn-fn' : ''}`}
+                  className={`t-key ${key === 'C' || key === '⌫' ? 't-key-fn' : ''}`}
                   onClick={() => appendDigit(key)}
                   aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
                 >
-                  {key}
+                  {key === 'C' ? 'Limpar' : key === '⌫' ? <BackspaceIcon /> : key}
                 </button>
               ))}
             </div>
 
-            <button className="primary-btn totem-continue" style={{ marginTop: 18 }} onClick={handleLookup} disabled={loading || !matricula.trim()}>
-              {loading ? 'Buscando...' : 'Continuar'}
+            <button type="button" className="t-btn t-continue" onClick={handleLookup} disabled={loading || !matricula.trim()}>
+              <span>{loading ? 'Buscando...' : 'Continuar'}</span>{loading ? <span className="t-spinner" aria-hidden /> : <ArrowIcon />}
             </button>
-            {statusMsg && !journeyClosed && <div className="status-msg" role="status">{statusMsg}</div>}
+            {statusMsg && !journeyClosed && <div className="t-status" role="status">{statusMsg}</div>}
           </div>
         )}
 
-        {step === 'register' && employee && (
-          <div className="register-stage register-stage-minimal">
-            {!confirmation ? (
+        {step === 'register' && employee && !done && (
+          <div className="t-card t-register t-fade">
+            {cameraOpen ? (
               <>
-                {cameraOpen ? (
-                  <div className="camera-stage camera-stage-minimal totem-fade">
-                    <div className="camera-preview-large camera-preview-minimal totem-camera">
-                      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
-                      <span className="totem-camera-ring" aria-hidden />
-                    </div>
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void capturePhoto()} disabled={loading}>
-                      {loading ? 'Registrando...' : 'Marcar ponto'}
-                    </button>
-                  </div>
-                ) : photo ? (
-                  <div className="camera-stage camera-stage-minimal photo-retry-stage totem-fade">
-                    <img src={photo} alt="Foto capturada" className="camera-preview-large camera-preview-minimal" />
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePunch(photo)} disabled={loading}>
-                      {loading ? 'Registrando...' : 'Tentar registrar novamente'}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="camera-stage camera-stage-minimal totem-fade">
-                    <div className="status-msg">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
-                    <button type="button" className="primary-btn photo-action-btn" onClick={() => void handlePhotoSelection()} disabled={loading}>Abrir câmera</button>
-                  </div>
-                )}
+                <div className="t-camera">
+                  <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} />
+                  <span className="t-face-guide" aria-hidden />
+                </div>
+                <p className="t-hint">Posicione o rosto e toque em Marcar ponto</p>
+                <button type="button" className="t-btn t-mark" onClick={() => void capturePhoto()} disabled={loading}>
+                  <CameraIcon /><span>{loading ? 'Registrando...' : 'Marcar ponto'}</span>
+                </button>
+              </>
+            ) : photo ? (
+              <>
+                <div className="t-camera"><img src={photo} alt="Foto capturada" /></div>
+                <button type="button" className="t-btn t-mark" onClick={() => void handlePunch(photo)} disabled={loading}>
+                  <span>{loading ? 'Registrando...' : 'Tentar registrar novamente'}</span>
+                </button>
               </>
             ) : (
-              <div className={`summary confirmation-summary confirmation-summary-minimal totem-success totem-type-${confirmation.type}`} role="status" aria-live="assertive">
-                <div className="confirmation-check" aria-hidden>
-                  <svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" /><path d="M15 27l7 7 15-16" /></svg>
-                </div>
-                <div className="confirmation-title">{confirmation.type === 'PENDENTE' ? 'Marcação salva' : confirmation.duplicate ? 'Já registrado' : 'Ponto registrado'}</div>
-                <div className="totem-receipt">
-                  <div><span>Colaborador</span><strong>{employee.name}</strong></div>
-                  <div><span>Tipo</span><strong className="confirmation-type">{typeLabel(confirmation.type)}</strong></div>
-                  <div><span>Horário</span><strong className="confirmation-time">{confirmedAt ? confirmedAt.toLocaleTimeString('pt-BR', { hourCycle: 'h23', timeZone: TZ }) : '—'}</strong></div>
-                  <div><span>Data</span><strong>{confirmedAt ? confirmedAt.toLocaleDateString('pt-BR', { timeZone: TZ }) : '—'}</strong></div>
-                  {confirmation.id ? <div><span>Registro</span><strong className="totem-mono">{confirmation.id.slice(-10).toUpperCase()}</strong></div> : null}
-                </div>
-                <button type="button" className="ghost-btn totem-next-btn" onClick={() => resetForNextCollaborator()}>
-                  Próximo colaborador
-                  <span className="totem-countdown" style={{ animationDuration: `${SUCCESS_SCREEN_MS}ms` }} aria-hidden />
-                </button>
-              </div>
+              <>
+                <div className="t-camera t-camera-off"><CameraIcon /></div>
+                <div className="t-notice">{statusMsg || 'Câmera indisponível. Toque para tentar novamente.'}</div>
+                <button type="button" className="t-btn t-mark" onClick={() => void handlePhotoSelection()} disabled={loading}><CameraIcon /><span>Abrir câmera</span></button>
+              </>
             )}
-            {statusMsg && <div className="status-msg" role="status">{statusMsg}</div>}
+            {statusMsg && (cameraOpen || photo) && !statusMsg.startsWith('Câmera pronta') && <div className="t-status" role="status">{statusMsg}</div>}
+          </div>
+        )}
+
+        {step === 'register' && employee && confirmation && (
+          <div className={`t-success t-type-${confirmation.type}`} role="status" aria-live="assertive">
+            <div className="t-card t-receipt-card">
+              <div className="confirmation-check t-check" aria-hidden>
+                <svg viewBox="0 0 120 120"><g className="t-sunrays">{Array.from({ length: 12 }, (_, i) => <line key={i} x1="60" y1="6" x2="60" y2="18" transform={`rotate(${i * 30} 60 60)`} />)}</g><circle cx="60" cy="60" r="34" /><path d="M44 61l11 11 22-24" /></svg>
+              </div>
+              <div className="t-success-title">{confirmation.type === 'PENDENTE' ? 'Marcação salva!' : confirmation.duplicate ? 'Já registrado!' : 'Ponto registrado!'}</div>
+              <div className="t-success-name">{employee.name}</div>
+              <dl className="t-receipt">
+                <dt>Tipo:</dt><dd>{typeLabel(confirmation.type)}</dd>
+                <dt>Horário:</dt><dd>{confirmedAt ? confirmedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: TZ }) : '—'}</dd>
+                <dt>Data:</dt><dd>{confirmedAt ? confirmedAt.toLocaleDateString('pt-BR', { timeZone: TZ }) : '—'}</dd>
+                {confirmation.id ? <><dt>Registro:</dt><dd className="t-mono">…{confirmation.id.slice(-10).toUpperCase()}</dd></> : null}
+              </dl>
+              {statusMsg ? <div className="t-status t-status-in">{statusMsg}</div> : null}
+            </div>
+            <button type="button" className="t-btn t-nextbtn" onClick={() => resetForNextCollaborator()}><span>Próximo colaborador</span><ArrowIcon /></button>
+            <div className="t-countdown-label"><Countdown ms={SUCCESS_SCREEN_MS} /></div>
+            <div className="t-countdown"><span style={{ animationDuration: `${SUCCESS_SCREEN_MS}ms` }} /></div>
           </div>
         )}
         </section>
       </div>
+      <footer className="t-footer">Ponto eletrônico • Portaria 671 MTE</footer>
     </main>
   );
+}
+
+function Countdown({ ms }: { ms: number }) {
+  const [left, setLeft] = useState(Math.ceil(ms / 1000));
+  useEffect(() => {
+    const start = Date.now();
+    const t = window.setInterval(() => setLeft(Math.max(0, Math.ceil((ms - (Date.now() - start)) / 1000))), 200);
+    return () => window.clearInterval(t);
+  }, [ms]);
+  return <>Voltando ao início em {left}s</>;
 }
