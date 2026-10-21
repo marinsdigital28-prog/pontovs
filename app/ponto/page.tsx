@@ -17,6 +17,60 @@ const TYPE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Sa�
 const TYPE_ICON: Record<string, string> = { ENTRADA: '→', INTERVALO: '☕', RETORNO: '↩', SAIDA: '←', PENDENTE: '⟳' };
 function greeting(date: Date | null) { const h = date ? Number(date.toLocaleString('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: TZ })) : 8; return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 
+/* Som de confirmação gerado na hora (Web Audio), sem arquivo externo. */
+let audioCtx: AudioContext | null = null;
+function unlockAudio() {
+  try {
+    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx && audioCtx.state === 'suspended') void audioCtx.resume();
+  } catch { /* sem áudio */ }
+}
+function tone(freq: number, start: number, dur: number, peak: number, type: OscillatorType = 'sine') {
+  if (!audioCtx) return;
+  const t0 = audioCtx.currentTime + start;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+function playSuccess() {
+  try { (navigator as any).vibrate?.([80, 60, 120]); } catch { /* sem vibração */ }
+  try { unlockAudio(); tone(659.25, 0, 0.22, 0.18); tone(987.77, 0.14, 0.28, 0.16); } catch { /* sem áudio */ }
+}
+function playError() {
+  try { unlockAudio(); tone(220, 0, 0.16, 0.08, 'triangle'); } catch { /* sem áudio */ }
+}
+
+/** Efeito visual de toque nas teclas (só transform/opacity). Não altera o fluxo. */
+function keyFx(btn: HTMLElement | null, x?: number, y?: number) {
+  if (!btn) return;
+  unlockAudio();
+  try { (navigator as any).vibrate?.(10); } catch { /* sem vibração */ }
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const r = btn.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 2.2;
+  const dot = document.createElement('span');
+  dot.className = 't-ripple';
+  dot.style.width = dot.style.height = `${size}px`;
+  dot.style.left = `${(x ?? r.left + r.width / 2) - r.left - size / 2}px`;
+  dot.style.top = `${(y ?? r.top + r.height / 2) - r.top - size / 2}px`;
+  btn.appendChild(dot);
+  btn.classList.remove('is-fx'); void btn.offsetWidth; btn.classList.add('is-fx');
+  window.setTimeout(() => { dot.remove(); btn.classList.remove('is-fx'); }, 520);
+}
+function keyFxFor(key: string) {
+  const label = key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`;
+  keyFx(document.querySelector(`button[aria-label="${label}"]`) as HTMLElement | null);
+}
+
 export default function Page() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -34,11 +88,13 @@ export default function Page() {
   const submittingRef = React.useRef(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [journeyClosed, setJourneyClosed] = useState(false);
+  const [shakeTick, setShakeTick] = useState(0);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
 
   function appendDigit(nextValue: string) {
     if (nextValue === 'C') {
+      setShakeTick((n) => n + 1);
       setMatricula('');
       return;
     }
@@ -345,6 +401,7 @@ export default function Page() {
   }
 
   async function capturePhoto() {
+    unlockAudio();
     if (submittingRef.current || loading) return;
     const video = videoRef.current;
     if (!video || video.videoWidth === 0) {
@@ -371,9 +428,9 @@ export default function Page() {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (confirmation) { if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') { e.preventDefault(); resetForNextCollaborator(); } return; }
     if (step === 'lookup') {
-      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); appendDigit(e.key); }
-      else if (e.key === 'Backspace') { e.preventDefault(); appendDigit('⌫'); }
-      else if (e.key === 'Escape' || e.key === 'Delete') { e.preventDefault(); appendDigit('C'); }
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); keyFxFor(e.key); appendDigit(e.key); }
+      else if (e.key === 'Backspace') { e.preventDefault(); keyFxFor('⌫'); appendDigit('⌫'); }
+      else if (e.key === 'Escape' || e.key === 'Delete') { e.preventDefault(); keyFxFor('C'); appendDigit('C'); }
       else if (e.key === 'Enter' && matricula.trim() && !loading) { e.preventDefault(); void handleLookup(); }
       return;
     }
@@ -392,19 +449,27 @@ export default function Page() {
   const digits = matricula.replace(/\D/g, '');
   const slotCount = Math.min(8, Math.max(4, digits.length + (digits.length < 8 ? 1 : 0)));
   const done = Boolean(confirmation);
+  const lookupError = step === 'lookup' && !loading && !journeyClosed && Boolean(statusMsg);
+  const confirmationKey = confirmation ? `${confirmation.type}|${confirmation.timestamp}` : '';
+  useEffect(() => { if (confirmationKey) playSuccess(); }, [confirmationKey]);
+  useEffect(() => { if (lookupError) playError(); }, [lookupError, statusMsg]);
 
   return (
     <main className={`ponto-kiosk-container totem totem-step-${done ? 'done' : step}`}>
-      <div className="t-install"><InstallAppButton compact /></div>
       <div className="t-layout">
         <section className="ponto-info-panel t-left" aria-label="Data e hora">
-          <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo" width={497} height={419} />
+          {done ? <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo" width={497} height={419} /> : null}
           {!done ? (
             <div className="t-card t-clock-card">
               <Rays className="t-rays t-rays-top" />
-              <div className="t-greet">{greeting(now)}!</div>
-              <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
-              <div className="t-date">{dayString}</div>
+              <div className="t-clock-row">
+                <img src="/logo-progredir.svg" alt="Espaço Progredir — Acreditando na Vida" className="t-logo t-logo-inline" width={497} height={419} />
+                <div className="t-clock-text">
+                  <div className="t-greet">{greeting(now)}!</div>
+                  <div className="t-time" aria-live="off"><span className="t-hhmm">{hhmm}</span><span className="t-ss">{ss}</span></div>
+                  <div className="t-date">{dayString}</div>
+                </div>
+              </div>
               {step === 'register' && employee ? (
                 <div className="t-who" key={employee.employeeNumber}>
                   <span className="t-chip t-chip-strong">Matrícula {employee.employeeNumber}</span>
@@ -426,7 +491,7 @@ export default function Page() {
               </div>
             )}
             <div className="t-label" id="totem-mat-label">MATRÍCULA</div>
-            <div className={`t-slots ${loading ? 'is-loading' : ''}`} style={{ ['--slots' as any]: slotCount }} aria-labelledby="totem-mat-label" aria-live="polite" aria-label={digits ? `Matrícula ${digits.split('').join(' ')}` : 'Digite seu número de matrícula'}>
+            <div key={`slots-${shakeTick}-${lookupError ? statusMsg : ''}`} className={`t-slots ${loading ? 'is-loading' : ''} ${shakeTick > 0 || lookupError ? 'is-shake' : ''}`} style={{ ['--slots' as any]: slotCount }} aria-labelledby="totem-mat-label" aria-live="polite" aria-label={digits ? `Matrícula ${digits.split('').join(' ')}` : 'Digite seu número de matrícula'}>
               {Array.from({ length: slotCount }, (_, i) => (
                 <span key={i} className={`t-slot ${digits[i] ? 'is-filled' : i === digits.length ? 'is-active' : 'is-empty'}`}>{digits[i] ?? ''}</span>
               ))}
@@ -438,6 +503,7 @@ export default function Page() {
                   key={key}
                   type="button"
                   className={`t-key ${key === 'C' || key === '⌫' ? 't-key-fn' : ''}`}
+                  onPointerDown={(ev) => keyFx(ev.currentTarget, ev.clientX, ev.clientY)}
                   onClick={() => appendDigit(key)}
                   aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
                 >
@@ -508,7 +574,7 @@ export default function Page() {
         </section>
       </div>
       {step === 'lookup' && !done ? <InstallBanner /> : null}
-      <footer className="t-footer">Ponto eletrônico • Portaria 671 MTE</footer>
+      <footer className="t-footer"><span>Ponto eletrônico • Portaria 671 MTE</span><div className="t-install"><InstallAppButton compact /></div></footer>
     </main>
   );
 }

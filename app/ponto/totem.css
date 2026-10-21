@@ -198,3 +198,130 @@ main.totem .t-ib-close{border:0;background:none;color:var(--muted);font-weight:6
 /* aviso "Jornada encerrada" sobrepõe o topo do cartão (é temporário) para não empurrar o teclado */
 main.totem .t-lookup{position:relative}
 main.totem .t-lookup .t-notice-gold{position:absolute;z-index:3;top:clamp(.4rem,1.6dvh,1rem);left:clamp(.5rem,2vw,1.4rem);right:clamp(.5rem,2vw,1.4rem);margin:0;box-shadow:0 10px 24px rgba(80,60,20,.18)}
+
+/* ===== Logo ao lado do relógio (sem linha própria de logo); espaço liberado vai para o teclado ===== */
+main.totem .t-clock-row{display:flex;align-items:center;gap:clamp(.5rem,2.4vw,1.6rem);min-width:0}
+main.totem .t-clock-text{min-width:0}
+main.totem .t-logo-inline{flex:none;align-self:center;margin:0;width:auto;max-width:34%;height:clamp(52px,17dvh,190px)}
+main.totem .t-hhmm{font-size:clamp(2.2rem,min(7.2vw,13dvh),6.6rem)}
+main.totem .t-ss{font-size:clamp(1.1rem,min(3.4vw,6dvh),3rem)}
+main.totem .t-date{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+main.totem .t-who{align-items:center}
+/* paisagem: cartão do relógio centralizado na coluna; teclado usa mais altura */
+main.totem .t-slot{height:clamp(40px,11dvh,104px)}
+main.totem .t-key{height:clamp(42px,9.6dvh,92px);font-size:clamp(1.2rem,min(2.8vw,4.6dvh),2.1rem)}
+main.totem .t-btn{height:clamp(44px,9dvh,78px)}
+@media (orientation:portrait){
+  main.totem .t-layout{grid-template-rows:auto minmax(0,1fr)}
+  main.totem .t-logo-inline{height:clamp(46px,10dvh,150px);max-width:30%}
+  main.totem .t-hhmm{font-size:clamp(2.2rem,min(13vw,8dvh),6.4rem)}
+  main.totem .t-ss{font-size:clamp(1.1rem,min(5.6vw,3.8dvh),3rem)}
+  main.totem .t-greet{font-size:clamp(1rem,min(5vw,3.2dvh),2.2rem)}
+  main.totem .t-date{font-size:clamp(.72rem,min(3.2vw,2.2dvh),1.15rem)}
+  main.totem .t-slot{height:clamp(40px,8.2dvh,100px)}
+  main.totem .t-key{height:clamp(42px,7.6dvh,88px)}
+  main.totem .t-btn{height:clamp(44px,7.4dvh,76px)}
+  main.totem .t-camera{width:min(100%,74vw,38dvh,440px)}
+}
+@media (orientation:portrait) and (max-height:700px){
+  main.totem .t-camera{width:min(100%,66vw,32dvh)}
+}
+@media (orientation:landscape) and (max-height:560px){
+  main.totem .t-logo-inline{height:clamp(40px,20dvh,90px)}
+  main.totem .t-key{height:clamp(34px,12.5dvh,58px)}
+  main.totem .t-slot{height:clamp(30px,11dvh,60px)}
+  main.totem .t-btn{height:clamp(38px,11dvh,56px)}
+}
+main.totem .t-date{white-space:normal}
+main.totem .t-footer{display:flex;align-items:center;justify-content:center;gap:.8rem;flex-wrap:nowrap;position:relative}
+main.totem .t-footer .t-install{position:static}
+main.totem .t-footer .install-app-btn{min-height:30px;padding:.25rem .6rem;font-size:.72rem}
+main.totem .t-footer .install-app-feedback{position:absolute;bottom:100%;right:0;max-width:260px;background:#fff;border:1px solid var(--sand);border-radius:10px;padding:.4rem .6rem;font-size:.75rem;color:var(--ink);box-shadow:0 6px 16px rgba(60,40,10,.15)}
+main.totem .t-footer .install-app-status{font-size:.72rem;color:var(--muted)}
+/* retrato: teclado ocupa toda a altura que sobrar */
+@media (orientation:portrait){
+  main.totem.totem-step-lookup .t-clock-card{border-radius:22px;box-shadow:0 10px 30px rgba(80,60,20,.10);border-bottom:1px solid rgba(201,162,94,.18)}
+  main.totem.totem-step-lookup .t-right .t-lookup{border-radius:22px;margin-top:0;border-top:1px solid rgba(201,162,94,.18);padding-top:clamp(.5rem,2dvh,1.6rem)}
+  main.totem .t-right{min-height:0}
+  main.totem .t-lookup{flex:1;min-height:0;display:flex;flex-direction:column}
+  main.totem .t-keypad{flex:1;min-height:0;grid-auto-rows:minmax(0,1fr)}
+  main.totem .t-key{height:auto;min-height:42px;max-height:110px}
+}
+@media (orientation:landscape) and (max-height:560px){ main.totem .t-btn{height:clamp(42px,12dvh,58px)} }
+@media (orientation:portrait){
+  main.totem .t-right{align-self:stretch}
+  main.totem .t-lookup > *{flex:none}
+  main.totem .t-lookup > .t-keypad{flex:1 1 auto}
+  main.totem .t-slots{width:100%;align-self:center}
+}
+@media (orientation:portrait){ main.totem .t-key{font-size:clamp(1.3rem,min(6vw,4.2dvh),2.6rem)} main.totem .t-key-fn{font-size:clamp(1rem,min(4.4vw,3dvh),1.6rem)} }
+@media (max-width:420px){ main.totem .t-footer{font-size:.66rem;gap:.4rem} main.totem .t-footer .install-app-btn{font-size:.66rem;padding:.2rem .45rem} }
+
+/* ===== Efeitos do teclado (só transform/opacity; 60fps) ===== */
+main.totem .t-key{position:relative;overflow:hidden;isolation:isolate;transition:transform .09s ease-out,box-shadow .12s;will-change:transform}
+main.totem .t-key::after{content:"";position:absolute;inset:-3px;border-radius:inherit;box-shadow:0 0 0 3px rgba(201,162,94,.95),0 0 18px 4px rgba(201,162,94,.55);opacity:0;pointer-events:none}
+main.totem .t-key:active,main.totem .t-key.is-fx{transform:translateY(2px) scale(.94)}
+main.totem .t-key.is-fx::after{animation:tGlow .5s ease-out}
+main.totem .t-ripple{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(46,125,31,.38) 0%,rgba(46,125,31,.18) 45%,transparent 70%);transform:scale(0);opacity:1;pointer-events:none;z-index:-1;animation:tRipple .5s cubic-bezier(.2,.7,.3,1) forwards}
+main.totem .t-key-fn .t-ripple{background:radial-gradient(circle,rgba(255,255,255,.5) 0%,rgba(255,255,255,.2) 45%,transparent 70%)}
+main.totem .t-slot.is-filled{animation:tDigitIn .26s cubic-bezier(.2,1.4,.4,1) both}
+main.totem .t-slots.is-shake{animation:tShake .38s ease both}
+@keyframes tRipple{to{transform:scale(1);opacity:0}}
+@keyframes tGlow{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+@keyframes tDigitIn{0%{transform:translateY(-10px) scale(.55);opacity:0}100%{transform:none;opacity:1}}
+@keyframes tShake{0%,100%{transform:none}20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(2px)}}
+@media (prefers-reduced-motion:reduce){main.totem .t-ripple{display:none}main.totem .t-key.is-fx,main.totem .t-key:active{transform:none}}
+main.totem .t-key::after{inset:0;box-shadow:inset 0 0 0 3px rgba(201,162,94,1),inset 0 0 16px 2px rgba(201,162,94,.6)}
+main.totem .t-ripple{background:radial-gradient(circle,rgba(46,125,31,.55) 0%,rgba(46,125,31,.28) 40%,transparent 68%)}
+
+/* === Teclado maior (+15-25%) e casas da matrícula com estilo distinto === */
+main.totem .t-keypad{gap:clamp(.28rem,.8dvh,.6rem)}
+main.totem .t-key{font-weight:800;border-radius:16px}
+main.totem .t-key:not(.t-key-fn){background:#fff;border:1px solid #e2dccf;box-shadow:0 3px 0 #e4ddcd,0 6px 14px rgba(80,60,20,.08)}
+main.totem .t-lookup,main.totem .t-register{padding:clamp(.5rem,2dvh,1.6rem) clamp(.6rem,2.2vw,1.7rem)}
+main.totem .t-label{margin-bottom:clamp(.2rem,.8dvh,.5rem)}
+main.totem .t-slots{margin-bottom:clamp(.3rem,1.2dvh,.8rem)}
+main.totem .t-btn{margin-top:clamp(.3rem,1.2dvh,.8rem)}
+main.totem .t-footer{padding-top:clamp(.15rem,.6dvh,.5rem);margin-top:clamp(.15rem,.8dvh,.6rem)}
+main.totem .t-clock-card{padding:clamp(.5rem,2.2dvh,1.8rem) clamp(.8rem,2.6vw,2rem)}
+/* casas: campo rebaixado verde-claro, não parecem teclas */
+main.totem .t-slot{background:#eaf4e6;border:2px solid #b9d7ae;border-bottom:4px solid #2f7a2f;border-radius:10px;box-shadow:inset 0 3px 6px rgba(31,80,31,.16);color:#174f17;font-weight:800}
+main.totem .t-slot.is-filled{background:#e2f0dc;border-color:#8fc283;border-bottom-color:#1f6b1f}
+main.totem .t-slot.is-active{background:#f3f9f0;border:2px solid #d4a63a;border-bottom:4px solid #d4a63a;box-shadow:inset 0 3px 6px rgba(31,80,31,.12),0 0 0 3px rgba(212,166,58,.25);animation:tSlotPulse 1.2s ease-in-out infinite}
+@keyframes tSlotPulse{0%,100%{box-shadow:inset 0 3px 6px rgba(31,80,31,.12),0 0 0 2px rgba(212,166,58,.18)}50%{box-shadow:inset 0 3px 6px rgba(31,80,31,.12),0 0 0 6px rgba(212,166,58,.42)}}
+@media (orientation:landscape){
+  main.totem .t-logo-inline{height:clamp(44px,14dvh,160px)}
+  main.totem .t-hhmm{font-size:clamp(2rem,min(6.6vw,11.5dvh),6rem)}
+  main.totem .t-slot{height:clamp(38px,9dvh,92px)}
+  main.totem .t-key{height:clamp(50px,11.8dvh,112px);font-size:clamp(1.5rem,min(3.4vw,6dvh),2.7rem)}
+  main.totem .t-key-fn{font-size:clamp(1rem,min(2.2vw,3.4dvh),1.5rem)}
+  main.totem .t-btn{height:clamp(44px,8.4dvh,74px)}
+}
+@media (orientation:portrait){
+  main.totem .t-logo-inline{height:clamp(40px,8dvh,130px)}
+  main.totem .t-hhmm{font-size:clamp(2rem,min(12vw,7dvh),6rem)}
+  main.totem .t-ss{font-size:clamp(1rem,min(5vw,3.4dvh),2.6rem)}
+  main.totem .t-slot{height:clamp(36px,6.6dvh,88px)}
+  main.totem .t-btn{height:clamp(42px,6.6dvh,72px)}
+  main.totem .t-key{min-height:48px;max-height:132px;font-size:clamp(1.6rem,min(7.4vw,5.2dvh),3.2rem)}
+  main.totem .t-key-fn{font-size:clamp(1.05rem,min(4.8vw,3.2dvh),1.8rem)}
+}
+@media (orientation:landscape) and (max-height:560px){
+  main.totem .t-logo-inline{height:clamp(34px,16dvh,80px)}
+  main.totem .t-key{height:clamp(38px,15dvh,68px);font-size:clamp(1.2rem,6dvh,1.9rem)}
+  main.totem .t-slot{height:clamp(28px,9.5dvh,54px)}
+  main.totem .t-btn{height:clamp(36px,10dvh,52px)}
+}
+@media (prefers-reduced-motion:reduce){main.totem .t-slot.is-active{animation:none}}
+@media (orientation:portrait) and (max-height:700px){
+  main.totem .t-logo-inline{height:clamp(36px,7dvh,60px)}
+  main.totem .t-hhmm{font-size:clamp(1.9rem,6.4dvh,3rem)}
+  main.totem .t-slot{height:clamp(34px,6dvh,50px)}
+  main.totem .t-btn{height:clamp(40px,6.2dvh,52px)}
+}
+/* numerais ~+30% e mais fortes */
+main.totem .t-key:not(.t-key-fn),main.totem .t-slot{font-weight:900}
+main.totem .t-slot{font-size:clamp(1.7rem,min(5.2vw,7.8dvh),3.9rem);line-height:1}
+@media (orientation:landscape){main.totem .t-key:not(.t-key-fn){font-size:clamp(1.7rem,min(3.8vw,6.8dvh),3rem)}}
+@media (orientation:portrait){main.totem .t-key:not(.t-key-fn){font-size:clamp(1.85rem,min(8.2vw,5.8dvh),3.6rem)}main.totem .t-slot{font-size:clamp(1.6rem,min(7vw,4.6dvh),3.6rem)}}
+@media (orientation:landscape) and (max-height:560px){main.totem .t-key:not(.t-key-fn){font-size:clamp(1.4rem,7dvh,2.2rem)}main.totem .t-slot{font-size:clamp(1.3rem,7dvh,2rem)}}
