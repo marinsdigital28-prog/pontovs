@@ -1,0 +1,19 @@
+{
+  "id": "/ponto",
+  "name": "Ponto Progredir — Totem",
+  "short_name": "Ponto",
+  "description": "Totem de registro de ponto do Espaço Progredir.",
+  "start_url": "/ponto",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#FBF6EC",
+  "theme_color": "#1F6B1F",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/ponto-progredir-icon-circular.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/logo-progredir.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
