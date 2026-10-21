@@ -2,7 +2,9 @@
 
 import './absence-calendar.css';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { dateKey as keyOfDate, dropBlockReason, fromKey, moveBlockReason, shiftRange } from '../../lib/absence-move';
+import { NATIONAL_HOLIDAYS } from '../../lib/operational-abonos';
 
 type CalendarRequest = {
   id: string;
@@ -31,7 +33,10 @@ type CalendarCertificate = {
 type CalendarItem = {
   id: string;
   rawId: string;
-  source: 'SOLICITAÇÃO' | 'ATESTADO';
+  source: 'SOLICITAÇÃO' | 'ATESTADO' | 'FERIADO';
+  type: string;
+  typeLabel: string;
+  justification: string;
   status: string;
   start: Date;
   end: Date;
@@ -94,10 +99,12 @@ export default function AbsenceCalendar({
   requests,
   certificates,
   onChanged,
+  closedPeriods = [],
 }: {
   requests: CalendarRequest[];
   certificates: CalendarCertificate[];
-  onChanged?: () => void;
+  onChanged?: () => void | Promise<void>;
+  closedPeriods?: string[];
 }) {
   const now = new Date();
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
@@ -105,6 +112,69 @@ export default function AbsenceCalendar({
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionMsg, setActionMsg] = useState('');
+  const [overrides, setOverrides] = useState<Record<string, { start: Date; end: Date }>>({});
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropKey, setDropKey] = useState<string | null>(null);
+  const [tip, setTip] = useState<{ item: CalendarItem; x: number; y: number; pinned: boolean } | null>(null);
+  const [pendingMove, setPendingMove] = useState<{ item: CalendarItem; start: Date; end: Date } | null>(null);
+  const [movePicker, setMovePicker] = useState<{ item: CalendarItem; value: string } | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => { setIsTouch(window.matchMedia?.('(hover: none)').matches ?? false); }, []);
+  useEffect(() => { if (!actionMsg) return; const t = window.setTimeout(() => setActionMsg(''), 6000); return () => window.clearTimeout(t); }, [actionMsg]);
+
+  function applyOverride<T extends { id: string; start: Date; end: Date }>(item: T): T {
+    const o = overrides[item.id];
+    return o ? { ...item, start: o.start, end: o.end } : item;
+  }
+  function findItem(id: string | null) { return id ? items.find((i) => i.id === id) || null : null; }
+
+  useEffect(() => { if (pendingMove) confirmRef.current?.focus(); }, [pendingMove]);
+  useEffect(() => {
+    if (!tip?.pinned) return;
+    const close = () => setTip(null);
+    window.addEventListener('scroll', close, true);
+    return () => window.removeEventListener('scroll', close, true);
+  }, [tip?.pinned]);
+
+  function requestMove(item: CalendarItem, newStart: Date) {
+    const reason = dropBlockReason({ source: item.source, type: item.type, status: item.status, start: item.start, end: item.end }, newStart, closedPeriods);
+    if (reason) { setActionMsg(`Não foi possível mover: ${reason}`); return; }
+    const next = shiftRange(item.start, item.end, newStart);
+    setPendingMove({ item, start: next.start, end: next.end });
+  }
+
+  async function confirmMove() {
+    if (!pendingMove) return;
+    const { item, start, end } = pendingMove;
+    setPendingMove(null);
+    setOverrides((o) => ({ ...o, [item.id]: { start, end } }));
+    setBusyId(item.id);
+    setActionMsg(`Movendo ${item.employee}…`);
+    try {
+      const response = await fetch('/api/admin/requests', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.rawId, action: 'RESCHEDULE', startDate: keyOfDate(start), endDate: keyOfDate(end) }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'Sem permissão para mover registros.' : data.error || 'Não foi possível mover o registro.');
+      setActionMsg(`${item.employee}: ${item.typeLabel} movida para ${dateRange(start, end)}.`);
+      await onChanged?.();
+      setOverrides((o) => { const n = { ...o }; delete n[item.id]; return n; });
+      setSelectedDay(keyOfDate(start));
+    } catch (e) {
+      setOverrides((o) => { const n = { ...o }; delete n[item.id]; return n; });
+      setActionMsg(`Movimento desfeito: ${e instanceof Error ? e.message : 'falha de rede.'}`);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  function showTip(item: CalendarItem, el: HTMLElement, pinned: boolean) {
+    const r = el.getBoundingClientRect();
+    setTip({ item, x: r.left + r.width / 2, y: r.bottom + 6, pinned });
+  }
 
   const items = useMemo<CalendarItem[]>(() => {
     const requestItems = requests
@@ -113,6 +183,9 @@ export default function AbsenceCalendar({
         id: `request-${item.id}`,
         rawId: item.id,
         source: 'SOLICITAÇÃO' as const,
+        type: item.type,
+        typeLabel: requestTypeLabel(item.type, item.classification),
+        justification: [item.reason, item.details].filter(Boolean).join(' — '),
         status: item.status,
         start: localDate(item.startDate),
         end: localDate(item.endDate),
@@ -126,6 +199,9 @@ export default function AbsenceCalendar({
       id: `certificate-${item.id}`,
       rawId: item.id,
       source: 'ATESTADO' as const,
+      type: item.type,
+      typeLabel: certificateTypeLabel(item.type),
+      justification: item.observation || '',
       status: item.status,
       start: localDate(item.startDate),
       end: localDate(item.endDate),
@@ -142,7 +218,12 @@ export default function AbsenceCalendar({
       employee: item.user.name,
       employeeNumber: item.user.employeeNumber,
     }));
-    return [...requestItems, ...certificateItems]
+    const holidayItems: CalendarItem[] = Object.entries(NATIONAL_HOLIDAYS).map(([key, label]) => ({
+      id: `holiday-${key}`, rawId: key, source: 'FERIADO' as const, type: 'FERIADO', typeLabel: 'Feriado',
+      justification: label, status: 'ATIVO', start: fromKey(key), end: fromKey(key), title: label.replace(/^Feriado nacional — /, ''),
+      subtitle: label, period: 'Dia todo', employee: 'Todos', employeeNumber: null,
+    }));
+    return [...requestItems.map(applyOverride), ...certificateItems, ...holidayItems]
       .filter((item) =>
         filter === 'TODOS'
           ? true
@@ -151,7 +232,7 @@ export default function AbsenceCalendar({
             : ['APROVADO', 'ATIVO'].includes(item.status),
       )
       .sort((a, b) => a.start.getTime() - b.start.getTime() || a.employee.localeCompare(b.employee));
-  }, [certificates, filter, requests]);
+  }, [certificates, filter, requests, overrides]);
 
   const monthCells = useMemo(() => {
     const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
@@ -237,7 +318,7 @@ export default function AbsenceCalendar({
           <span className="eyebrow">PLANEJAMENTO E COBERTURA</span>
           <h3>Calendário de ausências</h3>
           <p className="small-muted">
-            Acompanhe ausências, consultas, eventos e atestados. Use Desmarcar para cancelar um registro.
+            Acompanhe ausências, consultas, eventos, atestados e feriados. Passe o mouse (ou toque) para ver detalhes; arraste uma ausência para outro dia ou use Mover.
           </p>
         </div>
         <div className="absence-calendar-summary">
@@ -250,7 +331,6 @@ export default function AbsenceCalendar({
         </div>
       </div>
 
-      {actionMsg ? <div className="status-msg">{actionMsg}</div> : null}
 
       <div className="absence-calendar-toolbar">
         <div className="absence-calendar-month-nav">
@@ -324,28 +404,52 @@ export default function AbsenceCalendar({
           const inMonth = date.getMonth() === cursor.getMonth();
           const isToday = dayKey === keyOf(now);
           return (
-            <button
+            <div
               key={dayKey}
-              type="button"
-              className={`absence-calendar-day ${inMonth ? '' : 'outside'} ${isToday ? 'today' : ''} ${selectedDay === dayKey ? 'selected' : ''}`}
+              role="gridcell"
+              tabIndex={0}
+              className={`absence-calendar-day ${inMonth ? '' : 'outside'} ${isToday ? 'today' : ''} ${selectedDay === dayKey ? 'selected' : ''} ${dropKey === dayKey ? (dropAllowed(dayKey) ? 'drop-ok' : 'drop-no') : ''} ${closedPeriods.includes(dayKey.slice(0, 7)) ? 'closed' : ''}`}
               onClick={() => setSelectedDay(dayKey)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedDay(dayKey); } }}
+              onDragOver={(e) => { if (!dragId) return; e.preventDefault(); e.dataTransfer.dropEffect = dropAllowed(dayKey) ? 'move' : 'none'; if (dropKey !== dayKey) setDropKey(dayKey); }}
+              onDragLeave={() => setDropKey((k) => (k === dayKey ? null : k))}
+              onDrop={(e) => { e.preventDefault(); const item = findItem(dragId || e.dataTransfer.getData('text/plain')); setDragId(null); setDropKey(null); if (item) requestMove(item, date); }}
               aria-label={`${dateFormatter(date)}: ${dayItems.length} registro(s)`}
             >
               <span className="absence-calendar-day-number">{date.getDate()}</span>
               <span className="absence-calendar-events">
-                {dayItems.slice(0, 3).map((item) => (
-                  <span
-                    key={item.id}
-                    className={`absence-calendar-event ${statusClass(item.status)} ${item.period !== 'DIA_TODO' && item.source === 'SOLICITAÇÃO' ? 'partial' : ''}`}
-                    title={`${item.employee} — ${item.title}`}
-                  >
-                    <i />
-                    {item.employee.split(' ')[0]}
-                  </span>
-                ))}
+                {dayItems.slice(0, 3).map((item) => {
+                  const locked = moveBlockReason(item, closedPeriods);
+                  return (
+                    <span
+                      key={item.id}
+                      tabIndex={0}
+                      role="button"
+                      draggable={!locked && busyId !== item.id}
+                      aria-describedby={tip?.item.id === item.id ? 'absence-tip' : undefined}
+                      aria-label={`${item.typeLabel}: ${item.employee}, ${dateRange(item.start, item.end)}, ${statusLabel(item.status)}${locked ? '. Não pode ser movido.' : '. Arraste para mover ou use Mover no detalhamento.'}`}
+                      className={`absence-calendar-event ${item.source === 'FERIADO' ? 'holiday' : statusClass(item.status)} ${item.period !== 'DIA_TODO' && item.source === 'SOLICITAÇÃO' ? 'partial' : ''} ${locked ? 'locked' : 'movable'} ${dragId === item.id ? 'dragging' : ''} ${overrides[item.id] ? 'optimistic' : ''}`}
+                      onMouseEnter={(e) => { if (!tip?.pinned) showTip(item, e.currentTarget, false); }}
+                      onMouseLeave={() => { if (!tip?.pinned) setTip(null); }}
+                      onFocus={(e) => showTip(item, e.currentTarget, false)}
+                      onBlur={() => { if (!tip?.pinned) setTip(null); }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedDay(dayKey); if (tip?.pinned && tip.item.id === item.id) setTip(null); else showTip(item, e.currentTarget, true); }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') { setTip(null); return; }
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSelectedDay(dayKey); }
+                        if ((e.key === 'm' || e.key === 'M') && !locked) { e.preventDefault(); e.stopPropagation(); setMovePicker({ item, value: keyOfDate(item.start) }); }
+                      }}
+                      onDragStart={(e) => { if (locked) { e.preventDefault(); return; } setTip(null); setDragId(item.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', item.id); }}
+                      onDragEnd={() => { setDragId(null); setDropKey(null); }}
+                    >
+                      <i />
+                      {item.source === 'FERIADO' ? 'Feriado' : item.employee.split(' ')[0]}
+                    </span>
+                  );
+                })}
                 {dayItems.length > 3 ? <span className="absence-calendar-more">+{dayItems.length - 3} outros</span> : null}
               </span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -370,7 +474,7 @@ export default function AbsenceCalendar({
                 <div className="absence-calendar-detail-main">
                   <strong>{item.employee}</strong>
                   <span>
-                    {item.employeeNumber || 'Sem matrícula'} · {item.title} · {periodLabel(item)}
+                    {item.source === 'FERIADO' ? 'Todos os colaboradores' : item.employeeNumber || 'Sem matrícula'} · {item.typeLabel} · {periodLabel(item)}
                   </span>
                   <small>
                     {dateRange(item.start, item.end)}
@@ -379,7 +483,12 @@ export default function AbsenceCalendar({
                 </div>
                 <div className="absence-calendar-detail-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <span className={`status-pill ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
-                  {canCancel(item) ? (
+                  {!moveBlockReason(item, closedPeriods) ? (
+                    <button type="button" className="ghost-btn compact-btn" disabled={busyId === item.id} onClick={(e) => { e.stopPropagation(); setMovePicker({ item, value: keyOfDate(item.start) }); }} title="Mover para outra data (alternativa ao arrastar)">
+                      Mover
+                    </button>
+                  ) : null}
+                  {canCancel(item) && item.source !== 'FERIADO' ? (
                     <button
                       type="button"
                       className="danger-btn compact-btn"
@@ -399,8 +508,84 @@ export default function AbsenceCalendar({
           </div>
         )}
       </div>
+      {actionMsg ? <div className={`absence-toast ${/^(Não foi possível|Movimento desfeito)/.test(actionMsg) ? 'is-error' : ''}`} role="status" aria-live="polite">{actionMsg}</div> : null}
+
+      {tip ? (
+        <div id="absence-tip" role="tooltip" className={`absence-tip ${tip.pinned ? 'pinned' : ''}`} style={{ left: tip.x, top: tip.y }} onClick={(e) => e.stopPropagation()}>
+          <strong>{tip.item.typeLabel}</strong>
+          <span>{tip.item.source === 'FERIADO' ? tip.item.title : `${tip.item.employee}${tip.item.employeeNumber ? ` · ${tip.item.employeeNumber}` : ''}`}</span>
+          <span>{dateRange(tip.item.start, tip.item.end)} · {tipPeriod(tip.item)}</span>
+          <span className={`status-pill ${statusClass(tip.item.status)}`}>{tip.item.source === 'FERIADO' ? 'Fixo' : statusLabel(tip.item.status)}</span>
+          {tip.item.justification ? <em>{tip.item.justification}</em> : null}
+          <small>{moveBlockReason(tip.item, closedPeriods) ? `🔒 ${moveBlockReason(tip.item, closedPeriods)}` : (isTouch ? '↔ Para mover, use o botão Mover no detalhamento do dia.' : '↔ Arraste para outro dia ou pressione M para mover.')}</small>
+          {tip.pinned ? <button type="button" className="absence-tip-close" aria-label="Fechar" onClick={() => setTip(null)}>×</button> : null}
+        </div>
+      ) : null}
+
+      {movePicker ? (
+        <div className="absence-modal-backdrop" role="presentation" onClick={() => setMovePicker(null)}>
+          <form className="absence-modal" role="dialog" aria-modal="true" aria-labelledby="absence-move-title" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Escape') setMovePicker(null); }}
+            onSubmit={(e) => { e.preventDefault(); const it = movePicker.item; const v = movePicker.value; setMovePicker(null); if (/^\d{4}-\d{2}-\d{2}$/.test(v)) requestMove(it, fromKey(v)); }}>
+            <h4 id="absence-move-title">Mover {movePicker.item.typeLabel.toLowerCase()}</h4>
+            <p className="small-muted">{movePicker.item.employee} · atual: {dateRange(movePicker.item.start, movePicker.item.end)}</p>
+            <label>Nova data de início
+              <input autoFocus type="date" className="input" value={movePicker.value} onChange={(e) => setMovePicker({ ...movePicker, value: e.target.value })} required />
+            </label>
+            <div className="absence-modal-actions">
+              <button type="button" className="ghost-btn" onClick={() => setMovePicker(null)}>Cancelar</button>
+              <button type="submit" className="primary-btn">Continuar</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {pendingMove ? (
+        <div className="absence-modal-backdrop" role="presentation" onClick={() => setPendingMove(null)}>
+          <div className="absence-modal" role="alertdialog" aria-modal="true" aria-labelledby="absence-confirm-title" aria-describedby="absence-confirm-desc" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key === 'Escape') setPendingMove(null); }}>
+            <h4 id="absence-confirm-title">Confirmar mudança de data</h4>
+            <p id="absence-confirm-desc"><strong>{pendingMove.item.employee}</strong> · {pendingMove.item.typeLabel}</p>
+            <div className="absence-move-dates">
+              <span className="from">{dateRange(pendingMove.item.start, pendingMove.item.end)}</span>
+              <span aria-hidden>→</span>
+              <span className="to">{dateRange(pendingMove.start, pendingMove.end)}</span>
+            </div>
+            <p className="small-muted">A duração é mantida. A alteração fica registrada na trilha de auditoria.</p>
+            <div className="absence-modal-actions">
+              <button type="button" className="ghost-btn" onClick={() => setPendingMove(null)}>Cancelar</button>
+              <button type="button" className="primary-btn" ref={confirmRef} onClick={() => void confirmMove()}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
+
+  function dropAllowed(key: string) {
+    const item = findItem(dragId);
+    return Boolean(item && !dropBlockReason(item, fromKey(key), closedPeriods));
+  }
+}
+
+function requestTypeLabel(type: string, classification?: string | null) {
+  if (type === 'PASSEIO') return 'Passeio';
+  if (type === 'EVENTO_EXTERNO') return 'Evento externo';
+  const map: Record<string, string> = {
+    EMERGENCIA: 'Ausência emergencial', 'Atestado médico': 'Atestado (ausência)', Consulta: 'Consulta',
+    'Compromisso pessoal': 'Compromisso pessoal', 'Ausência previamente autorizada': 'Ausência autorizada',
+  };
+  return map[(classification || '').trim()] || 'Ausência';
+}
+
+function tipPeriod(item: CalendarItem) {
+  if (item.source !== 'SOLICITAÇÃO' || ['DIA_TODO', 'MANHA', 'TARDE'].includes(item.period)) return periodLabel(item);
+  return 'Dia todo';
+}
+
+function certificateTypeLabel(type: string) {
+  if (type === 'CONSULTA_MEDICA') return 'Consulta médica';
+  if (type === 'TRABALHO_EXTERNO' || type === 'TRABALHO_EXTERNO_HORAS') return 'Trabalho externo';
+  if (type === 'SAIDA_MEDICA') return 'Saída médica';
+  return 'Atestado';
 }
 
 function dateFormatter(date: Date) {

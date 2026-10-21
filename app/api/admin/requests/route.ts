@@ -5,7 +5,8 @@ import { authOptions } from '../../../../lib/auth';
 import prisma from '../../../../lib/prisma';
 import { appendAuditEvent } from '../../../../lib/security-controls';
 import { manualClientId, manualPunchTypes, parseManualTimestamp } from '../../../../lib/manual-punch';
-import { isPeriodClosed, periodFromDate } from '../../../../lib/period-closure';
+import { isPeriodClosed, periodFromDate, PERIOD_CLOSED_ACTION, PERIOD_REOPENED_ACTION } from '../../../../lib/period-closure';
+import { periodsTouched } from '../../../../lib/absence-move';
 
 export const dynamic = 'force-dynamic';
 function manager(session: any) {
@@ -39,7 +40,30 @@ export async function GET() {
       reviewer: { select: { name: true } },
     },
   });
-  return NextResponse.json({ requests });
+  return NextResponse.json({ requests, closedPeriods: await closedPeriodsList() });
+}
+
+/** Competências atualmente fechadas (último evento de fechamento/reabertura de cada uma). */
+async function closedPeriodsList() {
+  try {
+    const events = await prisma.securityAuditEvent.findMany({
+      where: { action: { in: [PERIOD_CLOSED_ACTION, PERIOD_REOPENED_ACTION] } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 500, select: { action: true, metadataJson: true },
+    });
+    const seen = new Map<string, boolean>();
+    for (const e of events) {
+      let period = '';
+      try { period = String(JSON.parse(e.metadataJson || '{}').period || ''); } catch { period = ''; }
+      if (period && !seen.has(period)) seen.set(period, e.action === PERIOD_CLOSED_ACTION);
+    }
+    return [...seen].filter(([, closed]) => closed).map(([p]) => p).sort();
+  } catch { return []; }
+}
+
+function utcPeriods(start: Date, end: Date) {
+  const s = new Date(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const e = new Date(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  return periodsTouched(s, e);
 }
 
 export async function PATCH(request: Request) {
@@ -69,6 +93,14 @@ export async function PATCH(request: Request) {
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
       return NextResponse.json({ error: 'Período inválido.' }, { status: 400 });
     }
+    if (['CANCELADO', 'REJEITADO'].includes(existing.status)) {
+      return NextResponse.json({ error: 'Registros cancelados ou rejeitados não podem ser reagendados.' }, { status: 409 });
+    }
+    for (const period of new Set([...utcPeriods(existing.startDate, existing.endDate), ...utcPeriods(start, end)])) {
+      if (await isPeriodClosed(period)) {
+        return NextResponse.json({ error: `A competência ${period.split('-').reverse().join('/')} está fechada/assinada. Reabra o período para mover este registro.`, code: 'PERIOD_CLOSED' }, { status: 409 });
+      }
+    }
     const updated = await prisma.employeeRequest.update({
       where: { id: existing.id },
       data: { startDate: start, endDate: end },
@@ -82,8 +114,10 @@ export async function PATCH(request: Request) {
       metadata: {
         employeeId: existing.employeeId,
         from: existing.startDate.toISOString().slice(0, 10),
+        fromEnd: existing.endDate.toISOString().slice(0, 10),
         to: start.toISOString().slice(0, 10),
         end: end.toISOString().slice(0, 10),
+        via: 'calendario-arrastar',
       },
     });
     return NextResponse.json({ request: updated });

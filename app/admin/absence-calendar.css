@@ -597,3 +597,42 @@
     margin-left: 1.15rem;
   }
 }
+
+/* ===== Tooltip, arrastar e soltar ===== */
+.absence-calendar-day{position:relative}
+.absence-calendar-day:focus-visible{outline:2px solid #075c3b;outline-offset:2px}
+.absence-calendar-day.closed{background:repeating-linear-gradient(135deg,#fff,#fff 8px,#f6f4ee 8px,#f6f4ee 16px)}
+.absence-calendar-day.drop-ok{border-color:#16855a !important;box-shadow:0 0 0 3px rgba(22,133,90,.25) !important;background:#effaf3 !important}
+.absence-calendar-day.drop-no{border-color:#c96565 !important;box-shadow:0 0 0 3px rgba(201,101,101,.2) !important;background:#fdf1f1 !important;cursor:not-allowed}
+.absence-calendar-event.movable{cursor:grab}
+.absence-calendar-event.movable:active{cursor:grabbing}
+.absence-calendar-event.locked{cursor:help}
+.absence-calendar-event.dragging{opacity:.45}
+.absence-calendar-event.optimistic{outline:1px dashed currentColor;animation:absPulse 1s ease-in-out infinite}
+.absence-calendar-event.holiday{background:#f5ecd8;color:#7a5a12}
+.absence-calendar-event:focus-visible{outline:2px solid #075c3b;outline-offset:1px}
+@keyframes absPulse{50%{opacity:.6}}
+.absence-tip{position:fixed;z-index:60;transform:translateX(-50%);display:grid;gap:3px;min-width:200px;max-width:280px;padding:10px 12px;border-radius:10px;background:#0f3a2a;color:#f4fbf7;font-size:12px;line-height:1.35;box-shadow:0 12px 28px rgba(5,40,26,.3);pointer-events:none}
+.absence-tip.pinned{pointer-events:auto;padding-right:28px}
+.absence-tip strong{font-size:13px;color:#ffd977}
+.absence-tip em{font-style:normal;color:#cfe5d9;border-left:2px solid #d8b34a;padding-left:6px;margin-top:2px}
+.absence-tip small{color:#a9c7b8;margin-top:3px}
+.absence-tip .status-pill{justify-self:start;font-size:10px}
+.absence-tip-close{position:absolute;top:4px;right:6px;border:0;background:none;color:#fff;font-size:18px;cursor:pointer;min-width:28px;min-height:28px}
+.absence-modal-backdrop{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:rgba(6,30,20,.45);padding:16px}
+.absence-modal{width:min(440px,100%);display:grid;gap:10px;padding:18px 20px;border-radius:14px;background:#fff;color:#123d2c;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.absence-modal h4{margin:0;font-size:1.05rem}
+.absence-modal p{margin:0}
+.absence-modal label{display:grid;gap:4px;font-size:13px;font-weight:600}
+.absence-move-dates{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-weight:700}
+.absence-move-dates .from{padding:6px 10px;border-radius:8px;background:#fceaea;color:#984a4a;text-decoration:line-through}
+.absence-move-dates .to{padding:6px 10px;border-radius:8px;background:#e6f5ed;color:#15543d}
+.absence-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+@media (prefers-reduced-motion:reduce){.absence-calendar-event.optimistic{animation:none}}
+.absence-toast{position:fixed;z-index:65;left:50%;bottom:24px;transform:translateX(-50%);max-width:min(92vw,560px);padding:12px 16px;border-radius:12px;background:#0f3a2a;color:#eafff3;font-size:13px;font-weight:600;box-shadow:0 14px 32px rgba(0,0,0,.3);border-left:4px solid #16855a}
+.absence-toast.is-error{border-left-color:#e07070;background:#3a1414;color:#ffecec}
+@media (max-width:760px){.absence-toast{bottom:84px}}
+.admin-shell .absence-modal .ghost-btn,.absence-modal .ghost-btn,.admin-shell .absence-calendar-detail-actions .ghost-btn,.absence-calendar-detail-actions .ghost-btn{background:#fff;color:#075c3b;border:1px solid #9cc5ae}
+.admin-shell .absence-modal .ghost-btn:hover,.admin-shell .absence-calendar-detail-actions .ghost-btn:hover{background:#eef7f2}
+.absence-modal .primary-btn{background:#075c3b;color:#fff}
+.absence-modal .input,.admin-shell .absence-modal input{background:#fff;color:#123d2c;border:1px solid #cfe0d6;color-scheme:light}

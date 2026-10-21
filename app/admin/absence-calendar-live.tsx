@@ -33,6 +33,7 @@ export default function AbsenceCalendarLive() {
   const [certificates, setCertificates] = useState<Cert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [closedPeriods, setClosedPeriods] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,6 +47,7 @@ export default function AbsenceCalendarLive() {
       const cJson = await cRes.json().catch(() => ({}));
       if (!rRes.ok && !cRes.ok) throw new Error(rJson.error || cJson.error || 'Falha ao carregar calendário');
 
+      setClosedPeriods(Array.isArray(rJson.closedPeriods) ? rJson.closedPeriods : []);
       const reqs = Array.isArray(rJson.requests) ? rJson.requests : Array.isArray(rJson.items) ? rJson.items : [];
       setRequests(
         reqs.map((r: any) => ({
@@ -104,7 +106,7 @@ export default function AbsenceCalendarLive() {
         </button>
         {error ? <span className="status-msg">{error}</span> : null}
       </div>
-      <AbsenceCalendar requests={requests} certificates={certificates} onChanged={() => void load()} />
+      <AbsenceCalendar requests={requests} certificates={certificates} closedPeriods={closedPeriods} onChanged={() => load()} />
     </div>
   );
 }
