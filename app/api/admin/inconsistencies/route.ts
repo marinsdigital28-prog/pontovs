@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadHolidayOverrides } from '@/lib/holiday-store';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -72,6 +73,7 @@ export async function GET(request: Request) {
   ]);
 
   const resolvedKeys = new Set(persistedResolved.map((issue) => extractAutoKey(issue.description)).filter((key): key is string => Boolean(key)));
+  await loadHolidayOverrides();
   const detected = detectInconsistencies({ employees, punches, exceptions: [...certificates, ...requests].map((item: any) => ({ userId: item.userId || item.employeeId, startDate: item.startDate, endDate: item.endDate, status: item.status, type: item.type })), from: fromValue, to: toValue }).filter((issue) => !resolvedKeys.has(issue.key));
   const stored = persistedOpen.filter((issue) => !extractAutoKey(issue.description || '')).map(mapPersistedIssue).filter((issue) => issue.date >= fromValue && issue.date <= toValue);
   const inconsistencies = [...detected, ...stored].sort((a, b) => `${b.date}|${b.user.name}`.localeCompare(`${a.date}|${a.user.name}`));

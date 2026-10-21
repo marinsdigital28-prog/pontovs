@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadHolidayOverrides } from '@/lib/holiday-store';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
   const valid = punches.filter((p) => p.status !== 'REJECTED');
   const byUser = new Map<string, typeof valid>();
   for (const p of valid) { const list = byUser.get(p.userId) || []; list.push(p); byUser.set(p.userId, list); }
+  await loadHolidayOverrides();
   const detected = detectInconsistencies({ employees: employees as any, punches: valid.filter((p) => p.timestamp >= from && p.timestamp <= to) as any, exceptions: [...certificates, ...approved].map((i: any) => ({ userId: i.userId || i.employeeId, startDate: i.startDate, endDate: i.endDate, status: i.status, type: i.type })) as any, from: fromKey, to: toKey });
 
   type Item = any;

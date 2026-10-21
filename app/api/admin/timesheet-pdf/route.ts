@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { loadHolidayOverrides } from '@/lib/holiday-store';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
         }),
       );
 
+      await loadHolidayOverrides();
       const signedPdf = await createSignedTimesheetPdfBatch({
         items: batches,
         month,
@@ -200,6 +202,7 @@ export async function POST(request: Request) {
       }),
     ]);
 
+    await loadHolidayOverrides();
     const signedPdf = await createSignedTimesheetPdf({
       employee: { ...employee, unit: employee.unit?.name || null },
       punches,
