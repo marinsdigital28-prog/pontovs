@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import InstallAppButton from '../../components/InstallAppButton';
 import './totem.css';
+import InstallBanner from './InstallBanner';
 
 const ArrowIcon = () => <svg viewBox="0 0 24 24" aria-hidden className="t-ico"><path d="M4 12h15M13 6l6 6-6 6" /></svg>;
 const BackspaceIcon = () => <svg viewBox="0 0 32 24" aria-hidden className="t-ico t-ico-bs"><path d="M10 3h18a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H10L2 12z" /><path d="M15 8l8 8M23 8l-8 8" /></svg>;
@@ -506,6 +507,7 @@ export default function Page() {
         )}
         </section>
       </div>
+      {step === 'lookup' && !done ? <InstallBanner /> : null}
       <footer className="t-footer">Ponto eletrônico • Portaria 671 MTE</footer>
     </main>
   );
