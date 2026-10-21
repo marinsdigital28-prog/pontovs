@@ -17,6 +17,27 @@ const TYPE_LABEL: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Sa�
 const TYPE_ICON: Record<string, string> = { ENTRADA: '→', INTERVALO: '☕', RETORNO: '↩', SAIDA: '←', PENDENTE: '⟳' };
 function greeting(date: Date | null) { const h = date ? Number(date.toLocaleString('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: TZ })) : 8; return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 
+/** Efeito visual de toque nas teclas (só transform/opacity). Não altera o fluxo. */
+function keyFx(btn: HTMLElement | null, x?: number, y?: number) {
+  if (!btn) return;
+  try { (navigator as any).vibrate?.(10); } catch { /* sem vibração */ }
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const r = btn.getBoundingClientRect();
+  const size = Math.max(r.width, r.height) * 2.2;
+  const dot = document.createElement('span');
+  dot.className = 't-ripple';
+  dot.style.width = dot.style.height = `${size}px`;
+  dot.style.left = `${(x ?? r.left + r.width / 2) - r.left - size / 2}px`;
+  dot.style.top = `${(y ?? r.top + r.height / 2) - r.top - size / 2}px`;
+  btn.appendChild(dot);
+  btn.classList.remove('is-fx'); void btn.offsetWidth; btn.classList.add('is-fx');
+  window.setTimeout(() => { dot.remove(); btn.classList.remove('is-fx'); }, 520);
+}
+function keyFxFor(key: string) {
+  const label = key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`;
+  keyFx(document.querySelector(`button[aria-label="${label}"]`) as HTMLElement | null);
+}
+
 export default function Page() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -34,11 +55,13 @@ export default function Page() {
   const submittingRef = React.useRef(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [journeyClosed, setJourneyClosed] = useState(false);
+  const [shakeTick, setShakeTick] = useState(0);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
 
   function appendDigit(nextValue: string) {
     if (nextValue === 'C') {
+      setShakeTick((n) => n + 1);
       setMatricula('');
       return;
     }
@@ -371,9 +394,9 @@ export default function Page() {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (confirmation) { if (e.key === 'Enter' || e.key === 'Escape' || e.key === ' ') { e.preventDefault(); resetForNextCollaborator(); } return; }
     if (step === 'lookup') {
-      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); appendDigit(e.key); }
-      else if (e.key === 'Backspace') { e.preventDefault(); appendDigit('⌫'); }
-      else if (e.key === 'Escape' || e.key === 'Delete') { e.preventDefault(); appendDigit('C'); }
+      if (/^[0-9]$/.test(e.key)) { e.preventDefault(); keyFxFor(e.key); appendDigit(e.key); }
+      else if (e.key === 'Backspace') { e.preventDefault(); keyFxFor('⌫'); appendDigit('⌫'); }
+      else if (e.key === 'Escape' || e.key === 'Delete') { e.preventDefault(); keyFxFor('C'); appendDigit('C'); }
       else if (e.key === 'Enter' && matricula.trim() && !loading) { e.preventDefault(); void handleLookup(); }
       return;
     }
@@ -392,6 +415,7 @@ export default function Page() {
   const digits = matricula.replace(/\D/g, '');
   const slotCount = Math.min(8, Math.max(4, digits.length + (digits.length < 8 ? 1 : 0)));
   const done = Boolean(confirmation);
+  const lookupError = step === 'lookup' && !loading && !journeyClosed && Boolean(statusMsg);
 
   return (
     <main className={`ponto-kiosk-container totem totem-step-${done ? 'done' : step}`}>
@@ -430,7 +454,7 @@ export default function Page() {
               </div>
             )}
             <div className="t-label" id="totem-mat-label">MATRÍCULA</div>
-            <div className={`t-slots ${loading ? 'is-loading' : ''}`} style={{ ['--slots' as any]: slotCount }} aria-labelledby="totem-mat-label" aria-live="polite" aria-label={digits ? `Matrícula ${digits.split('').join(' ')}` : 'Digite seu número de matrícula'}>
+            <div key={`slots-${shakeTick}-${lookupError ? statusMsg : ''}`} className={`t-slots ${loading ? 'is-loading' : ''} ${shakeTick > 0 || lookupError ? 'is-shake' : ''}`} style={{ ['--slots' as any]: slotCount }} aria-labelledby="totem-mat-label" aria-live="polite" aria-label={digits ? `Matrícula ${digits.split('').join(' ')}` : 'Digite seu número de matrícula'}>
               {Array.from({ length: slotCount }, (_, i) => (
                 <span key={i} className={`t-slot ${digits[i] ? 'is-filled' : i === digits.length ? 'is-active' : 'is-empty'}`}>{digits[i] ?? ''}</span>
               ))}
@@ -442,6 +466,7 @@ export default function Page() {
                   key={key}
                   type="button"
                   className={`t-key ${key === 'C' || key === '⌫' ? 't-key-fn' : ''}`}
+                  onPointerDown={(ev) => keyFx(ev.currentTarget, ev.clientX, ev.clientY)}
                   onClick={() => appendDigit(key)}
                   aria-label={key === 'C' ? 'Limpar matrícula' : key === '⌫' ? 'Apagar último dígito' : `Tecla ${key}`}
                 >
