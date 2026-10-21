@@ -22,6 +22,9 @@ import OverviewExitWatch from './overview-exit-watch';
 import ShiftsPanel from './shifts-panel';
 import InconsistenciesPanel from './inconsistencies-panel';
 import ForgottenQueue from './forgotten-queue';
+import TodayLive from './today-live';
+import TrendsPanel from './trends-panel';
+import HolidaysPanel from './holidays-panel';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -109,6 +112,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
     {tab === 'hoje' ? <section className="overview-layout">
+      <div className="overview-live"><TodayLive /></div>
       <div className="overview-top">
         <div className="card admin-hero overview-hero">
           <div><span className="eyebrow">OPERAÇÃO EM TEMPO REAL</span><h2>Operação de hoje</h2><p className="small-muted">Presença da equipe, pendências e atalhos.</p></div>
@@ -193,6 +197,8 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     {tab === 'folha' ? <section>
       <FolhaPontoPanel employees={employees.filter((item) => item.active)} />
       <PeriodClosureCard />
+      <div style={{ marginTop: 20 }}><TrendsPanel /></div>
+      <div style={{ marginTop: 20 }}><HolidaysPanel /></div>
       <div style={{ marginTop: 20 }}><BackupPanel /></div>
       <div className="overview-analytics" style={{ marginTop: 20 }}><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
     </section> : null}
