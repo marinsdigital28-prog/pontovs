@@ -148,3 +148,42 @@ body:has(.admin-shell){background:var(--r-bg,#06150f)}
   .admin-main{padding:0;max-width:none}
   .admin-shell .card{box-shadow:none}
 }
+
+/* Fila: Resolver marcações esquecidas */
+.fq .section-heading { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.fq-head-actions, .fq-row, .fq-badges { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fq button { width: auto; }
+.fq-msg { margin: 10px 0; padding: 8px 12px; border-radius: var(--r-radius-sm); font-size: .9rem; border: 1px solid var(--r-line); }
+.fq-msg.ok { background: rgba(52,211,153,.1); color: var(--r-ok); }
+.fq-msg.bad { background: rgba(248,113,113,.1); color: var(--r-bad); }
+.fq-msg.warn { background: rgba(251,191,36,.1); color: var(--r-warn); }
+.fq-wa { margin-left: 8px; font-weight: 600; color: var(--r-gold-2); }
+.fq-item { margin-top: 14px; border: 1px solid var(--r-line); border-radius: var(--r-radius); padding: 18px; background: var(--r-surface-2); color: var(--r-text); }
+.fq-item-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.fq-name { display: block; font-size: 1.2rem; color: var(--r-text); }
+.fq-meta, .fq-pos, .fq-hint { color: var(--r-muted); font-size: .85rem; }
+.fq-note { font-style: italic; color: var(--r-text); margin: 8px 0; }
+.fq-timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0 8px; }
+.fq-slot { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--r-line); background: var(--r-surface); }
+.fq-slot.missing { border: 1.5px dashed var(--r-gold); background: rgba(212,175,55,.07); }
+.fq-slot-label { font-weight: 700; font-size: .85rem; color: var(--r-text); }
+.fq-expected { font-size: .75rem; color: var(--r-muted); }
+.fq-actual { font-size: 1.15rem; font-weight: 700; color: var(--r-text); font-variant-numeric: tabular-nums; }
+.admin-shell .fq-time, .fq-time { font-size: 1.05rem; font-weight: 700; padding: 4px 8px; color-scheme: dark; }
+.fq-time.conf-ALTA { border-color: var(--r-ok) !important; }
+.fq-time.conf-MEDIA { border-color: var(--r-warn) !important; }
+.fq-time.conf-BAIXA { border-color: var(--r-bad) !important; }
+.fq-source { font-size: .72rem; font-weight: 600; }
+.fq-source.conf-ALTA { color: var(--r-ok); }
+.fq-source.conf-MEDIA { color: var(--r-warn); }
+.fq-source.conf-BAIXA { color: var(--r-bad); }
+.fq-context { font-size: .85rem; color: var(--r-text); }
+.fq-context p { margin: 4px 0; }
+.fq-hist { font-variant-numeric: tabular-nums; color: var(--r-muted); }
+.fq-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.fq-actions kbd, .fq-row kbd { font-family: inherit; font-size: .7rem; padding: 1px 5px; border-radius: 4px; border: 1px solid currentColor; opacity: .75; margin-right: 4px; }
+.fq-actions .danger { background: var(--r-bad); border-color: var(--r-bad); color: #1a0606; }
+.fq-reason, .fq-bulk label { display: grid; gap: 6px; font-size: .85rem; font-weight: 600; color: var(--r-muted); margin-bottom: 10px; }
+.fq-reason textarea, .fq-bulk textarea { font: inherit; font-weight: 400; resize: vertical; }
+.fq-bulk { margin: 14px 0; padding: 16px; border-radius: var(--r-radius); background: var(--r-surface-2); border: 1px solid var(--r-line-gold); color: var(--r-text); }
+.fq-bulk ul { margin: 8px 0; padding-left: 18px; font-size: .85rem; max-height: 180px; overflow: auto; color: var(--r-text); }
