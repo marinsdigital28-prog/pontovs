@@ -41,5 +41,5 @@ export default async function AdminPage() {
     safeEmployees(),
   ]);
   const displayedEmployeeCount = degraded ? employeeOptions.length : employeeCount;
-  return <main className="admin-container"><header className="admin-header"><div><div className="header-brand">PONTO PROGREDIR</div><h1>Central administrativa</h1><p className="small-muted">Gestão operacional · {manager.name}</p></div><a className="ghost-btn" href="/ponto">Abrir ponto</a></header><AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: item.active }))} stats={{ employeeCount: displayedEmployeeCount, punchesToday, openInconsistencies }} degraded={degraded} /><footer className="admin-footer">Desenvolvido por Marins Digital</footer></main>;
+  return <AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: item.active }))} stats={{ employeeCount: displayedEmployeeCount, punchesToday, openInconsistencies }} degraded={degraded} managerName={manager.name} />;
 }

@@ -40,7 +40,7 @@
 .ov-cal-weekdays span{text-align:center;font-size:.72rem;font-weight:800;color:#6b7c70;letter-spacing:.04em}
 .ov-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:.4rem}
 .ov-cal-cell{
-  min-height:88px;border:1px solid #e3ebe4;border-radius:12px;background:#fafcf9;
+  min-height:88px;border:1px solid #e3ebe4;border-radius:16px;background:#fafcf9;box-shadow:0 2px 8px rgba(8,53,40,.03);
   padding:.4rem .35rem;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:.25rem;
   transition:border-color .15s,box-shadow .15s,background .15s
 }
@@ -65,7 +65,7 @@
 .ov-cal-detail-list{list-style:none;margin:0;padding:0;display:grid;gap:.55rem}
 .ov-cal-detail-list li{
   display:grid;grid-template-columns:minmax(140px,.9fr) 1.4fr;gap:.75rem;
-  padding:.55rem .65rem;border-radius:12px;background:#f4f7f2;border:1px solid #e3ebe4
+  padding:.55rem .65rem;border-radius:14px;background:#f4f7f2;border:1px solid #e3ebe4;box-shadow:0 2px 8px rgba(8,53,40,.03)
 }
 .ov-cal-detail-list strong{display:block;font-size:.92rem}
 .ov-cal-detail-list small{color:#6b7c70}
@@ -123,12 +123,12 @@
 
 /* Overview calendar — alinhado às cores Espaço Progredir */
 .overview-calendar{
-  border-radius:20px!important;
+  border-radius:24px!important;
   border:1px solid rgba(11,92,66,.12)!important;
   background:
     radial-gradient(ellipse 70% 45% at 0% 0%, rgba(201,162,39,.12), transparent 55%),
     linear-gradient(168deg,#fff 0%,#f6fbf8 100%)!important;
-  box-shadow:0 14px 36px rgba(8,53,40,.07)!important;
+  box-shadow:0 10px 32px rgba(8,53,40,.05)!important;
   position:relative;
   overflow:hidden;
 }

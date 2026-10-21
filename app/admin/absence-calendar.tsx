@@ -1,5 +1,7 @@
 'use client';
 
+import './absence-calendar.css';
+
 import { useMemo, useState } from 'react';
 
 type CalendarRequest = {

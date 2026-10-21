@@ -126,10 +126,16 @@ export default function CertificatesPanel({ employees }: { employees: Employee[]
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ...form,
-        documentName: document?.name,
-        documentMime: document?.mime,
-        documentData: document?.data,
+        userId: form.userId,
+        type: form.type,
+        startDate: form.startDate,
+        endDate: isHourly ? form.startDate : (form.endDate || form.startDate),
+        startTime: isHourly ? (form.startTime || null) : null,
+        endTime: isHourly ? (form.endTime || null) : null,
+        observation: form.observation || null,
+        documentName: document?.name || null,
+        documentMime: document?.mime || null,
+        documentData: document?.data || null,
       }),
     });
     const data = await response.json().catch(() => ({}));

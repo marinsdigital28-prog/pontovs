@@ -1,0 +1,150 @@
+/* ===== Redesign do painel administrativo — Ponto Progredir =====
+   Paleta da marca: verde-escuro + dourado. Escopo: .admin-shell */
+.admin-shell{
+  --r-bg:#06150f; --r-surface:#0c1f18; --r-surface-2:#112a21; --r-line:rgba(255,255,255,.07);
+  --r-line-gold:rgba(212,175,55,.28); --r-text:#eef5f1; --r-muted:#9fb5ab; --r-gold:#d4af37; --r-gold-2:#e8c869;
+  --r-ok:#34d399; --r-warn:#fbbf24; --r-bad:#f87171; --r-info:#60a5fa;
+  --r-radius:16px; --r-radius-sm:10px; --r-gap:20px;
+  display:grid; grid-template-columns:260px minmax(0,1fr); min-height:100dvh; color:var(--r-text);
+  font-size:15px; line-height:1.5;
+}
+body:has(.admin-shell){background:var(--r-bg,#06150f)}
+
+/* Sidebar */
+.admin-sidebar{position:sticky;top:0;height:100dvh;display:flex;flex-direction:column;gap:18px;padding:22px 16px;background:linear-gradient(180deg,#0a1d16,#071610);border-right:1px solid var(--r-line)}
+.admin-brand{display:flex;align-items:center;gap:12px;padding:4px 8px 16px;border-bottom:1px solid var(--r-line)}
+.admin-brand img{border-radius:50%;box-shadow:0 0 0 2px var(--r-line-gold)}
+.admin-brand strong{display:block;font-size:1rem;letter-spacing:-.01em}
+.admin-brand span{display:block;font-size:.75rem;color:var(--r-muted)}
+.admin-shell .admin-tabs{display:flex;flex-direction:column;gap:4px;padding:0;margin:0;background:none;border:0;border-radius:0;overflow:visible}
+.admin-shell .admin-tabs button{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 12px;border:0;border-radius:var(--r-radius-sm);background:transparent;color:var(--r-muted);font-weight:600;font-size:.93rem;text-align:left;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap}
+.admin-shell .admin-tabs button:hover{background:rgba(255,255,255,.04);color:var(--r-text)}
+.admin-shell .admin-tabs button.active{background:rgba(212,175,55,.12);color:var(--r-gold-2);box-shadow:inset 3px 0 0 var(--r-gold)}
+.admin-shell .admin-tabs button:nth-child(5){border:0;color:var(--r-muted)}
+.admin-shell .admin-tabs button:nth-child(5).active{color:var(--r-gold-2)}
+.nav-icon{width:20px;height:20px;flex:0 0 20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.admin-sidebar-footer{margin-top:auto;display:flex;flex-direction:column;gap:12px;padding-top:16px;border-top:1px solid var(--r-line)}
+.admin-user{display:flex;align-items:center;gap:10px}
+.admin-user strong{display:block;font-size:.85rem}
+.admin-user span{display:block;font-size:.72rem;color:var(--r-muted)}
+.admin-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--r-gold);color:#10241c;font-weight:800;font-size:.78rem}
+.admin-open-ponto{text-align:center;justify-content:center}
+
+/* Área principal */
+.admin-main{min-width:0;padding:28px clamp(16px,3vw,40px) 40px;max-width:1360px;width:100%}
+.admin-topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:24px;padding-bottom:18px;border-bottom:1px solid var(--r-line)}
+.admin-topbar h1{margin:2px 0 2px;font-size:clamp(1.5rem,2.6vw,2rem);font-weight:750;letter-spacing:-.025em}
+.admin-topbar p{margin:0}
+.admin-topbar-date{color:var(--r-muted);font-size:.85rem;text-transform:capitalize;white-space:nowrap}
+.admin-shell .admin-footer{margin-top:40px;text-align:center;color:var(--r-muted);font-size:.75rem;opacity:.7}
+
+/* Tipografia */
+.admin-shell h2{font-size:1.15rem;font-weight:700;letter-spacing:-.015em;margin:2px 0 4px}
+.admin-shell h3{font-size:1rem;font-weight:650;margin:2px 0 6px}
+.admin-shell .eyebrow{display:inline-block;font-size:.68rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--r-gold)}
+.admin-shell .small-muted{color:var(--r-muted);font-size:.84rem}
+
+/* Cards e espaçamento */
+.admin-shell .card{background:var(--r-surface);border:1px solid var(--r-line);border-radius:var(--r-radius);padding:20px;box-shadow:0 1px 0 rgba(255,255,255,.02) inset,0 10px 30px rgba(0,0,0,.18)}
+.admin-shell .admin-main > section > * + *{margin-top:var(--r-gap)}
+.admin-shell .admin-two-col{gap:var(--r-gap)}
+.admin-shell .section-heading{gap:14px;margin-bottom:14px}
+
+/* Números do dia */
+.admin-shell .stat-grid{gap:14px}
+.admin-shell .summary{position:relative;background:var(--r-surface-2);border:1px solid var(--r-line);border-radius:14px;padding:16px 18px;overflow:hidden}
+.admin-shell .summary::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--r-gold);opacity:.7}
+.admin-shell .summary.summary-ok::before{background:var(--r-ok)}
+.admin-shell .summary.summary-warn::before{background:var(--r-warn)}
+.admin-shell .summary.summary-alert::before{background:var(--r-bad)}
+.admin-shell .summary strong{display:block;font-size:1.9rem;font-weight:750;line-height:1.1;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--r-text)}
+.admin-shell .summary.summary-ok strong{color:var(--r-ok)}
+.admin-shell .summary.summary-warn strong{color:var(--r-warn)}
+.admin-shell .summary.summary-alert strong{color:var(--r-bad)}
+
+/* Botões */
+.admin-shell .primary-btn,.admin-shell .ghost-btn,.admin-shell .danger-btn{display:inline-flex;align-items:center;gap:6px;min-height:38px;padding:8px 14px;border-radius:var(--r-radius-sm);font-weight:650;font-size:.86rem;cursor:pointer;transition:transform .08s,background .15s,border-color .15s}
+.admin-shell .primary-btn{background:var(--r-gold);color:#10241c;border:1px solid var(--r-gold);box-shadow:0 6px 16px rgba(212,175,55,.16)}
+.admin-shell .primary-btn:hover{background:var(--r-gold-2)}
+.admin-shell .ghost-btn{background:rgba(255,255,255,.03);color:var(--r-text);border:1px solid var(--r-line)}
+.admin-shell .ghost-btn:hover{border-color:var(--r-line-gold);background:rgba(212,175,55,.06)}
+.admin-shell .danger-btn{background:rgba(248,113,113,.12);color:#fecaca;border:1px solid rgba(248,113,113,.35)}
+.admin-shell button:active{transform:translateY(1px)}
+.admin-shell button:disabled{opacity:.55;cursor:not-allowed}
+.admin-shell .compact-btn{min-height:32px;padding:5px 10px;font-size:.8rem}
+
+/* Formulários */
+.admin-shell .input,.admin-shell select,.admin-shell textarea{background:#08180f;border:1px solid var(--r-line);border-radius:var(--r-radius-sm);color:var(--r-text);padding:9px 12px;font-size:.9rem;transition:border-color .15s,box-shadow .15s}
+.admin-shell .input:focus,.admin-shell select:focus,.admin-shell textarea:focus{outline:none;border-color:var(--r-gold);box-shadow:0 0 0 3px rgba(212,175,55,.18)}
+.admin-shell label.small-muted{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:.78rem}
+.admin-shell .form-two-col{gap:12px}
+
+/* Listas e linhas */
+.admin-shell .employee-list{display:flex;flex-direction:column;gap:6px}
+.admin-shell .employee-row{background:rgba(255,255,255,.02);border:1px solid var(--r-line);border-radius:12px;padding:12px 14px;transition:border-color .15s,background .15s}
+.admin-shell .employee-row:hover{border-color:var(--r-line-gold)}
+.admin-shell .employee-row-active{border-color:var(--r-gold);background:rgba(212,175,55,.06)}
+
+/* Tabelas */
+.admin-shell table{width:100%;border-collapse:separate;border-spacing:0;font-size:.86rem}
+.admin-shell .report-table th,.admin-shell .shifts-table th{position:sticky;top:0;background:#0f2a20;color:var(--r-muted);font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-bottom:1px solid var(--r-line)}
+.admin-shell .report-table td,.admin-shell .shifts-table td{padding:10px 12px;border-bottom:1px solid var(--r-line);vertical-align:middle}
+.admin-shell .report-table tbody tr:hover td,.admin-shell .shifts-table tbody tr:hover td{background:rgba(255,255,255,.025)}
+.admin-shell .report-table tbody tr:nth-child(even) td{background:rgba(255,255,255,.012)}
+
+/* Badges de status */
+.admin-shell .status-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;border:1px solid transparent;white-space:nowrap}
+.admin-shell .status-pill::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+.admin-shell .status-pill.ok{background:rgba(52,211,153,.12);color:var(--r-ok);border-color:rgba(52,211,153,.3)}
+.admin-shell .status-pill.off{background:rgba(159,181,171,.1);color:var(--r-muted);border-color:var(--r-line)}
+.admin-shell .status-pill.warn{background:rgba(251,191,36,.12);color:var(--r-warn);border-color:rgba(251,191,36,.3)}
+
+/* Mensagens, vazio e carregando */
+.admin-shell .status-msg{background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.25);color:#dbeafe;border-radius:12px;padding:10px 14px;font-size:.86rem}
+.admin-shell .admin-toast{margin-bottom:16px}
+.admin-shell .report-empty,.admin-shell .presence-empty,.admin-shell .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:120px;padding:24px;text-align:center;color:var(--r-muted);border:1px dashed var(--r-line-gold);border-radius:14px;background:rgba(212,175,55,.03)}
+.admin-shell .report-empty::before,.admin-shell .presence-empty::before,.admin-shell .empty-state::before{content:'○';font-size:1.4rem;color:var(--r-gold);opacity:.7}
+.admin-shell [aria-busy="true"],.admin-shell .is-loading{position:relative;opacity:.7}
+@keyframes admin-shimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+.admin-shell .skeleton{background:linear-gradient(90deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.09) 40px,rgba(255,255,255,.04) 80px);background-size:200px 100%;animation:admin-shimmer 1.2s infinite linear;border-radius:8px;min-height:14px}
+
+/* Presença */
+.admin-shell .presence-filter{border-radius:999px;border:1px solid var(--r-line);background:rgba(255,255,255,.02);color:var(--r-muted)}
+.admin-shell .presence-filter.active{border-color:var(--r-gold);background:rgba(212,175,55,.12);color:var(--r-gold-2)}
+.admin-shell .presence-person{background:var(--r-surface-2);border:1px solid var(--r-line);border-radius:14px}
+
+/* Pendências / saídas (antes em cartões brancos) */
+.admin-shell .ov-inbox-item,.admin-shell .ov-watch-list li{background:var(--r-surface-2)!important;border:1px solid var(--r-line)!important;border-radius:12px!important;color:var(--r-text)!important;box-shadow:none!important}
+.admin-shell .ov-inbox-item strong,.admin-shell .ov-watch-list b{color:var(--r-text)!important}
+.admin-shell .ov-inbox-item small,.admin-shell .ov-watch-list small{color:var(--r-muted)!important}
+
+/* Responsivo */
+@media (max-width:1024px){
+  .admin-shell{grid-template-columns:76px minmax(0,1fr)}
+  .admin-brand div,.admin-shell .admin-tabs button span,.admin-user div,.admin-open-ponto{display:none}
+  .admin-brand{justify-content:center;padding:4px 0 16px}
+  .admin-shell .admin-tabs button{justify-content:center;padding:12px 0}
+  .admin-user{justify-content:center}
+}
+@media (max-width:760px){
+  .admin-shell{display:block;padding-bottom:76px}
+  .admin-sidebar{position:fixed;top:auto;bottom:0;left:0;right:0;z-index:50;height:auto;flex-direction:row;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--r-line);background:rgba(7,22,16,.96);backdrop-filter:blur(10px)}
+  .admin-brand,.admin-sidebar-footer{display:none}
+  .admin-shell .admin-tabs{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px;width:100%}
+  .admin-shell .admin-tabs button{flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;font-size:.64rem;white-space:normal;text-align:center;line-height:1.1}
+  .admin-shell .admin-tabs button span{display:block}
+  .admin-shell .admin-tabs button.active{box-shadow:inset 0 3px 0 var(--r-gold)}
+  .admin-main{padding:18px 14px 24px}
+  .admin-topbar{align-items:flex-start;flex-direction:column;gap:4px;margin-bottom:16px}
+  .admin-shell .card{padding:16px;border-radius:14px}
+  .admin-shell .stat-grid,.admin-shell .admin-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .admin-shell .summary strong{font-size:1.5rem}
+  .admin-shell .report-table,.admin-shell .shifts-table{display:block;overflow-x:auto;white-space:nowrap}
+}
+
+@media print{
+  .admin-sidebar,.admin-topbar{display:none!important}
+  .admin-shell{display:block}
+  .admin-main{padding:0;max-width:none}
+  .admin-shell .card{box-shadow:none}
+}
