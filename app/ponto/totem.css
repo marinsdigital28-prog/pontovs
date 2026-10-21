@@ -273,3 +273,55 @@ main.totem .t-slots.is-shake{animation:tShake .38s ease both}
 @media (prefers-reduced-motion:reduce){main.totem .t-ripple{display:none}main.totem .t-key.is-fx,main.totem .t-key:active{transform:none}}
 main.totem .t-key::after{inset:0;box-shadow:inset 0 0 0 3px rgba(201,162,94,1),inset 0 0 16px 2px rgba(201,162,94,.6)}
 main.totem .t-ripple{background:radial-gradient(circle,rgba(46,125,31,.55) 0%,rgba(46,125,31,.28) 40%,transparent 68%)}
+
+/* === Teclado maior (+15-25%) e casas da matrícula com estilo distinto === */
+main.totem .t-keypad{gap:clamp(.28rem,.8dvh,.6rem)}
+main.totem .t-key{font-weight:800;border-radius:16px}
+main.totem .t-key:not(.t-key-fn){background:#fff;border:1px solid #e2dccf;box-shadow:0 3px 0 #e4ddcd,0 6px 14px rgba(80,60,20,.08)}
+main.totem .t-lookup,main.totem .t-register{padding:clamp(.5rem,2dvh,1.6rem) clamp(.6rem,2.2vw,1.7rem)}
+main.totem .t-label{margin-bottom:clamp(.2rem,.8dvh,.5rem)}
+main.totem .t-slots{margin-bottom:clamp(.3rem,1.2dvh,.8rem)}
+main.totem .t-btn{margin-top:clamp(.3rem,1.2dvh,.8rem)}
+main.totem .t-footer{padding-top:clamp(.15rem,.6dvh,.5rem);margin-top:clamp(.15rem,.8dvh,.6rem)}
+main.totem .t-clock-card{padding:clamp(.5rem,2.2dvh,1.8rem) clamp(.8rem,2.6vw,2rem)}
+/* casas: campo rebaixado verde-claro, não parecem teclas */
+main.totem .t-slot{background:#eaf4e6;border:2px solid #b9d7ae;border-bottom:4px solid #2f7a2f;border-radius:10px;box-shadow:inset 0 3px 6px rgba(31,80,31,.16);color:#174f17;font-weight:800}
+main.totem .t-slot.is-filled{background:#e2f0dc;border-color:#8fc283;border-bottom-color:#1f6b1f}
+main.totem .t-slot.is-active{background:#f3f9f0;border:2px solid #d4a63a;border-bottom:4px solid #d4a63a;box-shadow:inset 0 3px 6px rgba(31,80,31,.12),0 0 0 3px rgba(212,166,58,.25);animation:tSlotPulse 1.2s ease-in-out infinite}
+@keyframes tSlotPulse{0%,100%{box-shadow:inset 0 3px 6px rgba(31,80,31,.12),0 0 0 2px rgba(212,166,58,.18)}50%{box-shadow:inset 0 3px 6px rgba(31,80,31,.12),0 0 0 6px rgba(212,166,58,.42)}}
+@media (orientation:landscape){
+  main.totem .t-logo-inline{height:clamp(44px,14dvh,160px)}
+  main.totem .t-hhmm{font-size:clamp(2rem,min(6.6vw,11.5dvh),6rem)}
+  main.totem .t-slot{height:clamp(38px,9dvh,92px)}
+  main.totem .t-key{height:clamp(50px,11.8dvh,112px);font-size:clamp(1.5rem,min(3.4vw,6dvh),2.7rem)}
+  main.totem .t-key-fn{font-size:clamp(1rem,min(2.2vw,3.4dvh),1.5rem)}
+  main.totem .t-btn{height:clamp(44px,8.4dvh,74px)}
+}
+@media (orientation:portrait){
+  main.totem .t-logo-inline{height:clamp(40px,8dvh,130px)}
+  main.totem .t-hhmm{font-size:clamp(2rem,min(12vw,7dvh),6rem)}
+  main.totem .t-ss{font-size:clamp(1rem,min(5vw,3.4dvh),2.6rem)}
+  main.totem .t-slot{height:clamp(36px,6.6dvh,88px)}
+  main.totem .t-btn{height:clamp(42px,6.6dvh,72px)}
+  main.totem .t-key{min-height:48px;max-height:132px;font-size:clamp(1.6rem,min(7.4vw,5.2dvh),3.2rem)}
+  main.totem .t-key-fn{font-size:clamp(1.05rem,min(4.8vw,3.2dvh),1.8rem)}
+}
+@media (orientation:landscape) and (max-height:560px){
+  main.totem .t-logo-inline{height:clamp(34px,16dvh,80px)}
+  main.totem .t-key{height:clamp(38px,15dvh,68px);font-size:clamp(1.2rem,6dvh,1.9rem)}
+  main.totem .t-slot{height:clamp(28px,9.5dvh,54px)}
+  main.totem .t-btn{height:clamp(36px,10dvh,52px)}
+}
+@media (prefers-reduced-motion:reduce){main.totem .t-slot.is-active{animation:none}}
+@media (orientation:portrait) and (max-height:700px){
+  main.totem .t-logo-inline{height:clamp(36px,7dvh,60px)}
+  main.totem .t-hhmm{font-size:clamp(1.9rem,6.4dvh,3rem)}
+  main.totem .t-slot{height:clamp(34px,6dvh,50px)}
+  main.totem .t-btn{height:clamp(40px,6.2dvh,52px)}
+}
+/* numerais ~+30% e mais fortes */
+main.totem .t-key:not(.t-key-fn),main.totem .t-slot{font-weight:900}
+main.totem .t-slot{font-size:clamp(1.7rem,min(5.2vw,7.8dvh),3.9rem);line-height:1}
+@media (orientation:landscape){main.totem .t-key:not(.t-key-fn){font-size:clamp(1.7rem,min(3.8vw,6.8dvh),3rem)}}
+@media (orientation:portrait){main.totem .t-key:not(.t-key-fn){font-size:clamp(1.85rem,min(8.2vw,5.8dvh),3.6rem)}main.totem .t-slot{font-size:clamp(1.6rem,min(7vw,4.6dvh),3.6rem)}}
+@media (orientation:landscape) and (max-height:560px){main.totem .t-key:not(.t-key-fn){font-size:clamp(1.4rem,7dvh,2.2rem)}main.totem .t-slot{font-size:clamp(1.3rem,7dvh,2rem)}}
