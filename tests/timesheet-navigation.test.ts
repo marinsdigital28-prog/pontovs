@@ -85,14 +85,14 @@ describe('navegação da folha de ponto', () => {
     expect(timesheet).toContain('PDF de todos');
     expect(timesheetPdfRoute).toContain('createSignedTimesheetPdfBatch');
     expect(timesheetPdfRoute).toContain('createSignedTimesheetPdf');
-    expect(signedTimesheetPdf).toContain('A4 paisagem');
-    expect(signedTimesheetPdf).toContain("'Data', 'Escala', 'Marcações', 'Trab. cred.', 'Prev.', 'Falta', 'Saldo', 'Situação'");
-    expect(signedTimesheetPdf).toContain('Legenda: Trab. cred. = marcações + abonos');
-    expect(signedTimesheetPdf).toContain('Assinado digitalmente');
-    expect(signedTimesheetPdf).toContain('Espaço Progredir');
-    expect(signedTimesheetPdf).toContain('Certificado A1');
-    expect(signedTimesheetPdf).toContain('const footerReserve = 78');
-    expect(signedTimesheetPdf).toContain('CPF não cadastrado');
+    // layout A4 "arte-nova" aprovado (detalhes numéricos em tests/timesheet-folha-a4.test.ts)
+    expect(signedTimesheetPdf).toContain('const PAGE_W = 297 * MM');
+    expect(signedTimesheetPdf).toContain("'Data', 'Dia', 'Escala', 'Entrada', 'Saída intervalo', 'Retorno', 'Saída', 'Trabalhado', 'Previsto', 'Falta', 'Saldo', 'Situação'");
+    expect(signedTimesheetPdf).toContain('ASSINADO DIGITALMENTE');
+    expect(signedTimesheetPdf).toContain('ESPAÇO PROGREDIR');
+    expect(signedTimesheetPdf).toContain('ICP-Brasil A1 (e-CNPJ)');
+    expect(signedTimesheetPdf).toContain('Data: ____/____/________');
+    expect(signedTimesheetPdf).toContain('Não cadastrado');
     expect(signedTimesheetPdf).not.toContain('Atrasos');
     expect(signedTimesheetPdf).not.toContain("justificativa = 'Atraso'");
     expect(timesheet).toContain('CPF não cadastrado');
