@@ -315,7 +315,8 @@ export default function EmployeesPanel({
                 </div>
                 <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                   <span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span>
-                  <span className={c.hasPhone && c.hasEmail ? 'status-pill ok' : 'status-pill off'}>{c.hasPhone && c.hasEmail ? 'Contato OK' : 'Falta contato'}</span>
+                  {employee.profile !== undefined && !c.hasPhone ? <span className="status-pill warn">Sem telefone</span> : null}
+                  {!employee.cpf ? <span className="status-pill warn">Sem CPF</span> : null}
                   <button className="ghost-btn" type="button" onClick={() => openEmployee(employee)}>Abrir ficha</button>
                   <button className="ghost-btn" type="button" onClick={() => void toggleActive(employee)}>{employee.active ? 'Desativar' : 'Ativar'}</button>
                 </div>
