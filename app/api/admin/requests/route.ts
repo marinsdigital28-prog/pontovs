@@ -29,6 +29,8 @@ export async function GET() {
   const session = await getServerSession(authOptions as any) as any;
   if (!manager(session)) return NextResponse.json({ error: 'Acesso administrativo necessário.' }, { status: 401 });
   const requests = await prisma.employeeRequest.findMany({
+    // CONFIRMAR_HORARIO é enviado pelo gestor e tratado na fila de esquecidas, não na caixa de aprovação.
+    where: { type: { not: 'CONFIRMAR_HORARIO' } },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
     take: 500,
     select: {
