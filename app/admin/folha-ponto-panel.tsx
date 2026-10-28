@@ -218,6 +218,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
 export default function FolhaPontoPanel({ employees }: { employees: Employee[] }) {
   const [month, setMonth] = useState(currentMonth());
   const [employeeId, setEmployeeId] = useState(allEmployeesValue);
+  const [printOnlyId, setPrintOnlyId] = useState<string | null>(null);
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
   const [requests, setRequests] = useState<ApprovedRequest[]>([]);
@@ -383,7 +384,16 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
     setSigning(false);
   }
 
+  /** Imprime só a folha deste colaborador (as demais ficam ocultas durante a impressão). */
+  function printOnly(id: string) {
+    setPrintOnlyId(id);
+    const clear = () => { setPrintOnlyId(null); window.removeEventListener('afterprint', clear); };
+    window.addEventListener('afterprint', clear);
+    setTimeout(() => window.print(), 50);
+  }
+
   function handlePrintAll() {
+    setPrintOnlyId(null);
     setEmployeeId(allEmployeesValue);
     setTimeout(() => window.print(), 300);
   }
@@ -430,7 +440,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       {visibleEmployees.map((employee) => {
         const rows = dayRowsByEmployee.get(employee.id) || [];
         return (
-          <div key={employee.id} className="timesheet-employee-block folha-block">
+          <div key={employee.id} className={`timesheet-employee-block folha-block${printOnlyId && printOnlyId !== employee.id ? ' folha-print-skip' : ''}`}>
             <div className="section-heading folha-emp-heading">
               <div className="folha-print-header">
                 <div className="folha-print-topbar">
@@ -453,7 +463,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                 </p>
               </div>
               <div className="row-actions no-print">
-                <button className="ghost-btn" type="button" onClick={() => window.print()} disabled={signing}>
+                <button className="ghost-btn" type="button" onClick={() => printOnly(employee.id)} disabled={signing}>
                   Imprimir
                 </button>
                 <button className="primary-btn" type="button" disabled={signing} onClick={() => void signPdf(employee)}>
@@ -463,10 +473,13 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
             </div>
             <div className="folha-table-scroll">
               {(() => {
-                const totalWorked = rows.reduce((total, row) => total + (row.creditedWorked ?? 0), 0);
-                const totalExpected = rows.reduce((total, row) => total + (row.expected ?? 0), 0);
-                const totalBalance = rows.reduce((total, row) => total + (row.balance ?? 0), 0);
-                const workedDays = rows.filter((row) => row.creditedWorked !== null && row.creditedWorked > 0).length;
+                // dias futuros (depois de hoje, fuso SP) não entram nos totais — mesma regra do PDF assinado
+                const todayKey = brazilDateKey(new Date());
+                const pastRows = rows.filter((row) => row.date <= todayKey);
+                const totalWorked = pastRows.reduce((total, row) => total + (row.creditedWorked ?? 0), 0);
+                const totalExpected = pastRows.reduce((total, row) => total + (row.expected ?? 0), 0);
+                const totalBalance = pastRows.reduce((total, row) => total + (row.balance ?? 0), 0);
+                const workedDays = pastRows.filter((row) => row.creditedWorked !== null && row.creditedWorked > 0).length;
                 return (
                   <div className="folha-summary" aria-label="Resumo mensal">
                     <div><span>Dias trabalhados</span><strong>{String(workedDays).padStart(2, '0')}</strong></div>
