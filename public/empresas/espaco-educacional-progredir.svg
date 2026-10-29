@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 140" width="1600" height="560">
+<g fill="#E08A2B"><polygon points="29.4,76.9 13.0,79.1 27.0,70.2"/><polygon points="26.0,63.2 16.1,58.9 26.5,56.1"/><polygon points="28.5,49.3 15.9,38.5 31.8,43.0"/><polygon points="36.4,37.5 32.9,27.3 42.0,33.2"/><polygon points="48.4,30.1 47.9,13.5 55.3,28.3"/><polygon points="62.4,28.1 67.6,18.7 69.4,29.3"/><polygon points="76.0,32.0 88.0,20.5 81.9,36.0"/><polygon points="86.8,41.1 97.3,38.7 90.6,47.1"/><polygon points="93.0,53.8 109.5,55.0 94.0,60.8"/><polygon points="93.5,67.9 102.3,74.1 91.5,74.7"/><polygon points="88.2,81.0 98.3,94.1 83.6,86.5"/>
+<path d="M60 24 A38 38 0 1 1 59.9 24 Z M60 32 A30 30 0 1 0 60.1 32 Z" fill-rule="evenodd"/>
+<ellipse cx="60" cy="44" rx="6" ry="8"/>
+<path d="M36 60 Q60 50 84 60 Q70 62 66 70 L64 100 L56 100 L54 70 Q50 62 36 60 Z"/></g>
+<path d="M4 102 L44 82 Q60 92 76 82 L116 102 L110 124 Q86 112 60 126 Q34 112 10 124 Z" fill="#2DB34A"/>
+<path d="M60 92 L60 126" stroke="#1E8B37" stroke-width="2"/>
+<g font-family="Inter,Arial,sans-serif" font-weight="800" fill="#1A8F5C">
+<text x="132" y="52" font-size="34">ESPAÇO</text>
+<text x="132" y="90" font-size="34">EDUCACIONAL</text>
+<text x="134" y="120" font-size="22" font-weight="600" letter-spacing="3" fill="#2DA36A">PROGREDIR</text></g></svg>
