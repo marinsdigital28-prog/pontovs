@@ -89,7 +89,7 @@ describe('navegação da folha de ponto', () => {
     expect(signedTimesheetPdf).toContain('const PAGE_W = 297 * MM');
     expect(signedTimesheetPdf).toContain("'Data', 'Dia', 'Escala', 'Entrada', 'Saída intervalo', 'Retorno', 'Saída', 'Trabalhado', 'Previsto', 'Falta', 'Saldo', 'Situação'");
     expect(signedTimesheetPdf).toContain('ASSINADO DIGITALMENTE');
-    expect(signedTimesheetPdf).toContain('ESPAÇO PROGREDIR');
+    expect(signedTimesheetPdf).toContain('company.name'); // nome da empresa vem de lib/company (ESPAÇO PROGREDIR por padrão)
     expect(signedTimesheetPdf).toContain('ICP-Brasil A1 (e-CNPJ)');
     expect(signedTimesheetPdf).toContain('Data: ____/____/________');
     expect(signedTimesheetPdf).toContain('Não cadastrado');
