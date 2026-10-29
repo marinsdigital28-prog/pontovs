@@ -154,3 +154,17 @@ body:has(.adm2){background:#f4f6f2 !important;color:#111}
 .adm2-adjust .btns button{padding:5px 11px;font-size:13px}
 .adm2-adjust td small{color:var(--mut2)}
 .adm2 .absence-calendar-filters button.active,.adm2 .primary-btn *{color:#fff}
+
+/* Empresa */
+.company-badge{display:inline-block;white-space:nowrap;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;vertical-align:middle;margin-left:4px}
+.company-badge-progredir{background:#eaf2e6;color:#1e651d;border:1px solid #c9d8c4}
+.company-badge-escola{background:#f7efdc;color:#7a5410;border:1px solid #e6d3a5}
+.company-chip{border:1px solid #c9d8c4;background:#fff;border-radius:999px;padding:4px 12px;font-size:13px;cursor:pointer}
+.company-chip b{margin-left:4px;font-weight:700}
+.company-chip-active{background:#1e651d;color:#fff;border-color:#1e651d}
+.adm2-company-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px}
+.folha-print-cnpj{display:block;font-size:9px;font-weight:500;color:#333;letter-spacing:0}
+.batch-preview ul{list-style:none;padding:0;margin:6px 0 10px}
+.batch-row{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #eef2ec}
+.batch-row small{margin-left:auto}
+.batch-x{width:13px;color:#999}

@@ -17,7 +17,7 @@ const FILTERS: { k: 'ALL' | ChecklistStatus; t: string }[] = [{ k: 'ALL', t: 'To
 const ACTION_PT: Record<string, string> = { CHECKLIST_VERIFIED: 'marcou como verificado', CHECKLIST_UNVERIFIED: 'desfez a verificação de', CHECKLIST_CHARGED: 'registrou cobrança de documento de', CHECKLIST_CLOSED: 'fechou a auditoria do mês', CHECKLIST_REOPENED: 'reabriu a auditoria do mês', CHECKLIST_CROSSED: 'cruzou as ocorrências' };
 const initials = (n: string) => n.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
-export default function CertificateChecklist({ employees, onGo }: { employees: AdjustEmployee[]; onGo: (tab: string) => void }) {
+export default function CertificateChecklist({ employees, onGo, company = 'ALL' }: { employees: AdjustEmployee[]; onGo: (tab: string) => void; company?: string }) {
   const today = localDateKey(new Date());
   const [month, setMonth] = useState(today.slice(0, 7));
   const [records, setRecords] = useState<Rec[]>([]);
@@ -54,7 +54,7 @@ export default function CertificateChecklist({ employees, onGo }: { employees: A
     punches: records.map((r) => { const t = new Date(r.timestamp); return { userId: r.user.id, date: localDateKey(t), type: r.type, minutes: localMinutes(t), manual: r.origin === 'ADJUSTED' }; }),
   }), [employees, month, today, certs, reqs, records]);
   const state = useMemo(() => verificationState(events), [events]);
-  const closed = useMemo(() => { const c = events.filter((e) => e.action === 'CHECKLIST_CLOSED' || e.action === 'CHECKLIST_REOPENED').at(-1); return c?.action === 'CHECKLIST_CLOSED' ? c : null; }, [events]);
+  const closed = useMemo(() => { const c = events.filter((e) => (e.action === 'CHECKLIST_CLOSED' || e.action === 'CHECKLIST_REOPENED') && ((e as any).company || 'ALL') === company).at(-1); return c?.action === 'CHECKLIST_CLOSED' ? c : null; }, [events]);
   const verified = occ.filter((o) => state[o.key]?.verified).length;
   const count = (s: ChecklistStatus) => occ.filter((o) => o.status === s).length;
   const list = occ.filter((o) => (filter === 'ALL' || o.status === filter) && (!who || o.employeeId === who) && (!person || o.employeeId === person));
@@ -62,7 +62,7 @@ export default function CertificateChecklist({ employees, onGo }: { employees: A
 
   const post = async (action: string, keys: string[] = [], extra: Record<string, unknown> = {}) => {
     setBusy(keys[0] || action); setMsg('');
-    const r = await fetch('/api/admin/certificate-checklist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month, action, keys, ...extra }) });
+    const r = await fetch('/api/admin/certificate-checklist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ month, action, keys, company, ...extra }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) setMsg(j.error || 'Não foi possível registrar.'); else await loadEvents();
     setBusy('');

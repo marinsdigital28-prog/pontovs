@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { COMPANIES, COMPANY_CODES, resolveCompany, type CompanyCode, type CompanyFilter } from '@/lib/company';
+
+export function CompanyBadge({ code }: { code: CompanyCode }) {
+  const school = code === 'ESPACO_EDUCACIONAL_PROGREDIR';
+  return <span className={`company-badge ${school ? 'company-badge-escola' : 'company-badge-progredir'}`}>{school ? '🎓' : '🌱'} {COMPANIES[code].shortName}</span>;
+}
+
 
 export type EmployeeProfile = {
   phone?: string;
@@ -39,6 +46,7 @@ export type Employee = {
   scheduleEnd?: string | null;
   scheduleByDay?: string | null;
   profile?: EmployeeProfile | null;
+  company?: string;
   active: boolean;
 };
 
@@ -75,6 +83,8 @@ export default function EmployeesPanel({
 }) {
   const [employees, setEmployees] = useState<Employee[]>(initial);
   const [search, setSearch] = useState('');
+  const [companyFilter, setCompanyFilter] = useState<CompanyFilter>('ALL');
+  const [companyForm, setCompanyForm] = useState<CompanyCode>('ESPACO_PROGREDIR');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -94,14 +104,20 @@ export default function EmployeesPanel({
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return employees;
-    return employees.filter((e) => {
+    const byCompany = companyFilter === 'ALL' ? employees : employees.filter((e) => resolveCompany(e) === companyFilter);
+    if (!q) return byCompany;
+    return byCompany.filter((e) => {
       const p = e.profile || {};
       return `${e.name} ${e.employeeNumber || ''} ${e.cpf || ''} ${e.jobTitle || ''} ${p.phone || ''} ${p.personalEmail || ''} ${p.city || ''}`
         .toLowerCase()
         .includes(q);
     });
-  }, [employees, search]);
+  }, [employees, search, companyFilter]);
+  const companyCounts = useMemo(() => {
+    const c: Record<string, number> = { ALL: employees.length };
+    for (const code of COMPANY_CODES) c[code] = employees.filter((e) => resolveCompany(e) === code).length;
+    return c;
+  }, [employees]);
 
   const stats = useMemo(() => {
     let withPhone = 0, withEmail = 0, withDocs = 0;
@@ -118,6 +134,7 @@ export default function EmployeesPanel({
     setSelectedId(employee.id);
     setNameForm(employee.name);
     setJobTitleForm(employee.jobTitle || '');
+    setCompanyForm(resolveCompany(employee));
     setCpfForm(employee.cpf || '');
     setScheduleForm({ employeeNumber: employee.employeeNumber || '', workDays: employee.workDays || '', scheduleStart: employee.scheduleStart || '', scheduleEnd: employee.scheduleEnd || '' });
     setCreating(false);
@@ -228,6 +245,7 @@ export default function EmployeesPanel({
         cpf: cpfForm.trim() || null,
         jobTitle: jobTitleForm.trim() || null,
         profile: profileForm,
+        ...(selected && resolveCompany(selected) !== companyForm ? { company: companyForm } : {}),
       }),
     });
     const data = await response.json().catch(() => ({}));
@@ -296,6 +314,13 @@ export default function EmployeesPanel({
           <div className="summary"><span className="small-muted">Com docs</span><strong>{stats.withDocs}</strong></div>
         </div>
 
+        <div className="company-filter" role="group" aria-label="Filtrar por empresa" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+          {(['ALL', ...COMPANY_CODES] as CompanyFilter[]).map((code) => (
+            <button key={code} type="button" className={`company-chip ${companyFilter === code ? 'company-chip-active' : ''}`} onClick={() => setCompanyFilter(code)}>
+              {code === 'ALL' ? 'Todas' : COMPANIES[code].shortName} <b>{companyCounts[code] ?? 0}</b>
+            </button>
+          ))}
+        </div>
         <input className="input" placeholder="Buscar nome, matrícula, CPF, telefone, e-mail ou cidade" value={search} onChange={(e) => setSearch(e.target.value)} />
 
         <div className="employee-list" style={{ marginTop: 12 }}>
@@ -305,7 +330,7 @@ export default function EmployeesPanel({
             return (
               <div className={`employee-row ${active ? 'employee-row-active' : ''}`} key={employee.id} role="button" tabIndex={0} onClick={() => openEmployee(employee)} onKeyDown={(e) => e.key === 'Enter' && openEmployee(employee)} style={{ cursor: 'pointer' }}>
                 <div>
-                  <strong>{employee.name}</strong>
+                  <strong>{employee.name}</strong> <CompanyBadge code={resolveCompany(employee)} />
                   <div className="small-muted">{employee.employeeNumber || 'Sem matrícula'} · {employee.jobTitle || 'Cargo —'}{employee.cpf ? ` · CPF ${employee.cpf}` : ''}</div>
                   <div className="small-muted">
                     {employee.profile?.phone ? `📱 ${employee.profile.phone}` : '📱 sem celular'}{' · '}
@@ -376,6 +401,12 @@ export default function EmployeesPanel({
               <label className="small-muted">Nome completo<input className="input" value={nameForm} onChange={(e) => setNameForm(e.target.value)} /></label>
               <label className="small-muted">Cargo<input className="input" value={jobTitleForm} onChange={(e) => setJobTitleForm(e.target.value)} /></label>
             </div>
+            <label className="small-muted">Empresa *
+              <select className="input" required value={companyForm} onChange={(e) => setCompanyForm(e.target.value as CompanyCode)}>
+                {COMPANY_CODES.map((code) => <option key={code} value={code}>{COMPANIES[code].shortName}</option>)}
+              </select>
+              <span className="small-muted">Define o cabeçalho, o CNPJ e o selo da folha. A troca fica registrada na auditoria.</span>
+            </label>
             <div className="form-two-col">
               <label className="small-muted">CPF<input className="input" value={cpfForm} onChange={(e) => setCpfForm(e.target.value)} /></label>
               <label className="small-muted">Departamento<input className="input" value={profileForm.department || ''} onChange={(e) => setField('department', e.target.value)} /></label>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { COMPANIES, companyCnpjLabel, resolveCompany, type CompanyFilter } from '@/lib/company';
 import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
 import { resolveDaySchedule } from '@/lib/day-schedule';
 import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay, shouldSuppressAbono } from '@/lib/operational-abonos';
@@ -12,6 +13,7 @@ import './folha-preclose.css';
 type Employee = {
   id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null;
   workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null;
+  company?: string | null; profile?: unknown;
 };
 type RecordItem = {
   id: string; type: string; timestamp: string; status: string; origin: string;
@@ -215,7 +217,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
   });
 }
 
-export default function FolhaPontoPanel({ employees }: { employees: Employee[] }) {
+export default function FolhaPontoPanel({ employees, company = 'ALL' }: { employees: Employee[]; company?: CompanyFilter }) {
   const [month, setMonth] = useState(currentMonth());
   const [employeeId, setEmployeeId] = useState(allEmployeesValue);
   const [printOnlyId, setPrintOnlyId] = useState<string | null>(null);
@@ -365,7 +367,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
       const response = await fetch('/api/admin/timesheet-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ all: true, month }),
+        body: JSON.stringify({ all: true, month, company }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -439,14 +441,15 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
 
       {visibleEmployees.map((employee) => {
         const rows = dayRowsByEmployee.get(employee.id) || [];
+        const co = COMPANIES[resolveCompany(employee)];
         return (
           <div key={employee.id} className={`timesheet-employee-block folha-block${printOnlyId && printOnlyId !== employee.id ? ' folha-print-skip' : ''}`}>
             <div className="section-heading folha-emp-heading">
               <div className="folha-print-header">
                 <div className="folha-print-topbar">
                   <div className="folha-print-brand">
-                    <img className="folha-print-logo" src="/espaco-progredir-logo.jpeg" alt="" />
-                    <span className="folha-print-org">ESPAÇO PROGREDIR</span>
+                    <img className="folha-print-logo" src={`/${co.logoPath}`} alt="" />
+                    <span className="folha-print-org">{co.name}<small className="folha-print-cnpj">{companyCnpjLabel(co.code)}</small></span>
                   </div>
                   <h2 className="folha-print-title">FOLHA DE PONTO</h2>
                   <span className="folha-print-topbar-spacer" aria-hidden="true" />
@@ -582,8 +585,8 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
               <div className="signature-block institution-signature-block">
                 {signatureData ? <img className="institution-signature" src={signatureData} alt="Assinatura digital do Espaço Progredir" /> : null}
                 <div className="signature-certificate-block">
-                  <strong>✓ Assinado digitalmente por ESPAÇO PROGREDIR</strong>
-                  <span>Certificado digital A1 · CNPJ 05.553.848/0001-61</span>
+                  <strong>✓ Assinado digitalmente por {COMPANIES[resolveCompany(employee)].name}</strong>
+                  <span>Certificado digital A1 · {companyCnpjLabel(resolveCompany(employee))}</span>
                 </div>
                 <div className="signature-line">Assinatura digital do Espaço Progredir</div>
               </div>
