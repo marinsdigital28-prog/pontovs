@@ -6,6 +6,8 @@ import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
 import { INTER_BOLD, INTER_EXTRABOLD, INTER_REGULAR, INTER_SEMIBOLD } from './fonts/inter-fonts';
+import { COMPANIES, companyCnpjLabel, DEFAULT_COMPANY, isCompanyCode, type CompanyCode } from './company';
+import { LOGO_ESCOLA_PNG_B64 } from './company-logos';
 import { buildTimesheetRows, formatClock, formatSigned, type TimesheetRow, type SituationTone } from './timesheet-rows';
 
 export type TimesheetEmployee = {
@@ -19,6 +21,8 @@ export type TimesheetEmployee = {
   scheduleByDay?: string | null;
   department?: string | null;
   unit?: string | null;
+  /** empresa do colaborador (cabeçalho, CNPJ e nome no selo); padrão Espaço Progredir */
+  company?: CompanyCode | null;
 };
 
 /** origin 'ADJUSTED' = marcação incluída/ajustada pelo gestor (Portaria 671) → exibida com * */
@@ -120,12 +124,16 @@ function mid(top: number, h: number, size: number) {
   return top + h / 2 + (CAP * size * (25.4 / 72)) / 2;
 }
 
-let logoBytes: Promise<Buffer> | null = null;
-async function loadLogo(pdfDoc: PDFDocument) {
+const logoCache = new Map<string, Promise<Buffer>>();
+async function loadLogo(pdfDoc: PDFDocument, code: CompanyCode = DEFAULT_COMPANY) {
+  const cfg = COMPANIES[code];
   try {
-    logoBytes ??= readFile(path.join(process.cwd(), 'public', 'espaco-progredir-logo.jpeg'));
-    return await pdfDoc.embedJpg(await logoBytes);
+    if (cfg.pdfLogo === 'escola') return await pdfDoc.embedPng(Buffer.from(LOGO_ESCOLA_PNG_B64, 'base64'));
+    if (!logoCache.has(cfg.logoPath)) logoCache.set(cfg.logoPath, readFile(path.join(process.cwd(), 'public', cfg.logoPath)));
+    const bytes = await logoCache.get(cfg.logoPath)!;
+    return cfg.logoMime === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
   } catch {
+    logoCache.delete(cfg.logoPath);
     return null;
   }
 }
@@ -169,7 +177,10 @@ export async function buildTimesheetDocument({
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
   pdfDoc.setTitle(`Folha de ponto — ${employee.name} — ${monthTitle(month)}`);
-  pdfDoc.setAuthor('Espaço Progredir');
+  const companyCode: CompanyCode = isCompanyCode(employee.company) ? employee.company : DEFAULT_COMPANY;
+  const company = COMPANIES[companyCode];
+  const cnpjText = companyCnpjLabel(companyCode);
+  pdfDoc.setAuthor(company.shortName);
   const load = (b64: string) => pdfDoc.embedFont(Buffer.from(b64, 'base64'), { subset: true });
   const f: Fonts = { r: await load(INTER_REGULAR), sb: await load(INTER_SEMIBOLD), b: await load(INTER_BOLD), xb: await load(INTER_EXTRABOLD) };
   const page = pdfDoc.addPage([PAGE_W, PAGE_H]);
@@ -180,13 +191,16 @@ export async function buildTimesheetDocument({
   p.rrect(3.1, 3.1, 297 - 6.2, 210 - 6.2, 1.5, { stroke: C.gold, sw: 0.2 });
 
   // Cabeçalho
-  const logo = await loadLogo(pdfDoc);
+  const logo = await loadLogo(pdfDoc, companyCode);
   if (logo) {
     const h = 7; const w = h * (logo.width / logo.height);
     page.drawImage(logo, { x: 8 * MM, y: PAGE_H - (5.7 + h) * MM, width: w * MM, height: h * MM });
   }
-  p.text('ESPAÇO PROGREDIR', 19.3, 8.75, 10.5, f.b, C.g, 'left', 0.02);
-  p.text('CNPJ 05.553.848/0001-61', 19.3, 12.35, 7.4, f.r, C.mut);
+  const logoW = logo ? 7 * (logo.width / logo.height) : 9;
+  const nameX = Math.max(19.3, 8 + logoW + 2.3);
+  const headSize = Math.max(8, Math.min(10.5, 10.5 * (118 - nameX) / Math.max(1, p.width(company.name, 10.5, f.b))));
+  p.text(company.name, nameX, 8.75, headSize, f.b, C.g, 'left', 0.02);
+  p.text(cnpjText, nameX, 12.35, 7.4, f.r, C.mut);
   p.text('FOLHA DE PONTO', 148.5, 9.35, 12.5, f.b, C.gd, 'center', 0.14);
   p.text('Registro eletrônico de ponto · Portaria MTP nº 671/2021', 148.5, 12.75, 6.8, f.r, C.mut, 'center', 0.04);
   p.rrect(233, 5.2, 56, 8, 1.2, { stroke: C.line, sw: 0.25 });
@@ -308,8 +322,9 @@ export async function buildTimesheetDocument({
   p.rrect(SEAL.x, SEAL.y, 1.6, SEAL.h, 0.6, { fill: C.g });
   drawShield(p, 11.18, 195.29, 7.5);
   p.text('ASSINADO DIGITALMENTE', 21.08, 196.0, 5.8, f.b, C.gold, 'left', 0.12);
-  p.text('ESPAÇO PROGREDIR', 21.08, 199.65, 8.6, f.b, C.gd, 'left', 0.02);
-  p.text('CNPJ 05.553.848/0001-61', 21.08, 203.0, 6, f.r, C.mut);
+  const sealSize = Math.max(5.6, Math.min(8.6, 8.6 * 34.5 / Math.max(1, p.width(company.name, 8.6, f.b))));
+  p.text(company.name, 21.08, 199.65, sealSize, f.b, C.gd, 'left', 0.02);
+  p.text(cnpjText, 21.08, 203.0, 6, f.r, C.mut);
   p.vline(56.2, 194.4, 203.7, 0.25, C.line);
   const meta: Array<[string, string]> = [
     ['Certificado', 'ICP-Brasil A1 (e-CNPJ)'], ['Data/hora', `${fmtDateTime(emittedAt, true)} (BRT)`],

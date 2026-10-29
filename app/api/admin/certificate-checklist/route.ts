@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   const month = new URL(request.url).searchParams.get('month') || '';
   if (!/^\d{4}-\d{2}$/.test(month)) return NextResponse.json({ error: 'Mês inválido.' }, { status: 400 });
   const rows = await prisma.securityAuditEvent.findMany({ where: { resource: RESOURCE, resourceId: month }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }], take: 5000, include: { actor: { select: { name: true } } } });
-  const events = rows.map((r) => { let m: any = {}; try { m = r.metadataJson ? JSON.parse(r.metadataJson) : {}; } catch { /* */ } return { id: r.id, action: r.action, key: m.key, note: m.note, count: m.count, actorName: r.actor?.name || 'Sistema', createdAt: r.createdAt.toISOString(), hash: r.hash }; });
+  const events = rows.map((r) => { let m: any = {}; try { m = r.metadataJson ? JSON.parse(r.metadataJson) : {}; } catch { /* */ } return { id: r.id, action: r.action, key: m.key, note: m.note, count: m.count, company: m.company, actorName: r.actor?.name || 'Sistema', createdAt: r.createdAt.toISOString(), hash: r.hash }; });
   return NextResponse.json({ month, events });
 }
 
@@ -38,9 +38,10 @@ export async function POST(request: Request) {
   if (!/^\d{4}-\d{2}$/.test(month) || !ACTIONS.has(action)) return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
   const keys: string[] = Array.isArray(body?.keys) ? body.keys.filter((k: unknown) => typeof k === 'string' && k.length < 300).slice(0, 500) : [];
   const note = typeof body?.note === 'string' ? body.note.slice(0, 500) : undefined;
+  const company = typeof body?.company === 'string' && /^[A-Z_]{1,40}$/.test(body.company) ? body.company : 'ALL';
   const employeeId = typeof body?.employeeId === 'string' ? body.employeeId : undefined;
   if (['CHECKLIST_VERIFIED', 'CHECKLIST_UNVERIFIED', 'CHECKLIST_CHARGED'].includes(action) && !keys.length) return NextResponse.json({ error: 'Nenhuma ocorrência informada.' }, { status: 400 });
   if (keys.length) for (const key of keys) await appendAuditEvent({ action, actorId: manager.id, resource: RESOURCE, resourceId: month, metadata: { key, note, employeeId: key.split('|')[0] } });
-  else await appendAuditEvent({ action, actorId: manager.id, resource: RESOURCE, resourceId: month, metadata: { note, count: body?.count, employeeId } });
+  else await appendAuditEvent({ action, actorId: manager.id, resource: RESOURCE, resourceId: month, metadata: { note, count: body?.count, employeeId, company } });
   return NextResponse.json({ ok: true });
 }

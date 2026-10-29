@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { normalizeCpf, validateAdminEmployee } from '@/lib/employee-validation';
+import { isCompanyCode, resolveCompany } from '@/lib/company';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,7 @@ export async function GET(request: Request) {
     employees: employees.map((e) => ({
       ...e,
       profile: parseProfile(e.profileJson),
+      company: resolveCompany(e),
       profileJson: undefined,
     })),
   });
@@ -84,7 +86,9 @@ export async function POST(request: Request) {
         scheduleStart: body?.scheduleStart ? String(body.scheduleStart) : null,
         scheduleEnd: body?.scheduleEnd ? String(body.scheduleEnd) : null,
         scheduleByDay: body?.scheduleByDay ? JSON.stringify(body.scheduleByDay) : null,
-        profileJson: body?.profile ? JSON.stringify(body.profile) : null,
+        profileJson: body?.profile || isCompanyCode(body?.company)
+          ? JSON.stringify({ ...(body?.profile ?? {}), ...(isCompanyCode(body?.company) ? { company: body.company } : {}) })
+          : null,
         email: `employee-${employeeNumber}@local.invalid`,
         role: 'EMPLOYEE',
         active: body?.active !== false,
@@ -92,7 +96,7 @@ export async function POST(request: Request) {
       select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true, active: true },
     });
     await appendAuditEvent({ action: 'EMPLOYEE_CREATED', actorId: manager.id, resource: 'User', resourceId: employee.id, metadata: { employeeNumber: employee.employeeNumber } });
-    return NextResponse.json({ employee: { ...employee, profile: parseProfile(employee.profileJson), profileJson: undefined } }, { status: 201 });
+    return NextResponse.json({ employee: { ...employee, profile: parseProfile(employee.profileJson), company: resolveCompany(employee), profileJson: undefined } }, { status: 201 });
   } catch (error: any) {
     if (error?.code === 'P2002') return NextResponse.json({ error: 'A matrícula ou CPF já está cadastrado.' }, { status: 409 });
     return NextResponse.json({ error: 'Não foi possível cadastrar o colaborador.' }, { status: 500 });
@@ -143,6 +147,18 @@ export async function PATCH(request: Request) {
       data.profileJson = JSON.stringify({ ...prev, ...body.profile });
     }
   }
+  let companyChange: { from: string; to: string } | null = null;
+  if (body.company !== undefined) {
+    if (!isCompanyCode(body.company)) return NextResponse.json({ error: 'Empresa inválida.' }, { status: 400 });
+    const from = resolveCompany(current);
+    if (from !== body.company) {
+      // grava em profileJson.company (sem migração); preserva o restante do perfil
+      let base: Record<string, unknown> = {};
+      try { base = data.profileJson ? JSON.parse(String(data.profileJson)) : current.profileJson ? JSON.parse(current.profileJson) : {}; } catch { base = {}; }
+      data.profileJson = JSON.stringify({ ...base, company: body.company });
+      companyChange = { from, to: body.company };
+    }
+  }
   if (body.active !== undefined) data.active = Boolean(body.active);
   try {
     const employee = await prisma.user.update({
@@ -151,7 +167,10 @@ export async function PATCH(request: Request) {
       select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true, active: true },
     });
     await appendAuditEvent({ action: 'EMPLOYEE_UPDATED', actorId: manager.id, resource: 'User', resourceId: employee.id, metadata: { fields: Object.keys(data) } });
-    return NextResponse.json({ employee: { ...employee, profile: parseProfile(employee.profileJson), profileJson: undefined } });
+    if (companyChange) {
+      await appendAuditEvent({ action: 'EMPLOYEE_COMPANY_CHANGED', actorId: manager.id, resource: 'User', resourceId: employee.id, metadata: companyChange });
+    }
+    return NextResponse.json({ employee: { ...employee, profile: parseProfile(employee.profileJson), company: resolveCompany(employee), profileJson: undefined } });
   } catch (error: any) {
     if (error?.code === 'P2002') return NextResponse.json({ error: 'A matrícula ou CPF já está cadastrado.' }, { status: 409 });
     return NextResponse.json({ error: 'Não foi possível atualizar o colaborador.' }, { status: 500 });

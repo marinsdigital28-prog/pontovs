@@ -1,3 +1,4 @@
+import { matchesCompany, parseCompanyFilter, resolveCompany } from '@/lib/company';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
 
   try {
     if (all) {
-      const employees = await prisma.user.findMany({
+      const companyFilter = parseCompanyFilter(body?.company);
+      const employeesAll = await prisma.user.findMany({
         where: { role: 'EMPLOYEE', active: true },
         select: {
           id: true,
@@ -65,10 +67,12 @@ export async function POST(request: Request) {
           scheduleStart: true,
           scheduleEnd: true,
           scheduleByDay: true,
+          profileJson: true,
           unit: { select: { name: true } },
         },
         orderBy: [{ employeeNumber: 'asc' }, { name: 'asc' }],
       });
+      const employees = employeesAll.filter((e) => matchesCompany(e, companyFilter));
 
       if (!employees.length) {
         return NextResponse.json({ error: 'Nenhum colaborador ativo encontrado.' }, { status: 404 });
@@ -120,6 +124,7 @@ export async function POST(request: Request) {
               scheduleEnd: emp.scheduleEnd,
               scheduleByDay: emp.scheduleByDay,
               unit: emp.unit?.name || null,
+              company: resolveCompany(emp),
             },
             punches,
             certificates,
@@ -164,6 +169,7 @@ export async function POST(request: Request) {
         scheduleStart: true,
         scheduleEnd: true,
         scheduleByDay: true,
+        profileJson: true,
         unit: { select: { name: true } },
       },
     });
@@ -204,7 +210,7 @@ export async function POST(request: Request) {
     ]);
 
     const signedPdf = await createSignedTimesheetPdf({
-      employee: { ...employee, unit: employee.unit?.name || null },
+      employee: { ...(({ profileJson: _p, ...rest }) => rest)(employee), unit: employee.unit?.name || null, company: resolveCompany(employee) },
       punches,
       certificates,
       requests,
