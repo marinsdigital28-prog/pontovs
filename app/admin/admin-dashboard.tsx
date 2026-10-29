@@ -22,6 +22,7 @@ import AutoAdjustReview from './auto-adjust-review';
 import OverviewExitWatch from './overview-exit-watch';
 import ShiftsPanel from './shifts-panel';
 import InconsistenciesPanel from './inconsistencies-panel';
+import CertificateChecklist from './certificate-checklist';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -51,6 +52,7 @@ const navIcons: Record<string, React.ReactNode> = {
   folha: <><path d="M7 3.5h7l4.5 4.5v12.5H7z" /><path d="M14 3.5V8h4.5M9.5 13h6M9.5 16.5h6" /></>,
   pendencias: <path d="M6 16V11a6 6 0 1 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" />,
   fechamento: <><rect x="4" y="4" width="16" height="16" rx="2.5" /><path d="M8.5 12.5l2.5 2.5 4.5-5" /></>,
+  checklist: <><rect x="5" y="3.5" width="14" height="17" rx="2.5" /><path d="M9 3.5h6v3H9zM8.5 12l2 2 4-4M8.5 17h7" /></>,
   config: <><circle cx="12" cy="12" r="3" /><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" /></>,
 };
 const navHints: Record<string, string> = {
@@ -125,11 +127,12 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const pageCount = Math.max(1, Math.ceil(filteredPresence.length / pageSize));
   const pageRows = filteredPresence.slice((presencePage - 1) * pageSize, presencePage * pageSize);
   const ddmm = (d: Date) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
-  const titles: Record<string, string> = { hoje: 'Hoje', pendencias: 'Pendências', fechamento: 'Fechamento do mês', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', folha: 'Folha de ponto', config: 'Configurações' };
+  const titles: Record<string, string> = { hoje: 'Hoje', pendencias: 'Pendências', fechamento: 'Fechamento do mês', checklist: 'Checklist de atestados', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', folha: 'Folha de ponto', config: 'Configurações' };
   const subtitles: Record<string, string> = {
     hoje: new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
     pendencias: `${pendingTotal} itens · tudo que depende de você em um só lugar`,
     fechamento: `${monthCap}/${now.getFullYear()} · prazo ${ddmm(lastDay)}`,
+    checklist: 'Auditoria mensal · prova contra contestações',
     pessoas: `${stats.employeeCount} ativas`,
     ponto: 'Marcações originais preservadas · inclusões marcadas com *',
     ausencias: 'Atestados, férias e calendário',
@@ -162,6 +165,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         <NavBtn k="hoje" label="Hoje" />
         <NavBtn k="pendencias" label="Pendências" badge={pendingTotal || undefined} />
         <NavBtn k="fechamento" label="Fechamento do mês" badge={daysLeft <= 5 ? `${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}` : undefined} gold />
+        <NavBtn k="checklist" label="Checklist de atestados" />
         <div className="sec">Cadastro e registros</div>
         <NavBtn k="pessoas" label="Pessoas" />
         <NavBtn k="ponto" label="Ponto" />
@@ -254,6 +258,10 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         <span className="adm2-sp" />
         {step < 4 ? <button type="button" className="primary-btn" onClick={() => { setStep(step + 1); void loadPending(); window.scrollTo({ top: 0 }); }}>Próximo: {steps[step].t} →</button> : null}
       </div>
+    </section> : null}
+
+    {tab === 'checklist' ? <section className="adm2-stack">
+      <CertificateChecklist employees={active} onGo={go} />
     </section> : null}
 
     {tab === 'pessoas' ? <section className="adm2-stack">
