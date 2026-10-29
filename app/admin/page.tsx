@@ -7,6 +7,7 @@ import prisma from '@/lib/prisma';
 import { isDatabaseQuotaExceeded } from '@/lib/database-errors';
 import { listEmployeeFallbacks } from '@/lib/employee-fallback';
 import AdminDashboard from './admin-dashboard';
+import { resolveCompany } from '@/lib/company';
 
 export default async function AdminPage() {
   const session = (await getServerSession(authOptions as any)) as any;
@@ -28,7 +29,7 @@ export default async function AdminPage() {
   };
   const safeEmployees = async () => {
     try {
-      return await prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, active: true }, orderBy: { name: 'asc' } });
+      return await prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true, active: true }, orderBy: { name: 'asc' } });
     } catch (error) {
       if (isDatabaseQuotaExceeded(error)) { degraded = true; return listEmployeeFallbacks(); }
       return [];
@@ -41,5 +42,5 @@ export default async function AdminPage() {
     safeEmployees(),
   ]);
   const displayedEmployeeCount = degraded ? employeeOptions.length : employeeCount;
-  return <AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: item.active }))} stats={{ employeeCount: displayedEmployeeCount, punchesToday, openInconsistencies }} degraded={degraded} managerName={manager.name} />;
+  return <AdminDashboard employees={employeeOptions.map(({ profileJson, ...item }: any) => ({ ...item, company: resolveCompany({ profileJson }), active: item.active }))} stats={{ employeeCount: displayedEmployeeCount, punchesToday, openInconsistencies }} degraded={degraded} managerName={manager.name} />;
 }

@@ -13,6 +13,8 @@ import NotificationsPanel from './notifications-panel';
 import HealthCard from './health-card';
 import CertificateConflictsPanel from './certificate-conflicts-panel';
 import EmployeesPanel from './employees-panel';
+import AbsenceBatch from './absence-batch';
+import { COMPANIES, COMPANY_CODES, matchesCompany, type CompanyFilter } from '@/lib/company';
 import BackupPanel from './backup-panel';
 import PeriodClosureCard from './period-closure-card';
 import './overview-layout.css';
@@ -33,7 +35,7 @@ type EmployeeProfile = {
 type Employee = {
   id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null;
   workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null;
-  profile?: EmployeeProfile | null; active: boolean; _count?: { punches: number };
+  profile?: EmployeeProfile | null; company?: string; active: boolean; _count?: { punches: number };
 };
 type AuditEvent = { id: string; action: string; actorId?: string; resource?: string; createdAt: string; hash: string };
 type PresenceEmployee = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; status: 'PRESENTE' | 'NAO_MARCOU' | 'PENDENTE' | 'SAIU' | 'FOLGA'; scheduled: boolean; latestPunch: { id: string; type: string; timestamp: string; status: string; hasPhoto: boolean } | null };
@@ -114,6 +116,15 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   };
 
   const active = employees.filter((item) => item.active);
+  const [companyFilter, setCompanyFilter] = useState<CompanyFilter>('ALL');
+  const activeCo = active.filter((e) => matchesCompany(e, companyFilter));
+  const activeCoOpts = activeCo.map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }));
+  const companyBar = <div className="card adm2-company-bar" role="group" aria-label="Empresa">
+    <span className="small-muted">Empresa:</span>
+    {(['ALL', ...COMPANY_CODES] as CompanyFilter[]).map((code) => <button key={code} type="button" className={`company-chip ${companyFilter === code ? 'company-chip-active' : ''}`} onClick={() => setCompanyFilter(code)}>
+      {code === 'ALL' ? 'Todas' : `${code === 'ESPACO_EDUCACIONAL_PROGREDIR' ? '🎓' : '🌱'} ${COMPANIES[code].shortName}`} <b>{active.filter((e) => matchesCompany(e, code)).length}</b></button>)}
+    {companyFilter !== 'ALL' ? <span className="small-muted">Fechamento separado por empresa.</span> : null}
+  </div>;
   const activeOpts = active.map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }));
   const initials = (name: string) => name.split(/\s+/).filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
   const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long' });
@@ -243,14 +254,15 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     </section> : null}
 
     {tab === 'fechamento' ? <section className="adm2-stack">
+      {companyBar}
       <div className="card adm2-steps">
         <div className="row">{steps.map((s) => <button key={s.n} type="button" className={step === s.n ? 'on' : step > s.n ? 'done' : ''} onClick={() => setStep(s.n)}><span className="n">{step > s.n ? '✓' : s.n}</span><div><strong>{s.t}</strong><small>{s.d}</small></div></button>)}</div>
         <div className="prog"><i style={{ width: `${step * 25}%` }} /></div>
       </div>
       <div className="adm2-step-body">
-        {step === 1 ? <><AutoAdjustReview employees={active} /><InconsistenciesPanel employees={activeOpts} onOpenPunches={() => go('ponto')} /></> : null}
+        {step === 1 ? <><AutoAdjustReview employees={activeCo} /><InconsistenciesPanel employees={activeCoOpts} onOpenPunches={() => go('ponto')} /></> : null}
         {step === 2 ? <><RequestsPanel /><CertificateConflictsPanel /></> : null}
-        {step === 3 ? <FolhaPontoPanel employees={active} /> : null}
+        {step === 3 ? <FolhaPontoPanel employees={activeCo} company={companyFilter} /> : null}
         {step === 4 ? <><PeriodClosureCard /><BackupPanel /><div className="adm2-hint card">Para gerar os PDFs assinados, use <strong>Gerar PDF assinado</strong> na folha de cada pessoa (passo 3).</div></> : null}
       </div>
       <div className="adm2-step-nav">
@@ -261,7 +273,8 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     </section> : null}
 
     {tab === 'checklist' ? <section className="adm2-stack">
-      <CertificateChecklist employees={active} onGo={go} />
+      {companyBar}
+      <CertificateChecklist key={companyFilter} employees={activeCo} company={companyFilter} onGo={go} />
     </section> : null}
 
     {tab === 'pessoas' ? <section className="adm2-stack">
@@ -274,11 +287,13 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       <PunchesPanel employees={activeOpts} />
     </section> : null}
     {tab === 'ausencias' ? <section className="adm2-stack adm2-aus">
+      <AbsenceBatch />
       <CertificatesPanel employees={active.map(({ id, name, employeeNumber, cpf }) => ({ id, name, employeeNumber, cpf }))} />
       <div className="adm2-hint card">Solicitações para aprovar e conflitos atestado × ponto agora ficam em <button type="button" className="linkish" onClick={() => go('pendencias')}>Pendências</button>.</div>
     </section> : null}
     {tab === 'folha' ? <section className="adm2-stack">
-      <FolhaPontoPanel employees={active} />
+      {companyBar}
+      <FolhaPontoPanel employees={activeCo} company={companyFilter} />
     </section> : null}
     {tab === 'config' ? <section className="adm2-stack">
       <div className="admin-two-col"><BackupPanel /><SignatureSettings /></div>
