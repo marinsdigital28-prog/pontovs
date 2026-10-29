@@ -317,3 +317,10 @@
   }
   .institution-signature { max-height: 9mm !important; margin-bottom: 0.5mm !important; }
 }
+
+/* Imprimir uma folha: oculta as demais e evita página em branco no fim */
+@media print {
+  .folha-block.folha-print-skip { display: none !important; }
+  .folha-block:not(.folha-print-skip):last-of-type,
+  .folha-block:has(~ .folha-block.folha-print-skip):not(:has(~ .folha-block:not(.folha-print-skip))) { page-break-after: auto !important; break-after: auto !important; }
+}

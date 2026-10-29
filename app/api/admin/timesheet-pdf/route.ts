@@ -64,6 +64,7 @@ export async function POST(request: Request) {
           workDays: true,
           scheduleStart: true,
           scheduleEnd: true,
+          scheduleByDay: true,
           unit: { select: { name: true } },
         },
         orderBy: [{ employeeNumber: 'asc' }, { name: 'asc' }],
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
           const [punches, certificates, requests] = await Promise.all([
             prisma.punch.findMany({
               where: { userId: emp.id, status: 'VALID', timestamp: { gte: from, lt: to } },
-              select: { type: true, timestamp: true },
+              select: { type: true, timestamp: true, origin: true },
               orderBy: { timestamp: 'asc' },
             }),
             prisma.medicalCertificate.findMany({
@@ -117,6 +118,7 @@ export async function POST(request: Request) {
               workDays: emp.workDays,
               scheduleStart: emp.scheduleStart,
               scheduleEnd: emp.scheduleEnd,
+              scheduleByDay: emp.scheduleByDay,
               unit: emp.unit?.name || null,
             },
             punches,
@@ -161,6 +163,7 @@ export async function POST(request: Request) {
         workDays: true,
         scheduleStart: true,
         scheduleEnd: true,
+        scheduleByDay: true,
         unit: { select: { name: true } },
       },
     });
@@ -169,7 +172,7 @@ export async function POST(request: Request) {
     const [punches, certificates, requests] = await Promise.all([
       prisma.punch.findMany({
         where: { userId: employeeId, status: 'VALID', timestamp: { gte: from, lt: to } },
-        select: { type: true, timestamp: true },
+        select: { type: true, timestamp: true, origin: true },
         orderBy: { timestamp: 'asc' },
       }),
       prisma.medicalCertificate.findMany({
