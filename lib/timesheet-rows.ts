@@ -7,6 +7,7 @@
  *  - Dias FUTUROS (depois de hoje, fuso SP) não entram em nenhum total.
  *  - Atestado por horas: lib/certificate-calculation (recorta pela escala e desconta o almoço 12–13h em jornada integral).
  */
+import { isPartialRequest, requestCreditMinutes } from './request-credit';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { resolveDaySchedule } from './day-schedule';
 import { filterPunchesOutsideCertificates } from './certificate-conflicts';
@@ -28,7 +29,7 @@ export type RowsCertificate = {
   type?: string | null; startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null;
   hoursPerDayMinutes?: number | null; status: string;
 };
-export type RowsRequest = { type: string; startDate: Date; endDate: string | Date; status: string; reason: string };
+export type RowsRequest = { type: string; startDate: Date; endDate: string | Date; status: string; reason: string; classification?: string | null; details?: string | null; returnExpected?: boolean | null };
 
 export type SituationTone = 'ok' | 'folga' | 'feriado' | 'abono' | 'falta' | 'alerta' | 'futuro';
 export type TimesheetCell = { time: string; manual: boolean } | null;
@@ -166,7 +167,6 @@ export function buildTimesheetRows({
     const request = suppress ? undefined : requests.find((r) => r.status === 'APROVADO' && (
       (r.type === 'AUSENCIA' && keyOf(r.startDate) <= date && keyOf(r.endDate) >= date)
       || (r.type === 'TROCA_DIA' && (keyOf(r.startDate) === date || keyOf(r.endDate) === date))));
-    const requestMinutes = request?.type === 'AUSENCIA' ? expectedRaw || 0 : 0;
     let abono = getOperationalAbono(employee.employeeNumber, date);
     if (!abono && extraHolidays[date]) abono = { kind: 'FULL_DAY', reason: `Feriado — ${extraHolidays[date]}` };
     const abonoMinutes = abono && scheduled
@@ -191,6 +191,8 @@ export function buildTimesheetRows({
     }
 
     const worked = workedMinutes(dayPunches);
+    const requestMinutes = request ? requestCreditMinutes(request, expectedRaw, worked, dayStart, dayEnd) : 0;
+    const requestPartial = request ? isPartialRequest(request) : false;
     const justified = suppress ? 0 : Math.max(certMinutes, requestMinutes, abonoMinutes);
     const credited = worked === null ? (justified > 0 ? justified : (expectedRaw !== null ? 0 : null)) : worked + justified;
     const expected = expectedRaw;
@@ -208,7 +210,7 @@ export function buildTimesheetRows({
       const range = cert.startTime && cert.endTime ? `${cert.startTime.slice(0, 5)}–${cert.endTime.slice(0, 5)}` : (certMinutes >= (expected || 0) ? 'dia' : formatClock(certMinutes));
       situation = range === 'dia' ? `${label} · dia${plus}` : `${label} ${range}${plus}`; tone = 'abono'; fullDayAbono = !dayPunches.length;
     } else if (request?.type === 'AUSENCIA' && requestMinutes > 0) {
-      situation = `${request.reason || 'Ausência aprovada'} · dia${plus}`; tone = 'abono'; fullDayAbono = !dayPunches.length;
+      situation = `${request.reason || 'Ausência aprovada'} · ${requestPartial ? 'parcial' : 'dia'}${plus}`; tone = 'abono'; fullDayAbono = !dayPunches.length;
     } else if (abono && abonoMinutes > 0) {
       const end = (daySchedule?.end || employee.scheduleEnd || '').slice(0, 5);
       const period = abono.kind === 'FROM_TIME' && abono.fromTime ? `${abono.fromTime.slice(0, 5)}–${end}` : 'dia';
