@@ -1,5 +1,6 @@
 'use client';
 
+import { isPartialRequest, requestCreditMinutes } from '@/lib/request-credit';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
 import { resolveDaySchedule } from '@/lib/day-schedule';
@@ -29,6 +30,7 @@ type CertificateItem = {
 };
 type ApprovedRequest = {
   employeeId: string; type: 'AUSENCIA' | 'TROCA_DIA'; status: string; startDate: string; endDate: string; reason: string;
+  classification?: string | null; details?: string | null; returnExpected?: boolean | null;
 };
 
 const typeLabels: Record<string, string> = { ENTRADA: 'E', INTERVALO: 'I', RETORNO: 'R', SAIDA: 'S' };
@@ -158,7 +160,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
       : certificates.find((item) => item.userId === employee.id && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
     const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
     const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;
-    const justifiedByRequest = suppressAbono ? 0 : (approvedRequest?.type === 'AUSENCIA' ? expected || 0 : 0);
+    const justifiedByRequest = suppressAbono ? 0 : (approvedRequest ? requestCreditMinutes(approvedRequest, expected, worked, dayStart, dayEnd) : 0);
     const opsAbono = getOperationalAbono(employee.employeeNumber, date);
     const justifiedByOps = opsAbono ? operationalJustifiedMinutes(opsAbono, daySchedule?.start || employee.scheduleStart, daySchedule?.end || employee.scheduleEnd, expected) : 0;
     const justifiedRaw = Math.max(justifiedByCertificate, justifiedByRequest, justifiedByOps);
@@ -198,7 +200,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
       }
     } else if (approvedRequest?.type === "AUSENCIA" && justifiedByRequest > 0) {
       registeredEventLabel = approvedRequest.reason || "Ausência aprovada";
-      registeredEventTime = "Dia integral";
+      registeredEventTime = isPartialRequest(approvedRequest) ? "Parcial" : "Dia integral";
     } else if (opsAbono && justifiedByOps > 0) {
       registeredEventLabel = opsAbono.reason;
       const eventEnd = (daySchedule?.end || employee.scheduleEnd || "").slice(0, 5);
