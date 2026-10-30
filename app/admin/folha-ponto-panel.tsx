@@ -162,7 +162,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;
     const justifiedByRequest = suppressAbono ? 0 : (approvedRequest ? requestCreditMinutes(approvedRequest, expected, worked, dayStart, dayEnd) : 0);
     const opsAbono = getOperationalAbono(employee.employeeNumber, date);
-    const justifiedByOps = opsAbono ? operationalJustifiedMinutes(opsAbono, daySchedule?.start || employee.scheduleStart, daySchedule?.end || employee.scheduleEnd, expected) : 0;
+    const justifiedByOps = opsAbono && scheduled ? operationalJustifiedMinutes(opsAbono, daySchedule?.start || employee.scheduleStart, daySchedule?.end || employee.scheduleEnd, expected) : 0;
     const justifiedRaw = Math.max(justifiedByCertificate, justifiedByRequest, justifiedByOps);
     /* FORCE_SUPPRESS_ZERO */
     const justified = suppressAbono ? 0 : justifiedRaw;
