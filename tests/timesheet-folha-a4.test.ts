@@ -51,7 +51,7 @@ describe('folha de ponto A4 (arte-nova aprovada)', () => {
   test('Situação: atestado de horas com faixa, atestado dia, feriado, * e folga', () => {
     expect(rows[13].situation).toBe('Atestado 08:00–11:00 · +03:00');
     expect(rows[20].situation).toBe('Atestado · dia · +08:00');
-    expect(rows[11].situation).toBe('Feriado · Aparecida · +08:00');
+    expect(rows[11].situation).toBe('Feriado · Nossa Senhora Aparecida · +08:00');
     expect(rows[21].saida?.manual).toBe(true);
     expect(rows[2].situation).toBe('Folga');
   });

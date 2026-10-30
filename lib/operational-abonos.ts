@@ -18,7 +18,16 @@ export const HORA_INICIO_ABONO_OBITO_VIVIANE = '15:51';
 
 /** Feriados nacionais (dia integral abonado para quem está na escala) */
 export const NATIONAL_HOLIDAYS: Record<string, string> = {
+  '2026-01-01': 'Feriado nacional — Confraternização Universal',
+  '2026-04-03': 'Feriado nacional — Paixão de Cristo',
+  '2026-04-21': 'Feriado nacional — Tiradentes',
+  '2026-05-01': 'Feriado nacional — Dia do Trabalho',
   [DATA_INDEPENDENCIA]: 'Feriado nacional — Independência do Brasil',
+  '2026-10-12': 'Feriado nacional — Nossa Senhora Aparecida',
+  '2026-11-02': 'Feriado nacional — Finados',
+  '2026-11-15': 'Feriado nacional — Proclamação da República',
+  '2026-11-20': 'Feriado nacional — Dia Nacional de Zumbi e da Consciência Negra',
+  '2026-12-25': 'Feriado nacional — Natal',
 };
 
 export type OperationalAbono = {

@@ -106,7 +106,7 @@ export async function POST(request: Request) {
                 startDate: { lt: to },
                 endDate: { gte: from },
               },
-              select: { type: true, startDate: true, endDate: true, status: true, reason: true },
+              select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true },
             }),
           ]);
           return {
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
           startDate: { lt: to },
           endDate: { gte: from },
         },
-        select: { type: true, startDate: true, endDate: true, status: true, reason: true },
+        select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true },
       }),
     ]);
 
