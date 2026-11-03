@@ -204,7 +204,7 @@ export function buildTimesheetRows({
 
     let situation = 'OK'; let tone: SituationTone = 'ok'; let fullDayAbono = false;
     const types = new Set(dayPunches.map((p) => p.type));
-    if (!scheduled && extraDay) { situation = dayPunches.length ? 'Dia extra · fora da escala' : 'Dia extra · sem batidas'; tone = dayPunches.length ? 'ok' : 'alerta'; }
+    if (!scheduled && extraDay) { situation = dayPunches.length ? `Hora extra · fora da escala${worked ? ` +${formatClock(worked)}` : ''}` : 'Dia extra · sem batidas'; tone = dayPunches.length ? 'ok' : 'alerta'; }
     else if (!scheduled && !dayPunches.length) { situation = 'Folga'; tone = 'folga'; }
     else if (abono && abonoMinutes > 0 && justified === abonoMinutes && isHolidayAbono(abono)) {
       situation = `Feriado · ${holidayName(abono)}${plus}`; tone = 'feriado'; fullDayAbono = !dayPunches.length;

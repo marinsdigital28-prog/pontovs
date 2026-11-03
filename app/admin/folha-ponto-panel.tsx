@@ -172,7 +172,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const missing = expected === null || considered === null ? null : Math.max(0, expected - considered);
     const surplus = expected === null || considered === null ? null : Math.max(0, considered - expected);
     const balance = considered === null || expected === null ? null : considered - expected;
-    const schedule = extraDay ? 'Dia extra · fora da escala' : !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start}–${daySchedule.end}${daySchedule.mode === 'FULL' ? ' · almoço 1h' : ' · meio exp.'}` : 'Sem horário';
+    const schedule = extraDay ? 'Dia extra · hora extra (fora da escala)' : !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start}–${daySchedule.end}${daySchedule.mode === 'FULL' ? ' · almoço 1h' : ' · meio exp.'}` : 'Sem horário';
     const covered = justified > 0 || Boolean(approvedRequest?.type === 'AUSENCIA');
     const scheduleLabel = approvedRequest?.type === 'TROCA_DIA'
       ? `${schedule} · troca`
