@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 const allowedMimes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
-const certificateTypes = ['DIA_INTEGRAL','PERIODO_DIAS','HORAS','PERIODO_HORAS','CONSULTA_MEDICA','SAIDA_MEDICA','TRABALHO_EXTERNO','TRABALHO_EXTERNO_HORAS','OUTRO'] as const;
+const certificateTypes = ['DIA_INTEGRAL','PERIODO_DIAS','HORAS','PERIODO_HORAS','CONSULTA_MEDICA','SAIDA_MEDICA','TRABALHO_EXTERNO','TRABALHO_EXTERNO_HORAS','OUTRO','DIA_EXTRA'] as const;
 const hourlyTypes = new Set(['HORAS', 'PERIODO_HORAS', 'TRABALHO_EXTERNO_HORAS']);
 
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);

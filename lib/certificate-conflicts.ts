@@ -58,6 +58,7 @@ export function punchConflictsWithCertificate(
   certificate: ConflictCertificate,
 ): boolean {
   if (!isActiveCertificateStatus(certificate.status)) return false;
+  if (certificate.type === 'DIA_EXTRA') return false; // dia extra não é ausência: as batidas valem
   if (certificate.userId && punch.userId && certificate.userId !== punch.userId) return false;
 
   const punchDate = toDateKey(punch.timestamp);

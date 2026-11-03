@@ -15,7 +15,7 @@ type DayData = {
 };
 type Conflict = { body: Record<string, unknown>; overlaps: { id: string; type: string; startTime: string | null; endTime: string | null }[]; message: string };
 
-const CERT_LABEL: Record<string, string> = { DIA_INTEGRAL: 'Atestado dia inteiro', PERIODO_DIAS: 'Atestado (período)', HORAS: 'Declaração por horas', PERIODO_HORAS: 'Declaração por horas', CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica', TRABALHO_EXTERNO: 'Trabalho/Evento externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo (horas)', OUTRO: 'Abono' };
+const CERT_LABEL: Record<string, string> = { DIA_INTEGRAL: 'Atestado dia inteiro', PERIODO_DIAS: 'Atestado (período)', HORAS: 'Declaração por horas', PERIODO_HORAS: 'Declaração por horas', CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica', TRABALHO_EXTERNO: 'Trabalho/Evento externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo (horas)', OUTRO: 'Abono', DIA_EXTRA: 'Dia extra (fora da escala)' };
 const ACTIVE = ['ATIVO', 'APROVADO'];
 const clock = (v: string) => new Date(v).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const hm = (v: string) => clock(v).slice(0, 5);
@@ -54,6 +54,16 @@ export default function EmployeeDayPanel({ employees }: { employees: Emp[] }) {
 
   const activeCerts = (data?.certificates || []).filter((c) => ACTIVE.includes(c.status));
   const valid = (data?.punches || []).filter((p) => p.status === 'VALID');
+  const hasExtra = activeCerts.some((c) => c.type === 'DIA_EXTRA');
+
+  async function markExtra() {
+    if (!data) return;
+    const reason = window.prompt('Contar este dia como trabalhado fora da escala (as batidas reais viram horas trabalhadas). Motivo:', 'Dia trabalhado fora da escala');
+    if (reason === null) return;
+    if (reason.trim().length < 5) { setMsg({ tone: 'amb', text: 'Informe o motivo (mínimo 5 letras).' }); return; }
+    if (!window.confirm(`Confirmar dia extra para ${data.employee.name} em ${data.date.split('-').reverse().join('/')}? A escala da ficha não muda e as batidas não são alteradas.`)) return;
+    await createEntry({ type: 'DIA_EXTRA', observation: reason.trim() }, 'Dia extra (fora da escala)');
+  }
 
   async function createEntry(body: Record<string, unknown>, okText: string) {
     if (!data) return;
@@ -168,7 +178,7 @@ export default function EmployeeDayPanel({ employees }: { employees: Emp[] }) {
         <div className="dc-sub">{data.scheduled && data.schedule ? `Escala ${data.weekday} ${data.schedule.start}–${data.schedule.end}` : `Folga na ficha (trabalha: ${scheduledDays})`}</div>
         <h3>Escala da ficha</h3>
         <div className="dc-sched">{data.weekSchedule.filter((d) => d.code !== 'DOM').map((d) => <div key={d.code} className={`dc-d${d.scheduled ? ' on' : ''}${d.code === data.weekday ? ' hl' : ''}`}>{d.code}{d.scheduled && d.start ? ` ${d.start.slice(0, 5)}–${d.end?.slice(0, 5)}` : ''}</div>)}</div>
-        {!data.scheduled ? <div className="dc-w dc-amb">⚠ Dia fora da escala ({scheduledDays}). Contar como:<span className="dc-right"><button className="dc-btn g sm" type="button" disabled={busy} onClick={() => void createEntry({ type: 'TRABALHO_EXTERNO', observation: 'Passeio da escola' }, 'Passeio')}>Passeio</button><button className="dc-btn o sm" type="button" onClick={() => setMsg({ tone: 'ok', text: 'Mantido como Extra: horas em dia de folga entram como saldo positivo.' })}>Extra</button></span></div> : null}
+        {!data.scheduled && !hasExtra ? <div className="dc-w dc-amb">⚠ Dia fora da escala ({scheduledDays}). Contar como:<span className="dc-right"><button className="dc-btn g sm" type="button" disabled={busy} onClick={() => void createEntry({ type: 'TRABALHO_EXTERNO', observation: 'Passeio da escola' }, 'Passeio')}>Passeio</button><button className="dc-btn o sm" type="button" disabled={busy} onClick={() => void markExtra()}>Extra</button></span></div> : null}
         <h3>Batidas do dia (com foto)</h3>
         {!data.punches.length ? <div className="dc-p">Nenhuma batida neste dia.</div> : null}
         {data.punches.map((p) => <div key={p.id} className={`dc-p${p.status !== 'VALID' ? ' x' : ''}`}>
