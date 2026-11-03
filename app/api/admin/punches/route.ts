@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { duplicatePunchReason } from '../../../../lib/day-guards';
 import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -174,6 +175,12 @@ export async function POST(request: Request) {
   const employee = await prisma.user.findFirst({ where: { id: userId, role: 'EMPLOYEE' }, select: { id: true, unitId: true, name: true, employeeNumber: true } });
   if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
   const clientId = manualClientId(employee.id, date, time, type);
+  {
+    const dayStart = new Date(`${date}T00:00:00-03:00`); const dayEnd = new Date(`${date}T23:59:59.999-03:00`);
+    const sameDay = await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: dayStart, lte: dayEnd } }, select: { id: true, type: true, timestamp: true } });
+    const dup = duplicatePunchReason(sameDay, { type, timestamp });
+    if (dup && !body?.allowDuplicate) return NextResponse.json({ error: dup, duplicate: true }, { status: 409 });
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {

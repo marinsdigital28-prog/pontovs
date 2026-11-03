@@ -158,7 +158,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const certificate = suppressAbono
       ? undefined
       : certificates.find((item) => item.userId === employee.id && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
-    const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
+    const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && Boolean((item as any).launchedAt) && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
     const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;
     const justifiedByRequest = suppressAbono ? 0 : (approvedRequest ? requestCreditMinutes(approvedRequest, expected, worked, dayStart, dayEnd) : 0);
     const opsAbono = getOperationalAbono(employee.employeeNumber, date);

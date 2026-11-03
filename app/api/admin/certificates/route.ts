@@ -32,6 +32,8 @@ const bodySchema = z.object({
   documentName: optionalName,
   documentMime: optionalMime,
   documentData: optionalDoc,
+  replaceIds: z.array(z.string().min(1)).max(20).optional(),
+  replaceReason: optionalText,
 });
 
 function day(date: string) { return new Date(`${date}T12:00:00.000Z`); }
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
   });
   const startMinutes = minutesBetween(input.startTime, input.endTime) === null ? null : Number(input.startTime!.slice(0, 2)) * 60 + Number(input.startTime!.slice(3));
   const endMinutes = minutesBetween(input.startTime, input.endTime) === null ? null : Number(input.endTime!.slice(0, 2)) * 60 + Number(input.endTime!.slice(3));
-  const overlap = candidates.find((item) => {
+  const overlapping = candidates.filter((item) => {
     const existingHourly = hourlyTypes.has(item.type as typeof certificateTypes[number]) && item.startTime && item.endTime;
     if (hourly && existingHourly && item.startDate.getTime() === startDate.getTime()) {
       const existingStart = Number(item.startTime!.slice(0, 2)) * 60 + Number(item.startTime!.slice(3));
@@ -111,13 +113,23 @@ export async function POST(request: Request) {
     if (!hourly && existingHourly) return true;
     return !hourly || !existingHourly;
   });
-  if (overlap) {
+  const replaceIds = new Set(input.replaceIds || []);
+  const blocking = overlapping.filter((item) => !replaceIds.has(item.id));
+  if (blocking.length) {
     return NextResponse.json({
       error: hourly ? 'Existe sobreposição com outro lançamento neste horário.' : 'Já existe um abono/atestado cadastrado para parte deste período.',
+      canReplace: true,
+      overlaps: blocking.map((item) => ({ id: item.id, type: item.type, startDate: item.startDate, endDate: item.endDate, startTime: item.startTime, endTime: item.endTime })),
     }, { status: 409 });
   }
+  const toReplace = overlapping.filter((item) => replaceIds.has(item.id));
+  const replaceReason = input.replaceReason?.trim() || 'Substituído por novo lançamento';
 
-  const created = await prisma.medicalCertificate.create({
+  const created = await prisma.$transaction(async (tx) => {
+   for (const item of toReplace) {
+    await tx.medicalCertificate.update({ where: { id: item.id }, data: { status: 'CANCELADO', canceledAt: new Date(), canceledById: session.user.id, cancelReason: replaceReason } });
+   }
+   return tx.medicalCertificate.create({
     data: {
       userId: input.userId, createdById: session.user.id, type: input.type, startDate, endDate,
       startTime: hourly ? input.startTime : null, endTime: hourly ? input.endTime : null,
@@ -128,6 +140,10 @@ export async function POST(request: Request) {
     },
     select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, status: true, daysCount: true },
   });
+  });
+  for (const item of toReplace) {
+    await appendAuditEvent({ action: 'ATESTADO_CANCELADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: item.id, metadata: { userId: input.userId, reason: replaceReason, replacedBy: created.id } });
+  }
   await appendAuditEvent({
     action: 'ATESTADO_CRIADO', actorId: session.user.id, resource: 'MedicalCertificate', resourceId: created.id,
     metadata: { userId: input.userId, type: input.type, startDate: input.startDate, endDate: input.endDate, startTime: input.startTime || null, endTime: input.endTime || null, hoursPerDayMinutes, daysCount: created.daysCount, status: 'ATIVO' },

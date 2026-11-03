@@ -102,11 +102,11 @@ export async function POST(request: Request) {
             prisma.employeeRequest.findMany({
               where: {
                 employeeId: emp.id,
-                status: 'APROVADO',
+                status: 'APROVADO', launchedAt: { not: null },
                 startDate: { lt: to },
                 endDate: { gte: from },
               },
-              select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true },
+              select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true, launchedAt: true },
             }),
           ]);
           return {
@@ -195,11 +195,11 @@ export async function POST(request: Request) {
       prisma.employeeRequest.findMany({
         where: {
           employeeId,
-          status: 'APROVADO',
+          status: 'APROVADO', launchedAt: { not: null },
           startDate: { lt: to },
           endDate: { gte: from },
         },
-        select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true },
+        select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true, launchedAt: true },
       }),
     ]);
 

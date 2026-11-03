@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { preserveSeconds } from '../../../../../lib/day-guards';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
@@ -52,12 +53,20 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de editar.' }, { status: 423 });
 
   const nextType = body?.type === undefined ? existing.type : String(body.type).trim().toUpperCase();
-  const nextTimestamp = body?.timestamp === undefined ? existing.timestamp : parseTimestamp(body.timestamp);
+  const parsedTimestamp = body?.timestamp === undefined ? existing.timestamp : parseTimestamp(body.timestamp);
+  // Nunca perde os segundos: se o minuto não mudou, mantém o horário original exato.
+  const nextTimestamp = parsedTimestamp ? preserveSeconds(existing.timestamp, parsedTimestamp) : null;
   if (!allowedTypes.has(nextType) || !nextTimestamp) return NextResponse.json({ error: 'Tipo ou data/hora inválidos.' }, { status: 400 });
   const changes: Array<{ field: string; oldValue: string; newValue: string }> = [];
   if (nextType !== existing.type) changes.push({ field: 'type', oldValue: existing.type, newValue: nextType });
   if (nextTimestamp.getTime() !== existing.timestamp.getTime()) changes.push({ field: 'timestamp', oldValue: existing.timestamp.toISOString(), newValue: nextTimestamp.toISOString() });
   if (!changes.length) return NextResponse.json({ error: 'Nenhuma alteração foi informada.' }, { status: 400 });
+  if (nextType !== existing.type && !body?.allowDuplicate) {
+    const day = existing.timestamp.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const sameDay = await prisma.punch.findMany({ where: { userId: existing.userId, status: 'VALID', timestamp: { gte: new Date(`${day}T00:00:00-03:00`), lte: new Date(`${day}T23:59:59.999-03:00`) } }, select: { id: true, type: true, timestamp: true } });
+    const clash = sameDay.find((p) => p.id !== id && p.type === nextType && (nextType === 'SAIDA' || nextType === 'ENTRADA'));
+    if (clash) return NextResponse.json({ error: `Já existe ${nextType === 'SAIDA' ? 'uma Saída' : 'uma Entrada'} válida neste dia. Cancele a outra antes.`, duplicate: true }, { status: 409 });
+  }
 
   try {
     const updated = await prisma.$transaction(async (tx) => {

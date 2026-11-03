@@ -1,0 +1,23 @@
+.dc-wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px;margin-top:14px}
+.dc-card{background:#fff;border:1px solid #e3ebe4;border-radius:14px;padding:16px;box-shadow:0 2px 6px #0b5c4214;color:#143d1f}
+.dc-card h2{margin:0 0 4px;font-size:18px}.dc-card h3{margin:14px 0 8px;font-size:13px;color:#0b5c42;text-transform:uppercase;letter-spacing:.5px}
+.dc-sub{font-size:13px;color:#4d6b55}
+.dc-pick{display:flex;flex-wrap:wrap;gap:10px;align-items:end}.dc-pick label{display:flex;flex-direction:column;font-size:12px;color:#4d6b55;gap:4px;min-width:180px}
+.dc-p{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:#f6faf7;margin-bottom:6px;font-size:14px;flex-wrap:wrap}
+.dc-ph{width:40px;height:40px;border-radius:8px;background:linear-gradient(135deg,#9cc5a9,#0b5c42);object-fit:cover;flex:none}
+.dc-ph.none{background:#e5e5e5}
+.dc-p.x{opacity:.55}.dc-p.x .dc-t{text-decoration:line-through}
+.dc-chip{font-size:11px;border-radius:10px;padding:2px 8px;background:#e8f6ee;color:#0b5c42;font-weight:700}
+.dc-chip.warn{background:#fff3cd;color:#7a5d00}
+.dc-w{border-radius:10px;padding:10px;margin:8px 0;font-size:13px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.dc-amb{background:#fff3cd;border-left:4px solid #c9a227}.dc-red{background:#fdeceb;border-left:4px solid #c0392b}.dc-ok{background:#e8f6ee;border-left:4px solid #0b5c42}
+.dc-btn{border:none;border-radius:9px;padding:9px 12px;font-weight:700;font-size:13px;background:#0b5c42;color:#fff;cursor:pointer}
+.dc-btn:disabled{opacity:.5;cursor:default}
+.dc-btn.o{background:#fff;color:#0b5c42;border:1.5px solid #0b5c42}.dc-btn.g{background:#c9a227;color:#143d1f}.dc-btn.r{background:#fff;color:#c0392b;border:1.5px solid #c0392b}
+.dc-btn.sm{padding:5px 9px;font-size:12px}
+.dc-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dc-sched{display:flex;gap:4px}.dc-d{flex:1;text-align:center;padding:6px 0;border-radius:6px;background:#f0f0f0;font-size:11px}.dc-d.on{background:#0b5c42;color:#fff}.dc-d.hl{outline:2px solid #c0392b}
+.dc-card input,.dc-card select,.dc-pick input,.dc-pick select{width:100%;padding:8px;border:1px solid #cfdcd2;border-radius:8px;font-size:13px}
+.dc-card label{font-size:12px;color:#4d6b55}.dc-row{display:flex;gap:8px}.dc-row>div{flex:1}
+.dc-right{margin-left:auto;display:flex;gap:6px}
+@media (max-width:600px){.dc-acts{grid-template-columns:1fr}}

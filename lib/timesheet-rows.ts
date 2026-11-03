@@ -29,7 +29,7 @@ export type RowsCertificate = {
   type?: string | null; startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null;
   hoursPerDayMinutes?: number | null; status: string;
 };
-export type RowsRequest = { type: string; startDate: Date; endDate: string | Date; status: string; reason: string; classification?: string | null; details?: string | null; returnExpected?: boolean | null };
+export type RowsRequest = { type: string; startDate: Date; endDate: string | Date; status: string; reason: string; classification?: string | null; details?: string | null; returnExpected?: boolean | null; launchedAt?: Date | string | null };
 
 export type SituationTone = 'ok' | 'folga' | 'feriado' | 'abono' | 'falta' | 'alerta' | 'futuro';
 export type TimesheetCell = { time: string; manual: boolean } | null;
@@ -164,7 +164,7 @@ export function buildTimesheetRows({
     const cert = suppress ? undefined : certificates.find((c) =>
       ['APROVADO', 'ATIVO'].includes(c.status) && certKey(c.startDate) <= date && certKey(c.endDate) >= date);
     const certMinutes = cert ? certificateDayMinutes(cert, date, dayStart, dayEnd, fullDay, expectedRaw) : 0;
-    const request = suppress ? undefined : requests.find((r) => r.status === 'APROVADO' && (
+    const request = suppress ? undefined : requests.find((r) => r.status === 'APROVADO' && Boolean(r.launchedAt) && (
       (r.type === 'AUSENCIA' && keyOf(r.startDate) <= date && keyOf(r.endDate) >= date)
       || (r.type === 'TROCA_DIA' && (keyOf(r.startDate) === date || keyOf(r.endDate) === date))));
     let abono = getOperationalAbono(employee.employeeNumber, date);
