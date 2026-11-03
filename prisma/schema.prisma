@@ -193,6 +193,9 @@ model EmployeeRequest {
   documentData     String?  @db.Text
   reviewNote       String?
   reviewedAt  DateTime?
+  // Lançamento explícito na folha pelo gestor. Aprovação sozinha NÃO abona a folha.
+  launchedAt   DateTime?
+  launchedById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   @@index([employeeId, status, startDate])

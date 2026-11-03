@@ -34,7 +34,7 @@ export async function GET() {
     select: {
       id: true, employeeId: true, type: true, status: true, startDate: true, endDate: true,
       reason: true, details: true, medicalSpecialty: true, classification: true, returnExpected: true,
-      documentName: true, documentMime: true, reviewNote: true, reviewedAt: true, createdAt: true,
+      documentName: true, documentMime: true, reviewNote: true, reviewedAt: true, createdAt: true, launchedAt: true,
       employee: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } },
       reviewer: { select: { name: true } },
     },
@@ -85,6 +85,34 @@ export async function PATCH(request: Request) {
         to: start.toISOString().slice(0, 10),
         end: end.toISOString().slice(0, 10),
       },
+    });
+    return NextResponse.json({ request: updated });
+  }
+
+  const launch = z.object({
+    id: z.string().min(1),
+    action: z.enum(['LANCAR', 'RETIRAR_DA_FOLHA']),
+  }).safeParse(body);
+
+  if (launch.success) {
+    const existing = await prisma.employeeRequest.findUnique({
+      where: { id: launch.data.id },
+      select: { id: true, employeeId: true, type: true, status: true, launchedAt: true },
+    });
+    if (!existing) return NextResponse.json({ error: 'Solicitação não encontrada.' }, { status: 404 });
+    if (existing.status !== 'APROVADO') return NextResponse.json({ error: 'Só solicitações aprovadas podem ser lançadas na folha.' }, { status: 409 });
+    const launching = launch.data.action === 'LANCAR';
+    if (launching && existing.launchedAt) return NextResponse.json({ error: 'Esta solicitação já está lançada na folha.' }, { status: 409 });
+    if (!launching && !existing.launchedAt) return NextResponse.json({ error: 'Esta solicitação não está lançada na folha.' }, { status: 409 });
+    const updated = await prisma.employeeRequest.update({
+      where: { id: existing.id },
+      data: launching ? { launchedAt: new Date(), launchedById: session.user.id } : { launchedAt: null, launchedById: null },
+      select: { id: true, status: true, launchedAt: true },
+    });
+    await appendAuditEvent({
+      action: launching ? 'SOLICITACAO_LANCADA_NA_FOLHA' : 'SOLICITACAO_RETIRADA_DA_FOLHA',
+      actorId: session.user.id, resource: 'EmployeeRequest', resourceId: existing.id,
+      metadata: { employeeId: existing.employeeId, type: existing.type },
     });
     return NextResponse.json({ request: updated });
   }
