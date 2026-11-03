@@ -39,6 +39,7 @@ const weekdayCodes: Record<number, string> = { 0: 'DOM', 1: 'SEG', 2: 'TER', 3: 
 const allEmployeesValue = '__ALL__';
 const certificateTypeLabels: Record<string, string> = {
   DIA_INTEGRAL: 'Atestado',
+  DIA_EXTRA: 'Dia extra',
   PERIODO_DIAS: 'Atestado',
   HORAS: 'Atestado',
   PERIODO_HORAS: 'Atestado',
@@ -145,6 +146,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const weekday = new Date(`${date}T12:00:00-03:00`).getDay();
     const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
     const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, weekdayCodes[weekday]);
+    const extraDay = !scheduled && !suppressAbono && certificates.some((item) => item.userId === employee.id && item.type === 'DIA_EXTRA' && ['APROVADO', 'ATIVO'].includes(item.status) && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
     const worked = calculateWorked(dayPunches);
     const firstPunch = dayPunches[0];
     const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
@@ -153,11 +155,11 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const dayEnd = daySchedule ? minutesFromClock(daySchedule.end) : scheduleEnd;
     const span = dayStart !== null && dayEnd !== null ? Math.max(0, dayEnd - dayStart) : null;
     const lunch = span !== null && span > 6 * 60 ? 60 : 0;
-    const expected = scheduled && span !== null ? Math.max(0, span - lunch) : scheduled ? expectedMinutes : null;
+    const expected = scheduled && span !== null ? Math.max(0, span - lunch) : scheduled ? expectedMinutes : extraDay ? 0 : null;
     const configuredWorkday = scheduled && expected !== null;
     const certificate = suppressAbono
       ? undefined
-      : certificates.find((item) => item.userId === employee.id && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
+      : certificates.find((item) => item.userId === employee.id && item.type !== 'DIA_EXTRA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
     const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && Boolean((item as any).launchedAt) && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
     const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;
     const justifiedByRequest = suppressAbono ? 0 : (approvedRequest ? requestCreditMinutes(approvedRequest, expected, worked, dayStart, dayEnd) : 0);
@@ -170,7 +172,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const missing = expected === null || considered === null ? null : Math.max(0, expected - considered);
     const surplus = expected === null || considered === null ? null : Math.max(0, considered - expected);
     const balance = considered === null || expected === null ? null : considered - expected;
-    const schedule = !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start}–${daySchedule.end}${daySchedule.mode === 'FULL' ? ' · almoço 1h' : ' · meio exp.'}` : 'Sem horário';
+    const schedule = extraDay ? 'Dia extra · fora da escala' : !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start}–${daySchedule.end}${daySchedule.mode === 'FULL' ? ' · almoço 1h' : ' · meio exp.'}` : 'Sem horário';
     const covered = justified > 0 || Boolean(approvedRequest?.type === 'AUSENCIA');
     const scheduleLabel = approvedRequest?.type === 'TROCA_DIA'
       ? `${schedule} · troca`

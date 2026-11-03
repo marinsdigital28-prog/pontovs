@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     certificates, requests,
     warnings: [
       ...sequenceWarnings(valid),
-      ...(!scheduled && valid.length ? ['Dia fora da escala da ficha — conte como Extra ou lance Passeio/Evento.'] : []),
+      ...(!scheduled && valid.length && !certificates.some((c) => c.type === 'DIA_EXTRA' && ['ATIVO', 'APROVADO'].includes(c.status)) ? ['Dia fora da escala da ficha — conte como Extra ou lance Passeio/Evento.'] : []),
     ],
   });
 }
