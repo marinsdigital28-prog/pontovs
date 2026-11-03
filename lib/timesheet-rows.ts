@@ -46,7 +46,7 @@ export type TimesheetTotals = { worked: number; expected: number; missing: numbe
 export const CERTIFICATE_LABELS: Record<string, string> = {
   DIA_INTEGRAL: 'Atestado', PERIODO_DIAS: 'Atestado', HORAS: 'Atestado', PERIODO_HORAS: 'Atestado',
   CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica',
-  TRABALHO_EXTERNO: 'Trabalho externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo', OUTRO: 'Atestado',
+  TRABALHO_EXTERNO: 'Trabalho externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo', OUTRO: 'Atestado', DIA_EXTRA: 'Dia extra',
 };
 
 export function formatClock(value: number | null) {
@@ -153,16 +153,18 @@ export function buildTimesheetRows({
     const dayPunches = raw.filter((_, i) => kept.has(String(i))).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
     const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
+    const extraDay = !suppress && certificates.some((c) => c.type === 'DIA_EXTRA' && ['APROVADO', 'ATIVO'].includes(c.status) && certKey(c.startDate) <= date && certKey(c.endDate) >= date);
     const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, codes[weekday]);
     const dayStart = daySchedule ? minutesFromClock(daySchedule.start) : minutesFromClock(employee.scheduleStart);
     const dayEnd = daySchedule ? minutesFromClock(daySchedule.end) : minutesFromClock(employee.scheduleEnd);
     const span = dayStart !== null && dayEnd !== null ? Math.max(0, dayEnd - dayStart) : null;
     const lunch = span !== null && span > 6 * 60 ? 60 : 0;
-    const expectedRaw = scheduled && span !== null ? Math.max(0, span - lunch) : null;
+    // Dia extra fora da escala: previsto 0, as batidas reais entram como horas trabalhadas (saldo positivo).
+    const expectedRaw = scheduled && span !== null ? Math.max(0, span - lunch) : (extraDay && !scheduled ? 0 : null);
     const fullDay = daySchedule?.mode === 'FULL';
 
     const cert = suppress ? undefined : certificates.find((c) =>
-      ['APROVADO', 'ATIVO'].includes(c.status) && certKey(c.startDate) <= date && certKey(c.endDate) >= date);
+      c.type !== 'DIA_EXTRA' && ['APROVADO', 'ATIVO'].includes(c.status) && certKey(c.startDate) <= date && certKey(c.endDate) >= date);
     const certMinutes = cert ? certificateDayMinutes(cert, date, dayStart, dayEnd, fullDay, expectedRaw) : 0;
     const request = suppress ? undefined : requests.find((r) => r.status === 'APROVADO' && Boolean(r.launchedAt) && (
       (r.type === 'AUSENCIA' && keyOf(r.startDate) <= date && keyOf(r.endDate) >= date)
@@ -179,7 +181,7 @@ export function buildTimesheetRows({
     };
     const firsts = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'].map((t) => dayPunches.find((x) => x.type === t)).filter(Boolean);
     const extraPunches = dayPunches.length - firsts.length;
-    const scheduleLabel = !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start}–${daySchedule.end}` : '—';
+    const scheduleLabel = !scheduled && extraDay ? 'Dia extra' : !scheduled ? 'Folga' : daySchedule ? `${daySchedule.start}–${daySchedule.end}` : '—';
 
     const base = {
       date, day, weekday, future, scheduled, schedule: scheduleLabel,
@@ -202,7 +204,8 @@ export function buildTimesheetRows({
 
     let situation = 'OK'; let tone: SituationTone = 'ok'; let fullDayAbono = false;
     const types = new Set(dayPunches.map((p) => p.type));
-    if (!scheduled && !dayPunches.length) { situation = 'Folga'; tone = 'folga'; }
+    if (!scheduled && extraDay) { situation = dayPunches.length ? 'Dia extra · fora da escala' : 'Dia extra · sem batidas'; tone = dayPunches.length ? 'ok' : 'alerta'; }
+    else if (!scheduled && !dayPunches.length) { situation = 'Folga'; tone = 'folga'; }
     else if (abono && abonoMinutes > 0 && justified === abonoMinutes && isHolidayAbono(abono)) {
       situation = `Feriado · ${holidayName(abono)}${plus}`; tone = 'feriado'; fullDayAbono = !dayPunches.length;
     } else if (cert && certMinutes > 0 && justified === certMinutes) {

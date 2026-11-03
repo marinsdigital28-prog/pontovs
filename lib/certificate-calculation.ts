@@ -43,6 +43,7 @@ function clampHourMinutes(item: CertificateCoverageItem, scheduleStart: number, 
 
 export function certificateMinutesForDay(item: CertificateCoverageItem, date: string, scheduleStart: number | null, scheduleEnd: number | null, fullDay: boolean, expected: number | null) {
   if (!['APROVADO', 'ATIVO'].includes(item.status)) return 0;
+  if (item.type === 'DIA_EXTRA') return 0; // dia extra não abona: conta as batidas reais
   const startDate = dateKey(item.startDate); const endDate = dateKey(item.endDate);
   const itemDate = dateKey(item.eventDate || item.startDate);
   if (isHourCoverage(item)) {
