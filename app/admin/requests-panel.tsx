@@ -18,6 +18,7 @@ type RequestItem = {
   documentName?: string | null;
   documentMime?: string | null;
   reviewNote?: string | null;
+  launchedAt?: string | null;
   createdAt: string;
   employee: { id: string; name: string; employeeNumber: string | null; jobTitle: string | null };
   reviewer?: { name: string } | null;
@@ -91,6 +92,21 @@ export default function RequestsPanel() {
       setNote('');
       await load();
     }
+    setLoading(false);
+  }
+
+  async function toggleLaunch(id: string, launch: boolean) {
+    if (!launch && !window.confirm('Retirar esta solicitação da folha? Ela continua aprovada, só deixa de abonar.')) return;
+    setLoading(true);
+    setMessage('');
+    const response = await fetch('/api/admin/requests', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, action: launch ? 'LANCAR' : 'RETIRAR_DA_FOLHA' }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) setMessage(data.error || 'Não foi possível atualizar a folha.');
+    else { setMessage(launch ? 'Lançada na folha.' : 'Retirada da folha.'); await load(); }
     setLoading(false);
   }
 
@@ -226,6 +242,19 @@ export default function RequestsPanel() {
                 </div>
               ) : item.status === 'APROVADO' || item.status === 'PENDENTE' ? (
                 <div className="request-decision">
+                  {item.status === 'APROVADO' && ['AUSENCIA', 'TROCA_DIA'].includes(item.type) ? (
+                    item.launchedAt ? (
+                      <>
+                        <span className="pill ok">Lançada na folha</span>
+                        <button className="ghost-btn" type="button" disabled={loading} onClick={() => void toggleLaunch(item.id, false)}>Retirar da folha</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="pill">Aprovada · não está na folha</span>
+                        <button className="primary-btn" type="button" disabled={loading} onClick={() => void toggleLaunch(item.id, true)}>Lançar na folha</button>
+                      </>
+                    )
+                  ) : null}
                   <button
                     className="danger-btn"
                     type="button"

@@ -21,6 +21,7 @@ import OverviewInbox from './overview-inbox';
 import OverviewExitWatch from './overview-exit-watch';
 import ShiftsPanel from './shifts-panel';
 import InconsistenciesPanel from './inconsistencies-panel';
+import EmployeeDayPanel from './employee-day-panel';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -180,10 +181,12 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       </div>
     </section> : null}
     {tab === 'ponto' ? <section>
+      <div style={{ marginBottom: 20 }}><EmployeeDayPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
       <PunchesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} />
       <div style={{ marginTop: 20 }}><InconsistenciesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} onOpenPunches={() => window.scrollTo({ top: 0, behavior: 'smooth' })} /></div>
     </section> : null}
     {tab === 'ausencias' ? <section>
+      <div style={{ marginBottom: 20 }}><EmployeeDayPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
       <RequestsPanel />
       <div style={{ marginTop: 20 }}><CertificatesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber, cpf }) => ({ id, name, employeeNumber, cpf }))} /></div>
       <div style={{ marginTop: 20 }}><CertificateConflictsPanel /></div>
