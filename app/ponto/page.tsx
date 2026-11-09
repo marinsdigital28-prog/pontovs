@@ -89,6 +89,9 @@ export default function Page() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [journeyClosed, setJourneyClosed] = useState(false);
   const [shakeTick, setShakeTick] = useState(0);
+  // Aviso de batida esquecida (não bloqueia o ponto; só pede "Ciente").
+  const [forgotWarnings, setForgotWarnings] = useState<{ id: string; issueDate: string; message: string }[]>([]);
+  const warningTokenRef = React.useRef(0);
 
   const keypadNumbers = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
 
@@ -171,6 +174,7 @@ export default function Page() {
       setEmployee(data);
       setNextType(recognizedNextType);
       setStep('register');
+      if (!data.offlineFallback) void loadForgotWarnings(String(data.employeeNumber || normalizedEmployeeNumber));
       setStatusMsg(data.offlineFallback
         ? 'Funcionário reconhecido. Preparando a câmera para salvar a marcação neste aparelho.'
         : 'Funcionário reconhecido. Preparando a câmera...');
@@ -179,6 +183,28 @@ export default function Page() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadForgotWarnings(employeeNumber: string) {
+    const token = ++warningTokenRef.current;
+    setForgotWarnings([]);
+    try {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 6000);
+      const r = await fetch('/api/punch-warnings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ employeeNumber, source: 'totem' }), signal: controller.signal });
+      window.clearTimeout(timer);
+      const data = await r.json().catch(() => ({}));
+      if (token !== warningTokenRef.current) return; // já é outro colaborador
+      if (Array.isArray(data.warnings) && data.warnings.length) setForgotWarnings(data.warnings);
+    } catch { /* aviso nunca atrapalha o ponto */ }
+  }
+
+  function acknowledgeForgotWarnings() {
+    const ids = forgotWarnings.map((w) => w.id);
+    const employeeNumber = employee?.employeeNumber;
+    setForgotWarnings([]);
+    if (!ids.length || !employeeNumber) return;
+    void fetch('/api/punch-warnings', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ employeeNumber, ids, source: 'totem' }), keepalive: true }).catch(() => undefined);
   }
 
   function queueOfflinePunch(payload: { employeeNumber: string; clientTimestamp: string; clientId: string; photo: string | null; origin: 'OFFLINE'; connectivity: 'OFFLINE' | 'RETRYING'; location: { lat: number; lng: number; accuracy?: number; capturedAt: string } | null; device: { id?: string; os?: string; appVersion?: string } | null }, reason: string) {
@@ -345,6 +371,8 @@ export default function Page() {
   const [hhmm, ss] = [timeString.slice(0, 5), timeString.slice(6, 8)];
 
   function resetForNextCollaborator() {
+    warningTokenRef.current += 1;
+    setForgotWarnings([]);
     closeCamera();
     setStep('lookup');
     setMatricula('');
@@ -435,6 +463,7 @@ export default function Page() {
       return;
     }
     if (step === 'register') {
+      if (forgotWarnings.length) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); acknowledgeForgotWarnings(); } return; }
       if ((e.key === 'Enter' || e.key === ' ') && cameraOpen && !loading) { e.preventDefault(); void capturePhoto(); }
     }
   };
@@ -520,7 +549,17 @@ export default function Page() {
         )}
 
         {step === 'register' && employee && !done && (
-          <div className="t-card t-register t-fade">
+          <div className="t-card t-register t-fade" style={{ position: 'relative' }}>
+            {forgotWarnings.length ? (
+              <div className="t-forgot" role="alertdialog" aria-modal="true" aria-labelledby="t-forgot-title">
+                <div className="t-forgot-box">
+                  <strong id="t-forgot-title">⚠️ Atenção, {String(employee.name || '').split(' ')[0]}</strong>
+                  {forgotWarnings.map((w) => <p key={w.id}>{w.message}</p>)}
+                  <small>Avise o gestor ou peça o ajuste pelo app. Isso fica registrado.</small>
+                  <button type="button" className="t-btn t-mark" onClick={acknowledgeForgotWarnings} autoFocus><span>Ciente</span></button>
+                </div>
+              </div>
+            ) : null}
             {cameraOpen ? (
               <>
                 <div className="t-camera">

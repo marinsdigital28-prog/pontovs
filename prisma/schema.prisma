@@ -38,6 +38,8 @@ model User {
   scheduleEnd   String?
   scheduleByDay String?  // JSON: {"SEG":{"start":"07:00","end":"16:00","mode":"FULL"}}
   profileJson   String?  @db.Text // dados cadastrais extras (documentos, contatos, endereço) — NÃO altera matrícula/jornada
+  firstSeenAt   DateTime? // primeiro acesso ao app do colaborador (login/chamada autenticada)
+  lastSeenAt    DateTime? // último acesso ao app do colaborador
   email         String    @unique
   passwordHash  String?
   role          String    @default("EMPLOYEE")
@@ -216,4 +218,119 @@ model SecurityAuditEvent {
 
   @@index([createdAt])
   @@index([actorId, createdAt])
+}
+
+// ---- Verificação automática 17:20 + Pontinho + Ocorrências (aditivo, sem mexer em tabelas antigas) ----
+
+model AppSetting {
+  key         String   @id
+  value       String   @db.Text
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AutoCloseRun {
+  id          String   @id @default(cuid())
+  date        String   // YYYY-MM-DD (America/Sao_Paulo) verificado
+  phase       String   // TARDE (17:20 do próprio dia) | MANHA (re-checagem de quem sai depois das 17:20)
+  mode        String   // DRY_RUN | REAL
+  trigger     String   // cron | manual
+  actorId     String?
+  summaryJson String   @db.Text
+  createdAt   DateTime @default(now())
+  @@index([date])
+  @@index([createdAt])
+}
+
+model Pendencia {
+  id             String    @id @default(cuid())
+  userId         String
+  date           String    // YYYY-MM-DD
+  kind           String    // FALTA_BATIDA | POUCAS_BATIDAS | SEM_BATIDAS | FORA_ESCALA | TIPO_ERRADO | PEDIDO_NAO_LANCADO | SEM_FOTO | CONFLITO | SIMULACAO_AJUSTE
+  status         String    @default("OPEN") // OPEN | RESOLVED | IGNORED
+  title          String
+  detail         String    @db.Text
+  suggestionJson String?   @db.Text
+  dryRun         Boolean   @default(true)
+  runId          String?
+  resolution     String?
+  resolvedAt     DateTime?
+  resolvedById   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  @@unique([userId, date, kind])
+  @@index([status, createdAt])
+  @@index([userId, date])
+}
+
+model AutoAdjustment {
+  id          String    @id @default(cuid())
+  userId      String
+  date        String
+  punchId     String    @unique
+  type        String
+  time        String    // HH:MM
+  status      String    @default("ACTIVE") // ACTIVE | UNDONE
+  runId       String?
+  reason      String
+  undoneAt    DateTime?
+  undoneById  String?
+  undoReason  String?
+  createdAt   DateTime  @default(now())
+  @@index([userId, date])
+  @@index([date])
+}
+
+model Ocorrencia {
+  id           String    @id @default(cuid())
+  userId       String
+  date         String    // YYYY-MM-DD
+  month        String    // YYYY-MM
+  kind         String    // ESQUECEU_BATIDA
+  source       String    // AUTO_AJUSTE | PENDENCIA
+  detail       String    @db.Text
+  pendenciaId  String?
+  adjustmentId String?
+  status       String    @default("ATIVA") // ATIVA | CANCELADA
+  canceledAt   DateTime?
+  canceledById String?
+  cancelReason String?
+  createdAt    DateTime  @default(now())
+  @@unique([userId, date, kind])
+  @@index([userId, month])
+}
+
+model AssistantAction {
+  id           String    @id @default(cuid())
+  actorId      String
+  kind         String    // ADD_PUNCH | CANCEL_ADJUSTED_PUNCH | LANCAR_AUSENCIA | CANCEL_CERTIFICATE | LAUNCH_REQUEST
+  payloadJson  String    @db.Text
+  summaryJson  String    @db.Text
+  status       String    @default("PROPOSTA") // PROPOSTA | CONFIRMADA | CANCELADA | ERRO | EXPIRADA
+  resultJson   String?   @db.Text
+  expiresAt    DateTime
+  decidedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  @@index([actorId, createdAt])
+}
+
+// Aviso "você esqueceu de bater" mostrado no ponto + comprovante de ciência do colaborador.
+model PunchWarning {
+  id           String    @id @default(cuid())
+  userId       String
+  issueDate    String    // dia da batida esquecida (YYYY-MM-DD)
+  kind         String    // FALTA_BATIDA
+  message      String    @db.Text
+  missingJson  String?   @db.Text
+  shownCount   Int       @default(0)
+  firstShownAt DateTime?
+  lastShownAt  DateTime?
+  ackAt        DateTime?
+  ackDeviceInfo String?
+  historyJson  String?   @db.Text // [{at, event: SHOWN|ACK, source}] — comprovante de cada exibição e da ciência
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  @@unique([userId, issueDate, kind])
+  @@index([userId, ackAt])
+  @@index([issueDate])
 }

@@ -231,6 +231,12 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [batchProgress, setBatchProgress] = useState('');
+  const [ocorrencias, setOcorrencias] = useState<Array<{ userId: string; date: string; status: string }>>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/admin/ocorrencias?month=${month}`, { cache: 'no-store' }).then((r) => r.ok ? r.json() : { items: [] }).then((d) => { if (alive) setOcorrencias(Array.isArray(d.items) ? d.items : []); }).catch(() => undefined);
+    return () => { alive = false; };
+  }, [month]);
 
   const load = useCallback(async () => {
     const bounds = monthBounds(month);
@@ -491,6 +497,10 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                     <div><span>Saldo do mês</span><strong className={totalBalance < 0 ? 'folha-neg' : 'folha-pos'}>{formatMinutes(totalBalance)}</strong></div>
                   </div>
                 );
+              })()}
+              {(() => {
+                const mine = ocorrencias.filter((o) => o.userId === employee.id && o.status === 'ATIVA');
+                return mine.length ? <p className="small-muted no-print folha-ocorrencias" style={{ margin: '6px 0', color: '#92400e' }}>📌 Ocorrências no mês: <b>{mine.length}</b> esquecimento(s) de batida — dias {mine.map((o) => o.date.slice(8, 10)).join(', ')}</p> : null;
               })()}
               <div className="folha-legend" aria-label="Como interpretar a folha">
                 <strong>Como interpretar:</strong>

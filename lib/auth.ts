@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import prisma from './prisma';
+import { touchAppAccess } from './app-access';
 
 const managerRoles = ['ADMIN', 'MANAGER'];
 
@@ -21,6 +22,7 @@ export const authOptions: NextAuthOptions = {
         if (employeeNumber) {
           const employee = await prisma.user.findFirst({ where: { active: true, role: 'EMPLOYEE', employeeNumber }, select: { id: true, name: true, email: true } });
           if (!employee) return null;
+          await touchAppAccess(employee.id);
           return { id: employee.id, name: employee.name, email: employee.email, role: 'EMPLOYEE' };
         }
 

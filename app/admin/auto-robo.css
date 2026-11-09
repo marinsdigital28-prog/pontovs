@@ -1,0 +1,41 @@
+/* Verificação 17:20 + pendências + Pontinho (prefixo ar-) */
+.ar-card{background:#fff;border:1px solid #e3ebe4;border-radius:14px;padding:16px;box-shadow:0 2px 6px #0b5c4214;color:#143d1f}
+.ar-card h2{margin:0 0 4px;font-size:18px}.ar-card h3{margin:14px 0 8px;font-size:13px;color:#0b5c42;text-transform:uppercase;letter-spacing:.5px}
+.ar-sub{font-size:13px;color:#4d6b55}
+.ar-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.ar-k{border-radius:12px;padding:12px;background:#f6faf7;text-align:center}.ar-k b{display:block;font-size:28px}.ar-k span{font-size:12px;color:#4d6b55}
+.ar-k.g b{color:#0b5c42}.ar-k.y b{color:#b8860b}.ar-k.n b{color:#4d6b55}
+.ar-table{width:100%;border-collapse:collapse;font-size:13px}.ar-table td,.ar-table th{padding:7px 6px;border-bottom:1px solid #eef2ef;text-align:left;vertical-align:top}.ar-table th{font-size:11px;color:#4d6b55;text-transform:uppercase}
+.ar-star{color:#b8860b;font-weight:800}
+.ar-steps{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.ar-steps span{font-size:11px;background:#e8f6ee;color:#0b5c42;border-radius:8px;padding:3px 7px;font-weight:600}.ar-steps span.f{background:#fdeceb;color:#c0392b}.ar-steps span.q{background:#fff3cd;color:#7a5d00}
+.ar-w{border-radius:10px;padding:10px;margin:8px 0;font-size:13px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ar-amb{background:#fff3cd;border-left:4px solid #c9a227}.ar-red{background:#fdeceb;border-left:4px solid #c0392b}.ar-ok{background:#e8f6ee;border-left:4px solid #0b5c42}
+.ar-btn{border:none;border-radius:9px;padding:8px 11px;font-weight:700;font-size:13px;background:#0b5c42;color:#fff;white-space:nowrap;cursor:pointer}
+.ar-btn:disabled{opacity:.55;cursor:default}.ar-btn.o{background:#fff;color:#0b5c42;border:1.5px solid #0b5c42}.ar-btn.g{background:#c9a227;color:#143d1f}.ar-btn.r{background:#fff;color:#c0392b;border:1.5px solid #c0392b}.ar-btn.s{padding:5px 9px;font-size:12px}
+.ar-chip{font-size:11px;border-radius:10px;padding:2px 8px;background:#e8f6ee;color:#0b5c42;font-weight:700}.ar-chip.y{background:#fff3cd;color:#7a5d00}.ar-chip.r{background:#fdeceb;color:#c0392b}
+.ar-pend{border:1px solid #e3ebe4;border-radius:12px;padding:12px;margin-bottom:10px;background:#fff}
+.ar-pend .h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ar-pend .sug{font-size:13px;background:#f6faf7;border-radius:8px;padding:8px;margin:6px 0}
+.ar-acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ar-tabs{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}.ar-tabs button{font-size:12px;padding:5px 10px;border-radius:14px;background:#f0f0f0;border:none;cursor:pointer}.ar-tabs button.on{background:#0b5c42;color:#fff}
+.ar-bell{position:relative;font-size:20px;background:#0b5c4214;border:1px solid #cfe0d4;border-radius:50%;width:42px;height:42px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.ar-badge{position:absolute;top:-5px;right:-7px;background:#c0392b;color:#fff;font-size:11px;font-weight:800;border-radius:10px;padding:2px 6px;border:2px solid #fff}
+.ar-drawer-bg{position:fixed;inset:0;background:#0b2a1a55;z-index:60}
+.ar-drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:#f4f9f5;z-index:61;overflow:auto;padding:14px;box-shadow:-8px 0 30px #0003}
+.ar-mode{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;border-radius:16px;padding:4px 10px}.ar-mode.t{background:#fff3cd;color:#7a5d00}.ar-mode.real{background:#e8f6ee;color:#0b5c42}
+/* Pontinho */
+.ar-fab{position:fixed;right:22px;bottom:20px;width:72px;height:72px;border-radius:50%;background:#fff;box-shadow:0 6px 18px #0b5c4255;border:3px solid #c9a227;display:flex;align-items:center;justify-content:center;z-index:55;cursor:pointer}
+.ar-hello{position:fixed;right:104px;bottom:42px;background:#fff;border-radius:14px;padding:8px 12px;font-size:13px;box-shadow:0 2px 8px #0b5c4222;font-weight:600;z-index:55;color:#143d1f}
+.ar-chat{position:fixed;right:20px;bottom:100px;width:min(400px,calc(100vw - 24px));height:min(640px,calc(100vh - 130px));background:#fff;border-radius:18px;box-shadow:0 10px 30px #0b5c4244;border:1px solid #e3ebe4;overflow:hidden;display:flex;flex-direction:column;z-index:56;color:#143d1f}
+.ar-ch{background:linear-gradient(135deg,#0b5c42,#127a58);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}.ar-ch .n{font-weight:800;font-size:16px}.ar-ch .s{font-size:12px;opacity:.85}
+.ar-ch button{margin-left:auto;background:none;border:none;color:#fff;font-size:18px;cursor:pointer}
+.ar-msgs{padding:12px;display:flex;flex-direction:column;gap:8px;background:#f6faf7;flex:1;overflow:auto}
+.ar-m{max-width:88%;padding:9px 11px;border-radius:14px;font-size:13px;line-height:1.4;white-space:pre-wrap}
+.ar-m.u{align-self:flex-end;background:#0b5c42;color:#fff;border-bottom-right-radius:4px}.ar-m.b{align-self:flex-start;background:#fff;border:1px solid #e3ebe4;border-bottom-left-radius:4px}
+.ar-prop{align-self:stretch;background:#fff;border:2px solid #c9a227;border-radius:14px;padding:10px;font-size:13px}
+.ar-prop .t{font-weight:800;color:#7a5d00;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+.ar-ba{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}.ar-ba div{border-radius:8px;padding:7px;font-size:12px}.ar-ba .bf{background:#fdeceb}.ar-ba .af{background:#e8f6ee}.ar-ba i{display:block;font-style:normal;font-size:10px;font-weight:800;text-transform:uppercase;color:#4d6b55;margin-bottom:2px}
+.ar-sugs{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0}.ar-sugs button{font-size:11px;border:1px solid #0b5c42;color:#0b5c42;border-radius:12px;padding:3px 8px;background:#fff;cursor:pointer}
+.ar-inp{display:flex;gap:8px;padding:10px 12px}.ar-inp input{flex:1;padding:10px;border:1px solid #cfdcd2;border-radius:20px;font-size:13px}
+.ar-lock{font-size:11px;color:#4d6b55;padding:0 12px 10px;text-align:center}
+@media(max-width:600px){.ar-kpis b{font-size:22px}.ar-fab{width:60px;height:60px;right:14px;bottom:14px}.ar-hello{display:none}.ar-chat{right:6px;left:6px;width:auto;bottom:84px;height:calc(100vh - 100px)}}

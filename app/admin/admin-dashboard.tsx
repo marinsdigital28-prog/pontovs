@@ -22,6 +22,10 @@ import OverviewExitWatch from './overview-exit-watch';
 import ShiftsPanel from './shifts-panel';
 import InconsistenciesPanel from './inconsistencies-panel';
 import EmployeeDayPanel from './employee-day-panel';
+import AutoCloseCard from './auto-close-card';
+import PendenciasInbox from './pendencias-inbox';
+import PontinhoChat from './pontinho-chat';
+import './auto-robo.css';
 
 type EmployeeProfile = {
   phone?: string; personalEmail?: string; address?: string; city?: string; uf?: string; cep?: string;
@@ -59,6 +63,17 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [focusEmployee, setFocusEmployee] = useState<{ id: string; nonce: number } | null>(null);
   const [message, setMessage] = useState('');
+  const [dayFocus, setDayFocus] = useState<{ userId: string; date: string; nonce: number } | null>(null);
+  const [pendOpen, setPendOpen] = useState(false);
+  const [pendCount, setPendCount] = useState(0);
+  const openDay = useCallback((userId: string, date: string) => { setPendOpen(false); setTab('ponto'); setDayFocus({ userId, date, nonce: Date.now() }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, []);
+  const onPendCount = useCallback((n: number) => setPendCount(n), []);
+  useEffect(() => {
+    let alive = true;
+    const tick = () => fetch('/api/admin/pendencias?status=OPEN', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((d) => { if (alive && d) setPendCount(d.openCount || 0); }).catch(() => undefined);
+    void tick(); const t = window.setInterval(tick, 5 * 60_000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, []);
   const [scheduleApplying, setScheduleApplying] = useState(false);
   const [audit, setAudit] = useState<{ chainValid: boolean; events: AuditEvent[]; mode: string } | null>(null);
   const [presence, setPresence] = useState<PresenceEmployee[]>([]);
@@ -103,8 +118,12 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     <main className="admin-main">
     <header className="admin-topbar">
       <div><span className="eyebrow">PONTO PROGREDIR</span><h1>{({ hoje: 'Hoje', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', folha: 'Folha e relatórios', config: 'Configurações' } as Record<string, string>)[tab]}</h1><p className="small-muted">{navHints[tab]}</p></div>
-      <div className="admin-topbar-date">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button type="button" className="ar-bell" aria-label={`Pendências do ponto: ${pendCount}`} title="Pendências do ponto (verificação 17:20)" onClick={() => setPendOpen(true)}>🔔{pendCount ? <span className="ar-badge">{pendCount}</span> : null}</button>
+        <div className="admin-topbar-date">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+      </div>
     </header>
+    {pendOpen ? <><div className="ar-drawer-bg" onClick={() => setPendOpen(false)} /><div className="ar-drawer" role="dialog" aria-label="Pendências"><div style={{ textAlign: 'right' }}><button type="button" className="ar-btn o s" onClick={() => setPendOpen(false)}>✕ Fechar</button></div><PendenciasInbox onAdjust={openDay} onCount={onPendCount} /></div></> : null}
     {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
@@ -163,6 +182,10 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
           </div>
         </aside>
       </div>
+      <div className="admin-two-col" style={{ alignItems: 'start', gridColumn: '1 / -1' }}>
+        <AutoCloseCard onAdjust={openDay} />
+        <PendenciasInbox onAdjust={openDay} onCount={onPendCount} />
+      </div>
       <div className="overview-ops">
         <OverviewInbox onOpenRequests={() => setTab('ausencias')} onOpenIssues={() => setTab('ponto')} />
         <OverviewExitWatch presence={presence} employees={employees} />
@@ -181,12 +204,12 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       </div>
     </section> : null}
     {tab === 'ponto' ? <section>
-      <div style={{ marginBottom: 20 }}><EmployeeDayPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
+      <div style={{ marginBottom: 20 }}><EmployeeDayPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} focus={dayFocus} /></div>
       <PunchesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} />
       <div style={{ marginTop: 20 }}><InconsistenciesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} onOpenPunches={() => window.scrollTo({ top: 0, behavior: 'smooth' })} /></div>
     </section> : null}
     {tab === 'ausencias' ? <section>
-      <div style={{ marginBottom: 20 }}><EmployeeDayPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>
+      <div style={{ marginBottom: 20 }}><EmployeeDayPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} focus={dayFocus} /></div>
       <RequestsPanel />
       <div style={{ marginTop: 20 }}><CertificatesPanel employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber, cpf }) => ({ id, name, employeeNumber, cpf }))} /></div>
       <div style={{ marginTop: 20 }}><CertificateConflictsPanel /></div>
@@ -205,6 +228,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
         <section className="card"><div className="section-heading"><div><span className="eyebrow">CONTROLES</span><h2>Segurança e auditoria</h2></div><button className="ghost-btn" onClick={() => void loadAudit()}>Atualizar</button></div>{audit ? <div className="employee-list">{audit.events.map((event) => <div className="employee-row" key={event.id}><div><strong>{event.action}</strong><div className="small-muted">{event.resource || '—'} · {new Date(event.createdAt).toLocaleString('pt-BR')}</div></div></div>)}</div> : <p className="small-muted">Carregando...</p>}</section>
       </div>
     </section> : null}
+    {!degraded ? <PontinhoChat adminName={managerName || 'gestor'} badge={pendCount} /> : null}
     <footer className="admin-footer">Desenvolvido por Marins Digital</footer>
     </main>
     </div>

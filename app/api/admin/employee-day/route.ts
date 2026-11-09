@@ -32,6 +32,13 @@ export async function GET(request: Request) {
     prisma.medicalCertificate.findMany({ where: { userId, startDate: { lte: noon }, endDate: { gte: noon } }, orderBy: { createdAt: 'asc' }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, status: true, observation: true, documentName: true, cancelReason: true } }),
     prisma.employeeRequest.findMany({ where: { employeeId: userId, startDate: { lte: to }, endDate: { gte: from }, status: { in: ['PENDENTE', 'APROVADO'] } }, select: { id: true, type: true, status: true, reason: true, details: true, startDate: true, endDate: true, launchedAt: true, documentName: true } }),
   ]);
+  const [ocorrencias, monthOcorrencias, punchWarnings, pendencias, adjustments] = await Promise.all([
+    prisma.ocorrencia.findMany({ where: { userId, date }, orderBy: { createdAt: 'asc' } }).catch(() => []),
+    prisma.ocorrencia.count({ where: { userId, month: date.slice(0, 7), status: 'ATIVA' } }).catch(() => 0),
+    prisma.punchWarning.findMany({ where: { userId, issueDate: date } }).catch(() => []),
+    prisma.pendencia.findMany({ where: { userId, date }, orderBy: { createdAt: 'asc' } }).catch(() => []),
+    prisma.autoAdjustment.findMany({ where: { userId, date } }).catch(() => []),
+  ]);
   const photoIds = new Set((await prisma.punch.findMany({ where: { id: { in: punches.map((p) => p.id) }, photoData: { not: null } }, select: { id: true } })).map((p) => p.id));
   const weekday = new Date(`${date}T12:00:00-03:00`).getUTCDay();
   const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
@@ -47,6 +54,9 @@ export async function GET(request: Request) {
     date, weekday: CODES[weekday], scheduled, schedule: daySchedule, weekSchedule,
     punches: punches.map((p) => ({ id: p.id, type: p.type, timestamp: p.timestamp, status: p.status, origin: p.origin, manual: p.origin === 'ADJUSTED' || String(p.clientId || '').startsWith('manual-'), hasPhoto: photoIds.has(p.id) })),
     certificates, requests,
+    ocorrencias, monthOcorrencias, adjustments,
+    punchWarnings: punchWarnings.map((w) => ({ id: w.id, message: w.message, shownCount: w.shownCount, firstShownAt: w.firstShownAt, lastShownAt: w.lastShownAt, ackAt: w.ackAt })),
+    pendencias: pendencias.map((x) => ({ id: x.id, kind: x.kind, title: x.title, detail: x.detail, status: x.status, resolution: x.resolution, dryRun: x.dryRun })),
     warnings: [
       ...sequenceWarnings(valid),
       ...(!scheduled && valid.length && !certificates.some((c) => c.type === 'DIA_EXTRA' && ['ATIVO', 'APROVADO'].includes(c.status)) ? ['Dia fora da escala da ficha — conte como Extra ou lance Passeio/Evento.'] : []),

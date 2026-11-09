@@ -40,7 +40,15 @@ export type Employee = {
   scheduleByDay?: string | null;
   profile?: EmployeeProfile | null;
   active: boolean;
+  firstSeenAt?: string | null;
+  lastSeenAt?: string | null;
 };
+
+function lastAccessLabel(e: { lastSeenAt?: string | null; firstSeenAt?: string | null }) {
+  if (!e.lastSeenAt) return 'Nunca acessou o app';
+  const fmt = (v: string) => new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+  return `Último acesso ao app: ${fmt(e.lastSeenAt)}${e.firstSeenAt ? ` · 1º acesso ${fmt(e.firstSeenAt).slice(0, 8)}` : ''}`;
+}
 
 const emptyProfile: EmployeeProfile = {
   phone: '', personalEmail: '', address: '', number: '', complement: '', neighborhood: '',
@@ -75,6 +83,7 @@ export default function EmployeesPanel({
 }) {
   const [employees, setEmployees] = useState<Employee[]>(initial);
   const [search, setSearch] = useState('');
+  const [accessFilter, setAccessFilter] = useState<'TODOS' | 'NUNCA'>('TODOS');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
@@ -94,14 +103,15 @@ export default function EmployeesPanel({
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return employees;
-    return employees.filter((e) => {
+    const base = accessFilter === 'NUNCA' ? employees.filter((e) => e.active && !e.lastSeenAt) : employees;
+    if (!q) return base;
+    return base.filter((e) => {
       const p = e.profile || {};
       return `${e.name} ${e.employeeNumber || ''} ${e.cpf || ''} ${e.jobTitle || ''} ${p.phone || ''} ${p.personalEmail || ''} ${p.city || ''}`
         .toLowerCase()
         .includes(q);
     });
-  }, [employees, search]);
+  }, [employees, search, accessFilter]);
 
   const stats = useMemo(() => {
     let withPhone = 0, withEmail = 0, withDocs = 0;
@@ -296,7 +306,13 @@ export default function EmployeesPanel({
           <div className="summary"><span className="small-muted">Com docs</span><strong>{stats.withDocs}</strong></div>
         </div>
 
-        <input className="input" placeholder="Buscar nome, matrícula, CPF, telefone, e-mail ou cidade" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input className="input" style={{ flex: '1 1 260px' }} placeholder="Buscar nome, matrícula, CPF, telefone, e-mail ou cidade" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <select className="input" style={{ flex: '0 0 auto', width: 'auto' }} value={accessFilter} onChange={(e) => setAccessFilter(e.target.value as 'TODOS' | 'NUNCA')} aria-label="Filtro de acesso ao app">
+            <option value="TODOS">Todos</option>
+            <option value="NUNCA">Nunca acessou o app ({employees.filter((e) => e.active && !e.lastSeenAt).length})</option>
+          </select>
+        </div>
 
         <div className="employee-list" style={{ marginTop: 12 }}>
           {filtered.map((employee) => {
@@ -312,6 +328,7 @@ export default function EmployeesPanel({
                     {employee.profile?.personalEmail ? `✉️ ${employee.profile.personalEmail}` : '✉️ sem e-mail'}
                     {employee.profile?.city ? ` · ${employee.profile.city}/${employee.profile.uf || 'RJ'}` : ''}
                   </div>
+                  <div className="small-muted" style={{ color: employee.lastSeenAt ? undefined : '#b45309' }}>📲 {lastAccessLabel(employee)}</div>
                 </div>
                 <div className="row-actions" onClick={(e) => e.stopPropagation()}>
                   <span className={employee.active ? 'status-pill ok' : 'status-pill off'}>{employee.active ? 'Ativo' : 'Inativo'}</span>
