@@ -70,6 +70,21 @@ describe('verificação 17:20', () => {
     expect(evaluateDay({ employee: late, date: D, phase: 'TARDE', punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] }).outcome).toBe('DEFER');
   });
 
+  it('às 17:20 quem ainda não bateu a saída é adiado para as 08:00 (pode estar em hora extra)', () => {
+    const d = evaluateDay({ employee: emp, date: D, phase: 'TARDE', punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] });
+    expect(d.outcome).toBe('DEFER');
+    expect(d.forgotten).toBe(false);
+    const manha = evaluateDay({ employee: emp, date: D, phase: 'MANHA', punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] });
+    expect(manha.outcome).toBe('AUTO');
+    expect(manha.proposal).toEqual({ type: 'SAIDA', time: '17:00' });
+  });
+
+  it('às 17:20 quem já saiu e esqueceu a entrada é fechado na hora', () => {
+    const d = evaluateDay({ employee: emp, date: D, phase: 'TARDE', punches: [p('INTERVALO', '12:00'), p('RETORNO', '13:00'), p('SAIDA', '17:01')] });
+    expect(d.outcome).toBe('AUTO');
+    expect(d.proposal).toEqual({ type: 'ENTRADA', time: '08:00' });
+  });
+
   it('ajuste desfeito antes não é refeito automaticamente', () => {
     const d = evaluateDay({ employee: emp, date: D, undoneTypes: ['SAIDA'], punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] });
     expect(d.outcome).toBe('PENDENCIA');
