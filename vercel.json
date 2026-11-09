@@ -1,5 +1,9 @@
 {
   "framework": "nextjs",
   "buildCommand": "node scripts/build-all.mjs",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "crons": [
+    { "path": "/api/cron/auto-close", "schedule": "20 20 * * *" },
+    { "path": "/api/cron/auto-close/manha", "schedule": "0 11 * * *" }
+  ]
 }
