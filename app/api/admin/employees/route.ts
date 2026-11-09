@@ -50,6 +50,8 @@ export async function GET(request: Request) {
       active: true,
       createdAt: true,
       updatedAt: true,
+      firstSeenAt: true,
+      lastSeenAt: true,
       _count: { select: { punches: true } },
     },
   });
