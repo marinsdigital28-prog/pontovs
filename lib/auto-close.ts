@@ -5,7 +5,7 @@
  * Regras (Portaria 671): nunca altera batida original; só PROPÕE inserir a batida que falta como ajuste (*).
  *  - 3 batidas num dia integral, tudo coerente → AUTO (insere a que falta pelo horário da escala, almoço redondo).
  *  - ≤2 batidas, tipo estranho, sem foto, fora da escala, pedido do app, atestado/declaração parcial, dúvida → PENDÊNCIA.
- *  - Escala que termina depois das 17:20 → ADIADO (re-checa na manhã seguinte).
+ *  - Escala que termina depois das 17:20, ou dia ainda sem Saída às 17:20 → ADIADO (re-checa às 08:00 do dia seguinte).
  */
 import { resolveDaySchedule, type DaySchedule } from './day-schedule';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
@@ -116,6 +116,9 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
     return pend('FORA_ESCALA', 'Fora da escala', `Bateu ponto num dia fora da escala da ficha (${punchesText}).`, { kind: 'DIA_EXTRA', text: 'Lançar como Dia extra (hora extra, soma no mês). Se a escala mudou, corrija a ficha.' }, false);
   }
   if (phase === 'TARDE' && endsAfterCutoff(schedule)) return { ...base, outcome: 'DEFER', reason: `Escala até ${schedule!.end}: re-checa amanhã de manhã` };
+  // Às 17:20 quem ainda não bateu a saída pode estar fazendo hora extra: gravar Saída* agora
+  // encerraria a jornada e bloquearia a saída real no totem. Decide às 08:00 do dia seguinte.
+  if (phase === 'TARDE' && valid.length > 0 && !valid.some((p) => p.type === 'SAIDA')) return { ...base, outcome: 'DEFER', reason: 'Ainda sem saída às 17:20 (pode estar em hora extra): confere amanhã às 08:00' };
 
   const half = schedule?.mode === 'HALF' || (schedule ? toMin(schedule.end) - toMin(schedule.start) <= 6 * 60 : false);
   const required: readonly string[] = half ? ['ENTRADA', 'SAIDA'] : PUNCH_ORDER;

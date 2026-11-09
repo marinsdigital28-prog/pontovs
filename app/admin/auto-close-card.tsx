@@ -51,7 +51,7 @@ export default function AutoCloseCard({ onAdjust }: { onAdjust: (userId: string,
       <h2>🤖 Verificação automática · {date === todayKey() ? 'Hoje' : dd} 17:20</h2>
       {data ? <button type="button" className={`ar-mode ${data.mode === 'REAL' ? 'real' : 't'}`} style={{ border: 'none', cursor: 'pointer' }} onClick={() => void toggleMode()} title="Trocar modo">{data.mode === 'REAL' ? '● Ajustando de verdade' : '◐ Modo teste: só sugere, não grava'}</button> : null}
     </div>
-    <div className="ar-sub">Roda todo dia às 17:20 (horário de Brasília) · quem sai depois das 17:20 é conferido às 08:00 do dia seguinte · nenhuma batida original é alterada (Portaria 671)</div>
+    <div className="ar-sub">Roda todo dia às 17:20 (horário de Brasília) · quem ainda não bateu a saída é conferido às 08:00 do dia seguinte · nenhuma batida original é alterada (Portaria 671)</div>
     <div className="ar-acts" style={{ marginTop: 8 }}>
       <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSim(null); }} style={{ padding: 6, borderRadius: 8, border: '1px solid #cfdcd2' }} />
       <button type="button" className="ar-btn o s" disabled={busy} onClick={() => void simulate()}>{busy ? 'Conferindo…' : 'Simular este dia (não grava)'}</button>
@@ -62,7 +62,7 @@ export default function AutoCloseCard({ onAdjust }: { onAdjust: (userId: string,
       <div className="ar-k y"><b>{s.pendencias}</b><span>pendências para você revisar</span></div>
       <div className="ar-k n"><b>{s.ok}</b><span>dias completos, nada a fazer</span></div>
     </div> : <div className="ar-w ar-amb">Ainda não rodou para {dd}. Use “Simular este dia” para ver o que o robô faria.</div>}
-    {s?.defer ? <div className="ar-sub" style={{ marginTop: 6 }}>⏳ {s.defer} pessoa(s) com escala depois das 17:20: conferidas amanhã às 08:00.</div> : null}
+    {s?.defer ? <div className="ar-sub" style={{ marginTop: 6 }}>⏳ {s.defer} pessoa(s) ainda sem saída às 17:20 (ou com escala até mais tarde): conferidas amanhã às 08:00, para não travar quem está em hora extra.</div> : null}
 
     {data?.adjustments.length ? <>
       <h3>Ajustes automáticos feitos (com *)</h3>
