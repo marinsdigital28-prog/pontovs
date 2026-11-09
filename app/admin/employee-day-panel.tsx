@@ -12,7 +12,13 @@ type DayData = {
   employee: Emp; date: string; weekday: string; scheduled: boolean; schedule: { start: string; end: string } | null;
   weekSchedule: { code: string; scheduled: boolean; start: string | null; end: string | null }[];
   punches: DayPunch[]; certificates: DayCert[]; requests: DayReq[]; warnings: string[];
+  ocorrencias?: { id: string; kind: string; source: string; detail: string; status: string; cancelReason: string | null }[];
+  monthOcorrencias?: number;
+  adjustments?: { id: string; punchId: string; type: string; time: string; status: string; reason: string }[];
+  punchWarnings?: { id: string; message: string; shownCount: number; firstShownAt: string | null; lastShownAt: string | null; ackAt: string | null }[];
+  pendencias?: { id: string; kind: string; title: string; detail: string; status: string; resolution: string | null; dryRun: boolean }[];
 };
+const dt = (v: string | null) => v ? new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 type Conflict = { body: Record<string, unknown>; overlaps: { id: string; type: string; startTime: string | null; endTime: string | null }[]; message: string };
 
 const CERT_LABEL: Record<string, string> = { DIA_INTEGRAL: 'Atestado dia inteiro', PERIODO_DIAS: 'Atestado (período)', HORAS: 'Declaração por horas', PERIODO_HORAS: 'Declaração por horas', CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica', TRABALHO_EXTERNO: 'Trabalho/Evento externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo (horas)', OUTRO: 'Abono', DIA_EXTRA: 'Dia extra (fora da escala)' };
@@ -22,7 +28,7 @@ const hm = (v: string) => clock(v).slice(0, 5);
 const todayKey = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 const fmtDay = (d: string, wd: string) => `${wd.toLowerCase()} ${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
-export default function EmployeeDayPanel({ employees }: { employees: Emp[] }) {
+export default function EmployeeDayPanel({ employees, focus }: { employees: Emp[]; focus?: { userId: string; date: string; nonce: number } | null }) {
   const list = useMemo(() => [...employees].filter((e) => e.active !== false).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')), [employees]);
   const [userId, setUserId] = useState('');
   const [date, setDate] = useState(todayKey());
@@ -37,6 +43,7 @@ export default function EmployeeDayPanel({ employees }: { employees: Emp[] }) {
   const [hTo, setHTo] = useState('');
   const [obs, setObs] = useState('');
   const [newPunch, setNewPunch] = useState({ type: 'SAIDA', time: '', reason: '' });
+  useEffect(() => { if (focus?.userId && focus.date) { setUserId(focus.userId); setDate(focus.date); } }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     if (!userId || !date) { setData(null); return; }
@@ -121,6 +128,28 @@ export default function EmployeeDayPanel({ employees }: { employees: Emp[] }) {
     if (res.ok) await load();
   }
 
+  async function undoAuto(adjustmentId: string) {
+    const reason = window.prompt('Desfazer o ajuste automático (*). A batida ajustada fica cancelada com histórico. Motivo:');
+    if (!reason || reason.trim().length < 5) return;
+    setBusy(true);
+    const res = await fetch('/api/admin/auto-close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'undo', adjustmentId, reason: reason.trim() }) });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    setMsg(res.ok ? { tone: 'ok', text: 'Ajuste automático desfeito (registro guardado).' } : { tone: 'red', text: json.error || 'Não foi possível desfazer.' });
+    if (res.ok) await load();
+  }
+
+  async function cancelOcorrencia(id: string) {
+    const reason = window.prompt('Retirar esta ocorrência do colaborador. Motivo:');
+    if (!reason || reason.trim().length < 5) return;
+    setBusy(true);
+    const res = await fetch('/api/admin/ocorrencias', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, reason: reason.trim() }) });
+    const json = await res.json().catch(() => ({}));
+    setBusy(false);
+    setMsg(res.ok ? { tone: 'ok', text: 'Ocorrência retirada (fica no histórico).' } : { tone: 'red', text: json.error || 'Não foi possível retirar.' });
+    if (res.ok) await load();
+  }
+
   async function changeType(p: DayPunch, type: string) {
     if (type === p.type) return;
     const reason = window.prompt(`Motivo para mudar ${typeLabel(p.type)} → ${typeLabel(type)} (${clock(p.timestamp)}). O horário e os segundos são mantidos:`);
@@ -191,6 +220,15 @@ export default function EmployeeDayPanel({ employees }: { employees: Emp[] }) {
           </span> : null}
         </div>)}
         {data.warnings.map((w) => <div key={w} className="dc-w dc-red">✖ {w}</div>)}
+        {(data.adjustments || []).map((a) => <div key={a.id} className={`dc-w ${a.status === 'ACTIVE' ? 'dc-amb' : ''}`}>🤖 {a.reason}: {typeLabel(a.type)} {a.time}*{a.status !== 'ACTIVE' ? ' (desfeito)' : ''}{a.status === 'ACTIVE' ? <button className="dc-btn r sm dc-right" type="button" disabled={busy} onClick={() => void undoAuto(a.id)}>↩ Desfazer</button> : null}</div>)}
+        <h3>Ocorrências · {data.monthOcorrencias ?? 0} no mês</h3>
+        {!(data.ocorrencias || []).length ? <div className="dc-p">Nenhuma ocorrência neste dia.</div> : null}
+        {(data.ocorrencias || []).map((o) => <div key={o.id} className={`dc-p${o.status !== 'ATIVA' ? ' x' : ''}`}>
+          <span className="dc-t">📌 Esqueceu de bater · {o.detail}{o.status !== 'ATIVA' ? ` (retirada: ${o.cancelReason || ''})` : ''}</span>
+          {o.status === 'ATIVA' ? <button className="dc-btn o sm dc-right" type="button" disabled={busy} onClick={() => void cancelOcorrencia(o.id)}>Retirar</button> : null}
+        </div>)}
+        {(data.punchWarnings || []).map((w) => <div key={w.id} className={`dc-w ${w.ackAt ? 'dc-ok' : 'dc-amb'}`}>🔔 Aviso no ponto: “{w.message}” · mostrado {w.shownCount}x (1ª {dt(w.firstShownAt)}) · {w.ackAt ? `Ciente em ${dt(w.ackAt)}` : 'ainda sem Ciente'}</div>)}
+        {(data.pendencias || []).map((x) => <div key={x.id} className="dc-p"><span className="dc-t">🔔 Pendência 17:20: {x.title} · {x.status === 'OPEN' ? 'aberta' : x.status === 'IGNORED' ? 'ignorada' : `resolvida${x.resolution ? ` (${x.resolution})` : ''}`}</span></div>)}
         <h3>Ajuste de batida *</h3>
         <div className="dc-row">
           <div><label>Tipo</label><select value={newPunch.type} onChange={(e) => setNewPunch({ ...newPunch, type: e.target.value })}>{['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'].map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}</select></div>
