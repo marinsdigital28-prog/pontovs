@@ -17,7 +17,8 @@ function authorized(request: Request) {
 /**
  * Vercel Cron:
  *  - 20:20 UTC (17:20 Brasília): phase=TARDE, dia de hoje.
- *  - 11:00 UTC (08:00 Brasília): phase=MANHA, ontem — só quem tem escala terminando depois das 17:20.
+ *  - 11:00 UTC (08:00 Brasília): phase=MANHA, ontem — re-confere TODOS (quem saiu depois das 17:20, quem ficou sem saída)
+ *    e fecha sozinhas as pendências que se resolveram.
  * Parâmetros manuais (com o mesmo segredo): ?date=YYYY-MM-DD&phase=COMPLETO&preview=1 (preview = só relatório, nada gravado).
  */
 export async function handle(request: Request, forcedPhase?: Phase) {

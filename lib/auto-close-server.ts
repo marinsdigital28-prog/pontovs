@@ -6,7 +6,7 @@ import prisma from './prisma';
 import { appendAuditEvent } from './security-controls';
 import { isPeriodClosed, periodFromDate } from './period-closure';
 import { duplicatePunchReason, label as typeLabel } from './day-guards';
-import { AUTO_CLOSE_REASON, endsAfterCutoff, evaluateDay, scheduleFor, summarize, type DayDecision, type Phase, type Suggestion, type SuggestionPunch } from './auto-close';
+import { AUTO_CLOSE_REASON, evaluateDay, summarize, type DayDecision, type Phase, type Suggestion, type SuggestionPunch } from './auto-close';
 
 export type AutoCloseMode = 'DRY_RUN' | 'REAL';
 export const MODE_KEY = 'autoClose.mode';
@@ -54,8 +54,6 @@ export async function evaluateDate(date: string, phase: Phase, userIds?: string[
   const data = await loadDay(date, userIds);
   const decisions: DayDecision[] = [];
   for (const e of data.employees) {
-    const { schedule } = scheduleFor(e, date);
-    if (phase === 'MANHA' && !endsAfterCutoff(schedule)) continue;
     decisions.push(evaluateDay({
       employee: e, date, phase,
       punches: data.punches.filter((p) => p.userId === e.id),
@@ -120,7 +118,7 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
 
   const run = await prisma.autoCloseRun.create({ data: { date, phase, mode, trigger, actorId: actorId || null, summaryJson: JSON.stringify({ summary }) } });
   const system = actorId || (await systemActorId());
-  const applied: any[] = []; const errors: any[] = [];
+  const applied: any[] = []; const errors: any[] = []; const autoResolved: any[] = [];
   for (const d of decisions) {
     try {
       if (d.outcome === 'AUTO' && d.proposal) {
@@ -147,9 +145,20 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
       errors.push({ employeeId: d.employeeId, error: (error as Error).message });
     }
   }
-  await prisma.autoCloseRun.update({ where: { id: run.id }, data: { summaryJson: JSON.stringify({ summary, applied, errors, report }) } });
-  await appendAuditEvent({ action: 'AUTO_CLOSE_RUN', actorId: system, resource: 'AutoCloseRun', resourceId: run.id, metadata: { date, phase, mode, trigger, summary, applied: applied.length, errors: errors.length } });
-  return { runId: run.id, date, phase, mode, persisted: true, summary, report, applied, errors };
+  // Pendências abertas deste dia que se resolveram sozinhas (ex.: bateu a saída depois das 17:20, gestor ajustou):
+  // fecha a pendência e retira a ocorrência, para não contar esquecimento de quem só ficou até mais tarde.
+  const settled = decisions.filter((d) => d.outcome === 'OK' || d.outcome === 'SKIP').map((d) => d.employeeId);
+  if (settled.length) {
+    const stale = await prisma.pendencia.findMany({ where: { date, status: 'OPEN', userId: { in: settled } }, select: { id: true, userId: true, kind: true } });
+    for (const p of stale) {
+      await prisma.pendencia.update({ where: { id: p.id }, data: { status: 'RESOLVED', resolution: 'Resolvido sozinho: o dia ficou completo depois da verificação', resolvedAt: new Date() } });
+      await prisma.ocorrencia.updateMany({ where: { userId: p.userId, date, status: 'ATIVA', source: 'PENDENCIA', pendenciaId: p.id }, data: { status: 'CANCELADA', canceledAt: new Date(), cancelReason: 'Dia ficou completo depois da verificação (não foi esquecimento)' } });
+      autoResolved.push({ pendenciaId: p.id, employeeId: p.userId, kind: p.kind });
+    }
+  }
+  await prisma.autoCloseRun.update({ where: { id: run.id }, data: { summaryJson: JSON.stringify({ summary, applied, errors, report, autoResolved }) } });
+  await appendAuditEvent({ action: 'AUTO_CLOSE_RUN', actorId: system, resource: 'AutoCloseRun', resourceId: run.id, metadata: { date, phase, mode, trigger, summary, applied: applied.length, errors: errors.length, autoResolved: autoResolved.length } });
+  return { runId: run.id, date, phase, mode, persisted: true, summary, report, applied, errors, autoResolved };
 }
 
 export async function undoAdjustment(adjustmentId: string, actorId: string, reason: string) {
