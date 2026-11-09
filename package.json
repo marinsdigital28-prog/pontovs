@@ -28,6 +28,7 @@
     "@signpdf/signer-p12": "3.3.0",
     "@signpdf/signpdf": "3.3.0",
     "@upstash/redis": "^1.38.2",
+    "ai": "^7.0.166",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "next": "^15.0.0",
