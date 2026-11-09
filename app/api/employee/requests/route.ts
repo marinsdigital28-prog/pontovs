@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '../../../../lib/auth';
 import prisma from '../../../../lib/prisma';
+import { touchAppAccess } from '../../../../lib/app-access';
 import { appendAuditEvent } from '../../../../lib/security-controls';
 
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,7 @@ export async function GET() {
   const session = await getServerSession(authOptions as any) as any;
   const employeeId = session?.user?.id as string | undefined;
   if (!employeeId || sessionRole(session) !== 'EMPLOYEE') return NextResponse.json({ error: 'Sessão de colaborador necessária.' }, { status: 401 });
+  await touchAppAccess(employeeId);
   const requests = await prisma.employeeRequest.findMany({ where: { employeeId }, orderBy: { createdAt: 'desc' }, take: 100, select: { id: true, type: true, status: true, startDate: true, endDate: true, reason: true, details: true, medicalSpecialty: true, classification: true, returnExpected: true, documentName: true, documentMime: true, reviewNote: true, reviewedAt: true, createdAt: true } });
   return NextResponse.json({ requests });
 }
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions as any) as any;
   const employeeId = session?.user?.id as string | undefined;
   if (!employeeId || sessionRole(session) !== 'EMPLOYEE') return NextResponse.json({ error: 'Sessão de colaborador necessária.' }, { status: 401 });
+  await touchAppAccess(employeeId);
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'Dados da solicitação inválidos.' }, { status: 400 });
   const input = parsed.data; const startDate = day(input.startDate); const endDate = day(input.endDate);

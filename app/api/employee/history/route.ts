@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 import prisma from '../../../../lib/prisma';
+import { touchAppAccess } from '../../../../lib/app-access';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,7 @@ export async function GET() {
   if (!employeeId || role !== 'EMPLOYEE') {
     return NextResponse.json({ error: 'Faça login como colaborador para consultar o portal.' }, { status: 401 });
   }
+  await touchAppAccess(employeeId);
 
   try {
     const employee = await prisma.user.findFirst({
