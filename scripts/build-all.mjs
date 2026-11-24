@@ -26,6 +26,6 @@ const v0 = path.join(root, '.v0/inject-built-with-v0.mjs');
 if (fs.existsSync(v0)) run(process.execPath, [v0], { optional: true });
 
 run('npx', ['prisma', 'generate']);
-run('npx', ['prisma', 'db', 'push', '--skip-generate'], { optional: true });
+// prisma db push removido: alterações de schema só manualmente (migração Cloudflare).
 run('npx', ['next', 'build']);
 console.log('\n>>> build-all concluído');
