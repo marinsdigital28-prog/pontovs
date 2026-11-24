@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
 import { brazilDateKey } from '@/lib/brazil-time';
+import { withEffectiveTypes } from '@/lib/punch-interpretation';
 import { autoDescription, autoDescriptionPrefix, autoIssueKey, detectInconsistencies, extractAutoKey, parseDateBoundary } from '@/lib/inconsistency-detector';
 
 export const dynamic = 'force-dynamic';
@@ -64,7 +65,7 @@ export async function GET(request: Request) {
   if (!employeeIds.length) return NextResponse.json({ inconsistencies: [], total: 0, from: fromValue, to: toValue });
 
   const [punches, certificates, requests, persistedOpen, persistedResolved] = await Promise.all([
-    prisma.punch.findMany({ where: { userId: { in: employeeIds }, timestamp: { gte: from, lte: to } }, select: { id: true, userId: true, type: true, timestamp: true, status: true }, orderBy: { timestamp: 'asc' }, take: 10000 }),
+    prisma.punch.findMany({ where: { userId: { in: employeeIds }, timestamp: { gte: from, lte: to } }, select: { id: true, userId: true, type: true, timestamp: true, status: true }, orderBy: { timestamp: 'asc' }, take: 10000 }).then(withEffectiveTypes),
     prisma.medicalCertificate.findMany({ where: { userId: { in: employeeIds }, startDate: { lte: to }, endDate: { gte: from }, status: { in: ['APROVADO', 'ATIVO'] } }, select: { userId: true, startDate: true, endDate: true, status: true, type: true }, take: 5000 }),
     prisma.employeeRequest.findMany({ where: { employeeId: { in: employeeIds }, startDate: { lte: to }, endDate: { gte: from }, status: 'APROVADO' }, select: { employeeId: true, startDate: true, endDate: true, status: true, type: true }, take: 5000 }),
     prisma.inconsistency.findMany({ where: { status: 'OPEN', ...(employeeId ? { userId: employeeId } : {}) }, orderBy: { detectedAt: 'desc' }, take: 5000, select: { id: true, userId: true, type: true, status: true, description: true, detectedAt: true, user: { select: { id: true, name: true, employeeNumber: true, jobTitle: true } }, punch: { select: { id: true, type: true, timestamp: true } } } }),

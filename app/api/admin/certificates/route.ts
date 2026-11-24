@@ -186,7 +186,7 @@ export async function PATCH(request: Request) {
       for (const { punch } of pairs) {
         const window = existing.startTime && existing.endTime ? `${existing.startTime}–${existing.endTime}` : 'dia integral';
         await prisma.$transaction(async (tx) => {
-          await tx.punch.update({ where: { id: punch.id }, data: { status: 'REJECTED', origin: 'ADJUSTED' } });
+          await tx.punch.update({ where: { id: punch.id }, data: { status: 'REJECTED' } /* desconsiderar: tipo/horário/origem da batida ficam intactos */ });
           await tx.punchAudit.create({
             data: {
               id: crypto.randomUUID(), punchId: punch.id, changedById: session.user.id,

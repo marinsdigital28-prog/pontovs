@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../lib/security-controls';
 import { isDatabaseQuotaExceeded } from '../../../../lib/database-errors';
+import { brazilWeekday, scheduleForNow } from '@/lib/day-schedule';
 import { listEmployeeFallbacks } from '../../../../lib/employee-fallback';
 
 export const dynamic = 'force-dynamic';
@@ -33,10 +34,10 @@ export async function GET(request: Request) {
   const end = new Date(start); end.setDate(end.getDate() + 1);
   let employees;
   try {
-    employees = await prisma.user.findMany({ where: { active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true } });
+    employees = await prisma.user.findMany({ where: { active: true, role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true } });
   } catch (error) {
     if (!isDatabaseQuotaExceeded(error)) throw error;
-    employees = listEmployeeFallbacks().map(({ id, name, employeeNumber, jobTitle, workDays }) => ({ id, name, employeeNumber, jobTitle, workDays }));
+    employees = listEmployeeFallbacks().map(({ id, name, employeeNumber, jobTitle, workDays }) => ({ id, name, employeeNumber, jobTitle, workDays, scheduleStart: null, scheduleEnd: null, scheduleByDay: null }));
   }
   const rows = await Promise.all(employees.map(async (employee) => {
     let punch: { id: string; type: string; status: string; timestamp: Date } | null = null;
@@ -45,11 +46,11 @@ export async function GET(request: Request) {
     } catch (error) {
       if (!isDatabaseQuotaExceeded(error)) throw error;
     }
-    const scheduled = (employee.workDays || '').toUpperCase().split(/[,;\s]+/).filter(Boolean).includes(dayKeys[now.getDay()]);
+    const scheduled = employee.scheduleByDay || employee.scheduleStart ? Boolean(scheduleForNow(employee, now)) : (employee.workDays || '').toUpperCase().split(/[,;\s]+/).filter(Boolean).includes(dayKeys[brazilWeekday(now)]);
     const status = punch?.status === 'REJECTED' ? 'PENDENTE' : punch?.type === 'SAIDA' ? 'SAIU' : punch ? 'PRESENTE' : scheduled ? 'NAO_MARCOU' : 'FOLGA';
     return { id: employee.id, name: employee.name, employeeNumber: employee.employeeNumber, jobTitle: employee.jobTitle, status, scheduled, latestPunch: punch ? { id: punch.id, type: punch.type, timestamp: punch.timestamp, status: punch.status, hasPhoto: false } : null };
   }));
   const order = { PRESENTE: 0, NAO_MARCOU: 1, PENDENTE: 2, SAIU: 3, FOLGA: 4 } as const;
   rows.sort((a, b) => order[a.status] - order[b.status] || a.name.localeCompare(b.name, 'pt-BR'));
-  return NextResponse.json({ degraded: Boolean((manager as any).degraded), date: start.toISOString().slice(0, 10), day: dayKeys[now.getDay()], employees: rows, counts: rows.reduce((acc, row) => { acc[row.status] += 1; return acc; }, { PRESENTE: 0, NAO_MARCOU: 0, PENDENTE: 0, SAIU: 0, FOLGA: 0 }) });
+  return NextResponse.json({ degraded: Boolean((manager as any).degraded), date: start.toISOString().slice(0, 10), day: dayKeys[brazilWeekday(now)], employees: rows, counts: rows.reduce((acc, row) => { acc[row.status] += 1; return acc; }, { PRESENTE: 0, NAO_MARCOU: 0, PENDENTE: 0, SAIU: 0, FOLGA: 0 }) });
 }

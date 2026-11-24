@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '../../../../lib/prisma';
 import { resolveDaySchedule } from '../../../../lib/day-schedule';
+import { withEffectiveTypes } from '../../../../lib/punch-interpretation';
 import { isScheduledDay, parseWorkDays } from '../../../../lib/timesheet-schedule';
 import { sequenceWarnings } from '../../../../lib/day-guards';
 
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const from = new Date(`${date}T00:00:00-03:00`); const to = new Date(`${date}T23:59:59.999-03:00`);
   const noon = new Date(`${date}T12:00:00.000Z`);
   const [punches, certificates, requests] = await Promise.all([
-    prisma.punch.findMany({ where: { userId, timestamp: { gte: from, lte: to } }, orderBy: { timestamp: 'asc' }, select: { id: true, type: true, timestamp: true, status: true, origin: true, photoData: false, clientId: true } }),
+    prisma.punch.findMany({ where: { userId, timestamp: { gte: from, lte: to } }, orderBy: { timestamp: 'asc' }, select: { id: true, type: true, timestamp: true, status: true, origin: true, photoData: false, clientId: true } }).then(withEffectiveTypes),
     prisma.medicalCertificate.findMany({ where: { userId, startDate: { lte: noon }, endDate: { gte: noon } }, orderBy: { createdAt: 'asc' }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, status: true, observation: true, documentName: true, cancelReason: true } }),
     prisma.employeeRequest.findMany({ where: { employeeId: userId, startDate: { lte: to }, endDate: { gte: from }, status: { in: ['PENDENTE', 'APROVADO'] } }, select: { id: true, type: true, status: true, reason: true, details: true, startDate: true, endDate: true, launchedAt: true, documentName: true } }),
   ]);
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     employee: { id: employee.id, name: employee.name, employeeNumber: employee.employeeNumber },
     date, weekday: CODES[weekday], scheduled, schedule: daySchedule, weekSchedule,
-    punches: punches.map((p) => ({ id: p.id, type: p.type, timestamp: p.timestamp, status: p.status, origin: p.origin, manual: p.origin === 'ADJUSTED' || String(p.clientId || '').startsWith('manual-'), hasPhoto: photoIds.has(p.id) })),
+    punches: punches.map((p) => ({ id: p.id, type: p.type, originalType: p.originalType, interpretationSource: p.interpretation?.source || null, timestamp: p.timestamp, status: p.status, origin: p.origin, manual: p.origin === 'ADJUSTED' || /^(manual|auto)-/.test(String(p.clientId || '')), hasPhoto: photoIds.has(p.id) })),
     certificates, requests,
     ocorrencias, monthOcorrencias, adjustments,
     punchWarnings: punchWarnings.map((w) => ({ id: w.id, message: w.message, shownCount: w.shownCount, firstShownAt: w.firstShownAt, lastShownAt: w.lastShownAt, ackAt: w.ackAt })),
