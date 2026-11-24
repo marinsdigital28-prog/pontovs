@@ -25,7 +25,11 @@ export async function POST(request: Request) {
   const rate = await consumeRateLimit(getRequestKey(request, 'admin-timesheet-pdf', manager.id), 15, 60_000);
   if (!rate.allowed) return rateLimitResponse(rate.retryAfterSeconds);
 
-  const certificateBase64 = process.env.PONTO_A1_CERT_BASE64;
+  // Cloudflare: o PFX em base64 (~11,6 KB) excede o limite de 5 KB por secret; aceita partes _PART_1.._PART_4.
+  const certificateBase64 =
+    process.env.PONTO_A1_CERT_BASE64 ||
+    [1, 2, 3, 4].map((i) => process.env[`PONTO_A1_CERT_BASE64_PART_${i}`] || '').join('') ||
+    undefined;
   const certificatePassword = process.env.PONTO_A1_PASSWORD;
   if (!certificateBase64 || !certificatePassword) {
     return NextResponse.json(

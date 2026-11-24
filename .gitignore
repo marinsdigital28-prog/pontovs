@@ -11,3 +11,6 @@ imports/report-employees-import.json
 
 # APKs gerados localmente — entregues separadamente
 releases/
+.open-next
+.wrangler
+.dev.vars

@@ -123,7 +123,13 @@ function mid(top: number, h: number, size: number) {
 let logoBytes: Promise<Buffer> | null = null;
 async function loadLogo(pdfDoc: PDFDocument) {
   try {
-    logoBytes ??= readFile(path.join(process.cwd(), 'public', 'espaco-progredir-logo.jpeg'));
+    logoBytes ??= readFile(path.join(process.cwd(), 'public', 'espaco-progredir-logo.jpeg')).catch(async () => {
+      // Cloudflare Workers não tem o diretório public/ no filesystem: busca o asset estático.
+      const base = (process.env.NEXTAUTH_URL || '').replace(/\/$/, '');
+      const res = await fetch(`${base}/espaco-progredir-logo.jpeg`);
+      if (!res.ok) throw new Error(`logo HTTP ${res.status}`);
+      return Buffer.from(await res.arrayBuffer());
+    });
     return await pdfDoc.embedJpg(await logoBytes);
   } catch {
     return null;
