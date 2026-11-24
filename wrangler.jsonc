@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pontovs",
+  "main": "custom-worker.js",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  "placement": { "region": "aws:sa-east-1" },
+  "vars": {
+    "NODE_ENV": "production",
+    "NEXTAUTH_URL": "https://ponto.marinsdistemas.xyz"
+  },
+  // Mesmos horários (UTC) do vercel.json: 17:20 e 08:00 Brasília.
+  "triggers": { "crons": ["20 20 * * *", "0 11 * * *"] }
+}
