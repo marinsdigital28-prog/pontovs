@@ -2,15 +2,19 @@
  * Verificação automática das 17:20 (America/Sao_Paulo).
  * Lógica PURA (sem banco) para ser testada com casos reais.
  *
- * Regras (Portaria 671): nunca altera batida original; só PROPÕE inserir a batida que falta como ajuste (*).
- *  - 3 batidas num dia integral, tudo coerente → AUTO (insere a que falta pelo horário da escala, almoço redondo).
+ * Regras (Portaria 671): nunca altera batida original; só PROPÕE a leitura correta (tipo efetivo, tabela separada)
+ * e a batida que falta como ajuste (*).
+ *  - Leitura inteligente (lib/punch-classifier): escala do dia + hábito pessoal + duração do almoço, com confiança.
+ *  - 3 batidas num dia integral, confiança ≥ 75% → AUTO (no modo teste vira sugestão). Abaixo disso, pendência;
+ *    abaixo de 35%, "dúvida". Nunca soma +60 cego; nunca Retorno ≥ 13:30 fora do hábito.
  *  - ≤2 batidas, tipo estranho, sem foto, fora da escala, pedido do app, atestado/declaração parcial, dúvida → PENDÊNCIA.
  *  - Escala que termina depois das 17:20, ou dia ainda sem Saída às 17:20 → ADIADO (re-checa às 08:00 do dia seguinte).
  */
 import { resolveDaySchedule, type DaySchedule } from './day-schedule';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { getOperationalAbono, shouldSuppressAbono } from './operational-abonos';
-import { label as typeLabel, roundLunchTime } from './day-guards';
+import { label as typeLabel } from './day-guards';
+import { AUTO_MIN_CONFIDENCE, computeHabit, describeReading, interpretDay, toClassSchedule, type HistoryDay, type Reading } from './punch-classifier';
 
 export const AUTO_CLOSE_REASON = 'Ajuste automático 17:20';
 export const CUTOFF_MINUTES = 17 * 60 + 20;
@@ -20,14 +24,15 @@ const HOURLY = new Set(['HORAS', 'PERIODO_HORAS', 'TRABALHO_EXTERNO_HORAS', 'CON
 const ACTIVE = new Set(['ATIVO', 'APROVADO']);
 
 export type ACEmployee = { id: string; name: string; employeeNumber: string | null; workDays: string | null; scheduleStart: string | null; scheduleEnd: string | null; scheduleByDay: string | null };
-export type ACPunch = { id: string; type: string; timestamp: Date | string; status: string; origin?: string | null; hasPhoto: boolean; clientId?: string | null };
+export type ACPunch = { id: string; type: string; timestamp: Date | string; status: string; origin?: string | null; hasPhoto: boolean; clientId?: string | null; originalType?: string; interpretation?: { type: string; source: string } | null };
 export type ACCert = { id: string; type: string; startDate: Date | string; endDate: Date | string; startTime?: string | null; endTime?: string | null; status: string };
 export type ACRequest = { id: string; type: string; status: string; startDate: Date | string; endDate: Date | string; launchedAt?: Date | string | null; reason?: string | null; details?: string | null };
 export type Phase = 'TARDE' | 'MANHA' | 'COMPLETO';
 
 export type SuggestionPunch = { type: string; time: string };
+export type SuggestionRelabel = { punchId: string; time: string; from: string; to: string };
 export type Suggestion =
-  | { kind: 'INSERT_PUNCHES'; punches: SuggestionPunch[]; text: string }
+  | { kind: 'INSERT_PUNCHES'; punches: SuggestionPunch[]; relabels?: SuggestionRelabel[]; confidence?: number; level?: string; resultingDay?: string; text: string }
   | { kind: 'DIA_EXTRA'; text: string }
   | { kind: 'LAUNCH_REQUEST'; requestId: string; text: string }
   | { kind: 'TEXT'; text: string };
@@ -41,6 +46,10 @@ export type DayDecision = {
   punchesText: string;
   checks: Check[];
   proposal?: SuggestionPunch;
+  /** Leitura do sistema para batidas originais com tipo errado no totem (aplicada junto com o ajuste). */
+  relabels?: SuggestionRelabel[];
+  confidence?: number;
+  reading?: Pick<Reading, 'confidence' | 'level' | 'doubt' | 'alternative' | 'resultingDay'>;
   pendencia?: { kind: string; title: string; detail: string; suggestion: Suggestion | null };
   /** Esquecimento de batida → entra nas ocorrências do colaborador. */
   forgotten: boolean;
@@ -58,6 +67,7 @@ export function weekdayOf(date: string) { return new Date(`${date}T12:00:00-03:0
 export function scheduleFor(employee: ACEmployee, date: string) {
   const weekday = weekdayOf(date);
   const schedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
+  // Horário: scheduleByDay manda. Dia de trabalho: precisa estar também em workDays (evita faltas falsas; ver Jorge 0028).
   const workDays = employee.workDays ? parseWorkDays(employee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
   const scheduled = Boolean(schedule) && isScheduledDay(workDays, CODES[weekday]);
   return { schedule, scheduled, weekdayCode: CODES[weekday] };
@@ -68,31 +78,21 @@ export function endsAfterCutoff(schedule: DaySchedule | null) {
   return Boolean(schedule && toMin(schedule.end) > CUTOFF_MINUTES);
 }
 
-/** Completa as batidas que faltam: Entrada/Saída pela escala, almoço redondo (múltiplo de 30 min). */
-export function fillMissing(present: { type: string; min: number }[], schedule: DaySchedule | null, required: readonly string[]): SuggestionPunch[] | null {
-  if (!schedule) return null;
-  const byType = new Map(present.map((p) => [p.type, p.min]));
-  const out: SuggestionPunch[] = [];
-  const all = new Map(byType);
-  for (const type of required) {
-    if (byType.has(type)) continue;
-    let min: number;
-    if (type === 'ENTRADA') min = toMin(schedule.start);
-    else if (type === 'SAIDA') min = toMin(schedule.end);
-    else if (type === 'INTERVALO') min = all.has('RETORNO') ? toMin(roundLunchTime(toHm(all.get('RETORNO')! - 60))) : 12 * 60;
-    else min = all.has('INTERVALO') ? toMin(roundLunchTime(toHm(all.get('INTERVALO')! + 60))) : 13 * 60;
-    if (Number.isNaN(min)) return null;
-    all.set(type, min);
-    out.push({ type, time: toHm(min) });
-  }
-  // Ordem cronológica Entrada < Intervalo < Retorno < Saída, com pelo menos 2 min entre batidas.
-  const seq = required.map((t) => all.get(t)!);
-  for (let i = 1; i < seq.length; i += 1) if (!(seq[i] - seq[i - 1] >= 2)) return null;
-  return out;
+/** Completa as batidas que faltam (regra nova: hábito/escala, almoço redondo do hábito, nunca +60 cego). */
+export function fillMissing(present: { type: string; min: number }[], schedule: DaySchedule | null, required: readonly string[], history: HistoryDay[] = [], date = ''): SuggestionPunch[] | null {
+  const s = toClassSchedule(schedule);
+  if (!s) return null;
+  const lab: Record<string, number> = {};
+  for (const p of present) if (lab[p.type] === undefined) lab[p.type] = p.min;
+  const reading = interpretDay({ punches: present.map((p, i) => ({ id: `f${i}`, min: p.min, type: p.type, manual: false, fixed: true })), schedule: s, habit: date ? computeHabit(history, date) : null });
+  if (reading.doubt) return null;
+  return reading.fills.filter((f) => required.includes(f.type)).map((f) => ({ type: f.type, time: toHm(f.min) }));
 }
 
-export function evaluateDay({ employee, date, punches, certificates = [], requests = [], phase = 'COMPLETO', undoneTypes = [] }: {
+export function evaluateDay({ employee, date, punches, certificates = [], requests = [], phase = 'COMPLETO', undoneTypes = [], history = [] }: {
   employee: ACEmployee; date: string; punches: ACPunch[]; certificates?: ACCert[]; requests?: ACRequest[]; phase?: Phase; undoneTypes?: string[];
+  /** Dias anteriores do colaborador (batidas originais, tipo efetivo) para o hábito pessoal. */
+  history?: HistoryDay[];
 }): DayDecision {
   const valid = normalizePunches(punches.filter((p) => p.status === 'VALID' && dateKeyOf(p.timestamp) === date));
   const { schedule, scheduled } = scheduleFor(employee, date);
@@ -145,39 +145,52 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
 
   if (!valid.length) return pend('SEM_BATIDAS', 'Sem nenhuma batida', `Dia de escala (${schedule?.start}–${schedule?.end}) sem batida, atestado ou abono.`, { kind: 'TEXT', text: 'Falta? Se tiver justificativa, lance no Dia do colaborador.' }, false);
 
-  // Duplicadas (mesmo tipo repetido ou < 2 min).
-  const dupType = types.find((t, i) => types.indexOf(t) !== i);
-  const nearDup = valid.find((p, i) => i > 0 && +new Date(p.timestamp) - +new Date(valid[i - 1].timestamp) < 2 * 60_000);
-  checks.push({ label: 'Sobreposição e duplicadas', ok: !dupType && !nearDup });
-  checks.push({ label: 'Tipo de cada batida', ok: inOrder && !dupType });
-  if (dupType || nearDup || !inOrder) {
-    const hint = wrongTypeHint(valid, required);
-    return pend('TIPO_ERRADO', 'Tipo de batida estranho', `${punchesText}. ${dupType ? `${typeLabel(dupType)} repetido.` : nearDup ? 'Batidas a menos de 2 min.' : 'Sequência fora de ordem.'}`, { kind: 'TEXT', text: hint }, true);
-  }
-  if (types.length > required.length) return pend('CONFLITO', 'Batidas a mais', `${punchesText}.`, { kind: 'TEXT', text: 'Confira e cancele a batida indevida no Dia do colaborador.' }, false);
+  // Lançamento manual de madrugada (ex.: 12:00 digitado como 00:00 / 12 AM): nunca interpretar, o gestor confere.
+  const odd = valid.find((p) => isManual(p) && !p.hasPhoto && toMin(hmOf(p.timestamp)) < 5 * 60);
+  checks.push({ label: 'Horário dos lançamentos manuais', ok: !odd });
+  if (odd) return pend('HORARIO_SUSPEITO', `${typeLabel(odd.type)}* lançada às ${hmOf(odd.timestamp)}`, `${punchesText}. Lançamento manual de madrugada — provavelmente meio-dia digitado como 00:00 (12 AM). A batida não foi alterada.`, { kind: 'TEXT', text: `Confira: se era ${typeLabel(odd.type)} 12:00, cancele a batida das ${hmOf(odd.timestamp)}* e lance a correta no Dia do colaborador.` }, false);
 
-  const present = valid.map((p) => ({ type: p.type, min: toMin(hmOf(p.timestamp)) }));
-  const fill = fillMissing(present, schedule, required);
+  // Duplicadas a menos de 2 min: clique duplo/erro de totem → o gestor decide qual vale.
+  const nearDup = valid.find((p, i) => i > 0 && +new Date(p.timestamp) - +new Date(valid[i - 1].timestamp) < 2 * 60_000);
+  checks.push({ label: 'Sobreposição e duplicadas', ok: !nearDup });
+  if (nearDup) return pend('TIPO_ERRADO', 'Batidas a menos de 2 min', `${punchesText}. Batidas a menos de 2 min.`, { kind: 'TEXT', text: wrongTypeHint(valid, required) }, true);
+
+  const cs = toClassSchedule(schedule);
   const photosOk = valid.every((p) => p.hasPhoto || isManual(p));
   checks.push({ label: `Fotos das ${valid.length} batidas`, ok: photosOk });
-  checks.push({ label: `Escala do dia${schedule ? ` (${schedule.start}–${schedule.end})` : ''}`, ok: Boolean(schedule) });
-  const lastType = types[types.length - 1];
-  // Intervalo como última batida às ≥13:30 sem volta → provavelmente era Saída (não corrige sozinho).
-  const lastIsLateBreak = lastType === 'INTERVALO' && present[present.length - 1].min >= 13 * 60 + 30 && !half;
+  checks.push({ label: `Escala do dia${schedule ? ` (${schedule.start}–${schedule.end})` : ''}`, ok: Boolean(cs) });
+  if (!cs) return pend('POUCAS_BATIDAS', `${valid.length} batida(s) sem escala`, `${punchesText}. Sem escala no cadastro para este dia.`, { kind: 'TEXT', text: 'Sem sugestão segura: cadastre a escala (por dia) e informe os horários no Ajustar.' }, true);
 
-  if (!half && valid.length === 3 && fill && fill.length === 1 && photosOk && !undoneTypes.includes(fill[0].type)) {
-    checks.push({ label: 'Almoço em horário redondo', ok: true });
-    return { ...base, outcome: 'AUTO', reason: `Falta ${typeLabel(fill[0].type)}`, proposal: fill[0], forgotten: true };
+  const habit = computeHabit(history, date);
+  const reading = interpretDay({
+    punches: valid.map((p) => ({ id: p.id, min: toMin(hmOf(p.timestamp)), type: p.type, manual: isManual(p), fixed: isManual(p) || ['GESTOR', 'SUGESTAO_ACEITA'].includes(String(p.interpretation?.source || '')) })),
+    schedule: cs,
+    habit,
+  });
+  const pct = Math.round(reading.confidence * 100);
+  const readingInfo = { confidence: reading.confidence, level: reading.level, doubt: reading.doubt, alternative: reading.alternative, resultingDay: reading.resultingDay };
+  checks.push({ label: `Leitura do sistema (${habit ? `hábito de ${habit.n} dias` : 'sem histórico: escala'}) · ${pct}%`, ok: reading.level === 'ALTA' });
+  if (reading.doubt && /mais batidas/.test(reading.doubt)) return pend('CONFLITO', 'Batidas a mais', `${punchesText}.`, { kind: 'TEXT', text: 'Confira e cancele a batida indevida no Dia do colaborador.' }, false);
+  const relabels: SuggestionRelabel[] = reading.relabels.map((r) => ({ punchId: r.punchId, time: toHm(r.min), from: r.from, to: r.to }));
+  const fills: SuggestionPunch[] = reading.fills.filter((f) => required.includes(f.type) || valid.length > 2).map((f) => ({ type: f.type, time: toHm(f.min) }));
+  if (!relabels.length && !fills.length) return { ...base, outcome: 'OK', reason: 'Dia completo (leitura do sistema)', reading: readingInfo };
+
+  const text = describeReading(reading);
+  const lastP = valid[valid.length - 1];
+  const earlyExit = reading.labels[lastP.id] === 'SAIDA' && toMin(hmOf(lastP.timestamp)) < toMin(schedule!.end) - 5 ? ` Saída antecipada às ${hmOf(lastP.timestamp)} fica como está.` : '';
+  const suggestion: Suggestion = reading.doubt
+    ? { kind: 'TEXT', text: `Dúvida: ${reading.doubt} Leitura provável: ${reading.resultingDay}. Informe os horários no Ajustar.` }
+    : { kind: 'INSERT_PUNCHES', punches: fills, relabels, confidence: reading.confidence, level: reading.level, resultingDay: reading.resultingDay, text: `Sugestão (${pct}%): ${text}. Dia fica: ${reading.resultingDay}.${earlyExit}` };
+
+  if (!half && valid.length === 3 && fills.length === 1 && !reading.doubt && reading.confidence >= AUTO_MIN_CONFIDENCE && photosOk && !undoneTypes.includes(fills[0].type)) {
+    return { ...base, outcome: 'AUTO', reason: `Falta ${typeLabel(fills[0].type)}`, proposal: fills[0], relabels, confidence: reading.confidence, reading: readingInfo, pendencia: { kind: 'AJUSTE_SUGERIDO', title: `Ajuste sugerido (${pct}%): ${text}`, detail: '', suggestion }, forgotten: true };
   }
-  if (lastIsLateBreak) return pend('TIPO_ERRADO', 'Saída marcada como Intervalo?', `${punchesText}. A última batida é Intervalo às ${toHm(present[present.length - 1].min)} e não há volta.`, { kind: 'TEXT', text: `Sugestão: mudar o tipo da batida das ${toHm(present[present.length - 1].min)} para Saída (Ajustar).` }, true);
-
-  const why = !photosOk ? 'batida sem foto' : !schedule ? 'sem escala no cadastro' : !fill ? 'o horário da escala não encaixa nas batidas' : undoneTypes.length ? 'um ajuste automático deste dia foi desfeito' : `${valid.length} batida(s)`;
-  const kind = !photosOk ? 'SEM_FOTO' : 'POUCAS_BATIDAS';
-  const missingLabels = required.filter((t) => !distinct.has(t)).map(typeLabel).join(', ');
-  const suggestion: Suggestion | null = fill && fill.length
-    ? { kind: 'INSERT_PUNCHES', punches: fill, text: `Sugestão: ${fill.map((p) => `${typeLabel(p.type)} ${p.time}*`).join(' e ')}.${lastType === 'SAIDA' && present[present.length - 1].min < toMin(schedule!.end) - 5 ? ` Saída antecipada às ${toHm(present[present.length - 1].min)} fica como está.` : ''}` }
-    : { kind: 'TEXT', text: 'Sem sugestão segura: informe os horários no Ajustar.' };
-  return pend(kind, valid.length <= 2 ? `Só ${valid.length} batida${valid.length > 1 ? 's' : ''}` : `Falta ${missingLabels}`, `${punchesText}. Falta: ${missingLabels} (${why}).`, suggestion, true);
+  const missingLabels = reading.fills.map((f) => typeLabel(f.type)).join(', ');
+  const why = !photosOk ? 'batida sem foto' : reading.doubt ? reading.doubt : undoneTypes.length ? 'um ajuste automático deste dia foi desfeito' : reading.level !== 'ALTA' ? `confiança ${pct}% (< 75%)` : `${valid.length} batida(s)`;
+  const kind = !photosOk ? 'SEM_FOTO' : reading.level === 'DUVIDA' || reading.doubt ? 'DUVIDA' : !fills.length ? 'TIPO_ERRADO' : 'POUCAS_BATIDAS';
+  const title = kind === 'DUVIDA' ? `Dúvida (${pct}%): ${text || 'confira o dia'}` : kind === 'TIPO_ERRADO' ? `Tipo trocado no totem (${pct}%): ${text}` : valid.length <= 2 ? `Só ${valid.length} batida${valid.length > 1 ? 's' : ''} (${pct}%): ${text}` : `Sugestão (${pct}%): ${text}`;
+  const d = pend(kind, title, `${punchesText}.${missingLabels ? ` Falta: ${missingLabels}` : ''} (${why}).${reading.alternative ? ` Outra leitura possível: ${reading.alternative}.` : ''}`, suggestion, fills.length > 0);
+  return { ...d, relabels, confidence: reading.confidence, reading: readingInfo };
 }
 
 /**
