@@ -504,6 +504,7 @@ export default function Page() {
                   <span className="t-chip t-chip-strong">Matrícula {employee.employeeNumber}</span>
                   <strong className="t-who-name">{employee.name}</strong>
                   {nextType ? <span className="t-chip">Próxima marcação: {typeLabel(nextType)}</span> : null}
+                  {employee.suggestionWarning ? <span className="t-chip" role="alert" style={{ background: '#fef3c7', color: '#92400e', whiteSpace: 'normal' }}>⚠️ {employee.suggestionWarning}</span> : null}
                 </div>
               ) : null}
             </div>

@@ -6,7 +6,9 @@ import prisma from './prisma';
 import { appendAuditEvent } from './security-controls';
 import { isPeriodClosed, periodFromDate } from './period-closure';
 import { duplicatePunchReason, label as typeLabel } from './day-guards';
-import { AUTO_CLOSE_REASON, evaluateDay, summarize, type DayDecision, type Phase, type Suggestion, type SuggestionPunch } from './auto-close';
+import { AUTO_CLOSE_REASON, dateKeyOf, evaluateDay, hmOf, summarize, toMin, type DayDecision, type Phase, type Suggestion, type SuggestionPunch, type SuggestionRelabel } from './auto-close';
+import { isOriginalPunch, loadInterpretations, applyInterpretations, setInterpretation } from './punch-interpretation';
+import type { HistoryDay } from './punch-classifier';
 
 export type AutoCloseMode = 'DRY_RUN' | 'REAL';
 export const MODE_KEY = 'autoClose.mode';
@@ -47,7 +49,20 @@ export async function loadDay(date: string, userIds?: string[]) {
     prisma.autoAdjustment.findMany({ where: { date, userId: { in: ids }, status: 'UNDONE' }, select: { userId: true, type: true } }),
   ]);
   const photos = new Set(photoRows.map((p) => p.id));
-  return { employees, punches: punches.map((p) => ({ ...p, hasPhoto: photos.has(p.id) })), certificates, requests, undone };
+  // Hábito: últimos 60 dias de batidas ORIGINAIS (tipo efetivo = leitura do sistema quando houver).
+  const histFrom = new Date(from.getTime() - 61 * 86_400_000);
+  const histRows = await prisma.punch.findMany({ where: { userId: { in: ids }, status: 'VALID', timestamp: { gte: histFrom, lt: from } }, select: { id: true, userId: true, type: true, timestamp: true, origin: true, clientId: true }, orderBy: { timestamp: 'asc' } });
+  const interp = await loadInterpretations([...punches.map((p) => p.id), ...histRows.map((p) => p.id)]);
+  const history = new Map<string, HistoryDay[]>();
+  for (const p of applyInterpretations(histRows.filter((r) => isOriginalPunch(r)), interp)) {
+    const date = dateKeyOf(p.timestamp);
+    const list = history.get(p.userId) || [];
+    let day = list[list.length - 1];
+    if (!day || day.date !== date) { day = { date, punches: [] }; list.push(day); }
+    day.punches.push({ type: p.type, min: toMin(hmOf(p.timestamp)) });
+    history.set(p.userId, list);
+  }
+  return { employees, punches: applyInterpretations(punches, interp).map((p) => ({ ...p, hasPhoto: photos.has(p.id) })), certificates, requests, undone, history };
 }
 
 export async function evaluateDate(date: string, phase: Phase, userIds?: string[]) {
@@ -60,6 +75,7 @@ export async function evaluateDate(date: string, phase: Phase, userIds?: string[
       certificates: data.certificates.filter((c) => c.userId === e.id),
       requests: data.requests.filter((r) => r.employeeId === e.id),
       undoneTypes: data.undone.filter((u) => u.userId === e.id).map((u) => u.type),
+      history: data.history.get(e.id) || [],
     }));
   }
   return { decisions, employees: data.employees };
@@ -75,7 +91,7 @@ async function upsertOcorrencia(userId: string, date: string, source: 'AUTO_AJUS
   return row.id;
 }
 
-async function upsertPendencia(d: DayDecision, kind: string, title: string, detail: string, suggestion: Suggestion | null, dryRun: boolean, runId: string) {
+async function upsertPendencia(d: DayDecision, kind: string, title: string, detail: string, suggestion: Suggestion | null, dryRun: boolean, runId: string | null) {
   const key = { userId_date_kind: { userId: d.employeeId, date: d.date, kind } };
   const existing = await prisma.pendencia.findUnique({ where: key });
   if (existing && existing.status !== 'OPEN') return { id: existing.id, created: false };
@@ -91,7 +107,8 @@ export async function insertAdjustedPunch({ userId, unitId, date, punch, actorId
   if (Number.isNaN(timestamp.getTime())) throw new Error('Horário inválido.');
   if (await isPeriodClosed(periodFromDate(timestamp))) throw new Error('Competência fechada: reabra o período antes de ajustar.');
   const { from, to } = dayBounds(date);
-  const sameDay = await prisma.punch.findMany({ where: { userId, status: 'VALID', timestamp: { gte: from, lte: to } }, select: { id: true, type: true, timestamp: true } });
+  const sameDayRaw = await prisma.punch.findMany({ where: { userId, status: 'VALID', timestamp: { gte: from, lte: to } }, select: { id: true, type: true, timestamp: true } });
+  const sameDay = applyInterpretations(sameDayRaw, await loadInterpretations(sameDayRaw.map((p) => p.id)));
   if (sameDay.some((p) => p.type === punch.type)) throw new Error(`Já existe ${typeLabel(punch.type)} válida neste dia.`);
   const dup = duplicatePunchReason(sameDay, { type: punch.type, timestamp });
   if (dup) throw new Error(dup);
@@ -123,19 +140,22 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
     try {
       if (d.outcome === 'AUTO' && d.proposal) {
         const emp = employees.find((e) => e.id === d.employeeId)!;
+        const sug = d.pendencia?.suggestion || { kind: 'INSERT_PUNCHES' as const, punches: [d.proposal], relabels: d.relabels || [], text: `Sugestão: ${typeLabel(d.proposal.type)} ${d.proposal.time}*.` };
+        const title = d.pendencia?.title || `Ajuste sugerido: ${typeLabel(d.proposal.type)} ${d.proposal.time}*`;
         if (mode === 'REAL' && system) {
           try {
+            await applyRelabels(d.employeeId, date, d.relabels || [], system, 'AUTO', d.confidence ?? null, `${AUTO_CLOSE_REASON} (leitura do sistema ${Math.round((d.confidence ?? 0) * 100)}%)`);
             const r = await insertAdjustedPunch({ userId: d.employeeId, unitId: emp.unitId, date, punch: d.proposal, actorId: system, reason: `${AUTO_CLOSE_REASON} (sistema)`, runId: run.id });
             await upsertOcorrencia(d.employeeId, date, 'AUTO_AJUSTE', `Esqueceu ${typeLabel(d.proposal.type)} · ajustado ${d.proposal.time}* (${d.punchesText})`, { adjustmentId: r.adjustment!.id });
-            applied.push({ employeeId: d.employeeId, name: d.employeeName, type: d.proposal.type, time: d.proposal.time, adjustmentId: r.adjustment!.id });
+            applied.push({ employeeId: d.employeeId, name: d.employeeName, type: d.proposal.type, time: d.proposal.time, relabels: d.relabels || [], adjustmentId: r.adjustment!.id });
             continue;
           } catch (error) {
-            const p = await upsertPendencia(d, 'AJUSTE_SUGERIDO', `Ajuste não gravado: ${typeLabel(d.proposal.type)} ${d.proposal.time}*`, `${d.punchesText}. Motivo: ${(error as Error).message}`, { kind: 'INSERT_PUNCHES', punches: [d.proposal], text: `Sugestão: ${typeLabel(d.proposal.type)} ${d.proposal.time}*.` }, false, run.id);
+            const p = await upsertPendencia(d, 'AJUSTE_SUGERIDO', `Ajuste não gravado: ${title}`, `${d.punchesText}. Motivo: ${(error as Error).message}`, sug, false, run.id);
             await upsertOcorrencia(d.employeeId, date, 'PENDENCIA', `Esqueceu ${typeLabel(d.proposal.type)} (${d.punchesText})`, { pendenciaId: p.id });
             continue;
           }
         }
-        const p = await upsertPendencia(d, 'AJUSTE_SUGERIDO', `Ajuste sugerido: ${typeLabel(d.proposal.type)} ${d.proposal.time}*`, `${d.punchesText}. Falta ${typeLabel(d.proposal.type)}; tudo conferido (fotos, tipos, escala, abonos, pedidos). Modo teste: nada foi gravado.`, { kind: 'INSERT_PUNCHES', punches: [d.proposal], text: `Sugestão: ${typeLabel(d.proposal.type)} ${d.proposal.time}* (horário da escala${['INTERVALO', 'RETORNO'].includes(d.proposal.type) ? ', almoço redondo' : ''}).` }, true, run.id);
+        const p = await upsertPendencia(d, 'AJUSTE_SUGERIDO', title, `${d.punchesText}. Falta ${typeLabel(d.proposal.type)}; tudo conferido (fotos, tipos, escala, hábito, abonos, pedidos). Modo teste: nada foi gravado.`, sug, true, run.id);
         await upsertOcorrencia(d.employeeId, date, 'PENDENCIA', `Esqueceu ${typeLabel(d.proposal.type)} (${d.punchesText})`, { pendenciaId: p.id });
       } else if (d.outcome === 'PENDENCIA' && d.pendencia) {
         const p = await upsertPendencia(d, d.pendencia.kind, d.pendencia.title, d.pendencia.detail, d.pendencia.suggestion, mode === 'DRY_RUN', run.id);
@@ -156,9 +176,20 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
       autoResolved.push({ pendenciaId: p.id, employeeId: p.userId, kind: p.kind });
     }
   }
-  await prisma.autoCloseRun.update({ where: { id: run.id }, data: { summaryJson: JSON.stringify({ summary, applied, errors, report, autoResolved }) } });
-  await appendAuditEvent({ action: 'AUTO_CLOSE_RUN', actorId: system, resource: 'AutoCloseRun', resourceId: run.id, metadata: { date, phase, mode, trigger, summary, applied: applied.length, errors: errors.length, autoResolved: autoResolved.length } });
-  return { runId: run.id, date, phase, mode, persisted: true, summary, report, applied, errors, autoResolved };
+  // Mesma data: se a leitura nova gerou outro tipo de pendência, a antiga (de leitura de batidas) é substituída.
+  for (const d of decisions) {
+    const kind = d.outcome === 'AUTO' ? (mode === 'REAL' ? null : 'AJUSTE_SUGERIDO') : d.outcome === 'PENDENCIA' ? d.pendencia?.kind : null;
+    if (!kind) continue;
+    const others = await prisma.pendencia.findMany({ where: { userId: d.employeeId, date, status: 'OPEN', kind: { in: RECHECK_KINDS.filter((k) => k !== kind) } }, select: { id: true } });
+    for (const o of others) await prisma.pendencia.update({ where: { id: o.id }, data: { status: 'RESOLVED', resolution: `Substituída pela leitura inteligente: ${d.pendencia?.title || d.reason}`, resolvedAt: new Date() } });
+  }
+  // Reconfere pendências abertas de dias anteriores com a leitura atual (fecha as que se resolveram e
+  // substitui sugestões antigas, ex.: Retorno 14:00 da regra +60). Nunca grava batida em dias passados.
+  let rechecked: RecheckResult = { checked: 0, resolved: [], replaced: [], updated: 0, errors: [] };
+  try { rechecked = await recheckOpenPendencias({ beforeDate: date, mode, runId: run.id }); } catch (error) { errors.push({ recheck: (error as Error).message }); }
+  await prisma.autoCloseRun.update({ where: { id: run.id }, data: { summaryJson: JSON.stringify({ summary, applied, errors, report, autoResolved, rechecked }) } });
+  await appendAuditEvent({ action: 'AUTO_CLOSE_RUN', actorId: system, resource: 'AutoCloseRun', resourceId: run.id, metadata: { date, phase, mode, trigger, summary, applied: applied.length, errors: errors.length, autoResolved: autoResolved.length, recheckResolved: rechecked.resolved.length, recheckReplaced: rechecked.replaced.length } });
+  return { runId: run.id, date, phase, mode, persisted: true, summary, report, applied, errors, autoResolved, rechecked };
 }
 
 export async function undoAdjustment(adjustmentId: string, actorId: string, reason: string) {
@@ -188,7 +219,7 @@ export async function resolvePendencia(id: string, action: 'ACEITAR' | 'IGNORAR'
     if (!s || s.kind === 'TEXT') throw new Error('Esta pendência não tem sugestão automática. Use Ajustar.');
     if (s.kind === 'INSERT_PUNCHES') {
       const emp = await prisma.user.findUnique({ where: { id: p.userId }, select: { unitId: true } });
-      const done: string[] = [];
+      const done: string[] = await applyRelabels(p.userId, p.date, s.relabels || [], actorId, 'SUGESTAO_ACEITA', s.confidence ?? null, `${AUTO_CLOSE_REASON} (sugestão aceita pelo gestor)`);
       for (const punch of s.punches) {
         await insertAdjustedPunch({ userId: p.userId, unitId: emp?.unitId || null, date: p.date, punch, actorId, reason: `${AUTO_CLOSE_REASON} (sugestão aceita pelo gestor)` });
         done.push(`${typeLabel(punch.type)} ${punch.time}*`);
@@ -213,4 +244,84 @@ export async function resolvePendencia(id: string, action: 'ACEITAR' | 'IGNORAR'
   await prisma.pendencia.update({ where: { id }, data: { status, resolution, resolvedAt: new Date(), resolvedById: actorId } });
   await appendAuditEvent({ action: `PENDENCIA_${status}`, actorId, resource: 'Pendencia', resourceId: id, metadata: { userId: p.userId, date: p.date, kind: p.kind, resolution } });
   return { status, resolution };
+}
+
+/** Aplica a leitura do sistema (tipo efetivo) nas batidas originais. Confere que o dia não mudou desde a sugestão. */
+export async function applyRelabels(userId: string, date: string, relabels: SuggestionRelabel[], actorId: string, source: 'AUTO' | 'SUGESTAO_ACEITA' | 'GESTOR', confidence: number | null, reason: string) {
+  if (!relabels.length) return [] as string[];
+  const ids = relabels.map((r) => r.punchId);
+  const rows = await prisma.punch.findMany({ where: { id: { in: ids }, userId, status: 'VALID' }, select: { id: true, type: true, timestamp: true, origin: true, clientId: true } });
+  const eff = applyInterpretations(rows, await loadInterpretations(ids));
+  for (const r of relabels) {
+    const p = eff.find((x) => x.id === r.punchId);
+    if (!p || dateKeyOf(p.timestamp) !== date) throw new Error(`A batida das ${r.time} não está mais válida neste dia. Reabra o Dia do colaborador.`);
+    if (p.type !== r.from && p.type !== r.to) throw new Error(`A batida das ${r.time} mudou de tipo desde a sugestão. Reabra o Dia do colaborador.`);
+  }
+  if (await isPeriodClosed(periodFromDate(new Date(`${date}T12:00:00-03:00`)))) throw new Error('Competência fechada: reabra o período antes de ajustar.');
+  const done: string[] = [];
+  for (const r of relabels) {
+    const res = await setInterpretation({ punchId: r.punchId, type: r.to, source, actorId, reason, confidence });
+    if (res.changed) done.push(`${r.time} → ${typeLabel(r.to)}`);
+  }
+  if (done.length) await appendAuditEvent({ action: 'PUNCH_INTERPRETATION_SET', actorId, resource: 'Punch', resourceId: ids.join(','), metadata: { userId, date, source, confidence, relabels } });
+  return done;
+}
+
+export const RECHECK_KINDS = ['AJUSTE_SUGERIDO', 'POUCAS_BATIDAS', 'TIPO_ERRADO', 'SEM_FOTO', 'DUVIDA', 'HORARIO_SUSPEITO'];
+
+export type RecheckResult = { checked: number; resolved: { pendenciaId: string; userId: string; date: string; kind: string; title: string }[]; replaced: { pendenciaId: string; userId: string; date: string; oldTitle: string; newKind: string; newTitle: string; newId: string }[]; updated: number; errors: { date: string; error: string }[] };
+
+/** Reconfere pendências OPEN (até 45 dias) de datas anteriores a `beforeDate` com a leitura atual. */
+export async function recheckOpenPendencias({ beforeDate, mode, runId, dryRunOnly = false, onlyUserIds }: { beforeDate: string; mode: AutoCloseMode; runId: string | null; dryRunOnly?: boolean; onlyUserIds?: string[] }): Promise<RecheckResult> {
+  const since = new Date(new Date(`${beforeDate}T12:00:00Z`).getTime() - 45 * 86_400_000).toISOString().slice(0, 10);
+  // Só pendências de leitura de batidas; pedidos do app, abonos, faltas e fora da escala ficam com o gestor.
+  const open = await prisma.pendencia.findMany({ where: { status: 'OPEN', kind: { in: RECHECK_KINDS }, date: { gte: since, lt: beforeDate }, ...(onlyUserIds ? { userId: { in: onlyUserIds } } : {}) }, select: { id: true, userId: true, date: true, kind: true, title: true, suggestionJson: true } });
+  const out: RecheckResult = { checked: 0, resolved: [], replaced: [], updated: 0, errors: [] };
+  const byDate = new Map<string, typeof open>();
+  for (const p of open) byDate.set(p.date, [...(byDate.get(p.date) || []), p]);
+  for (const [date, list] of [...byDate.entries()].sort()) {
+    try {
+      const { decisions } = await evaluateDate(date, 'COMPLETO', [...new Set(list.map((p) => p.userId))]);
+      for (const p of list) {
+        out.checked += 1;
+        const d = decisions.find((x) => x.employeeId === p.userId);
+        if (!d) continue; // colaborador inativo: deixa como está
+        if (d.outcome === 'OK' || d.outcome === 'SKIP') {
+          const resolution = `Resolvido sozinho na reconferência: ${d.reason}`;
+          out.resolved.push({ pendenciaId: p.id, userId: p.userId, date, kind: p.kind, title: p.title });
+          if (dryRunOnly) continue;
+          await prisma.pendencia.update({ where: { id: p.id }, data: { status: 'RESOLVED', resolution, resolvedAt: new Date() } });
+          await prisma.ocorrencia.updateMany({ where: { userId: p.userId, date, status: 'ATIVA', source: 'PENDENCIA', pendenciaId: p.id }, data: { status: 'CANCELADA', canceledAt: new Date(), cancelReason: 'Reconferência: o dia já estava completo (não há batida a lançar)' } });
+          continue;
+        }
+        const next = d.outcome === 'AUTO' && d.pendencia ? { ...d.pendencia, kind: 'AJUSTE_SUGERIDO' } : d.pendencia;
+        if (!next) continue;
+        const detail = d.outcome === 'AUTO' ? `${d.punchesText}. Reconferência com a leitura inteligente (escala + hábito). Nada foi gravado.` : next.detail;
+        const nextJson = next.suggestion ? JSON.stringify(next.suggestion) : null;
+        if (next.kind === p.kind) {
+          if (p.title === next.title && p.suggestionJson === nextJson) continue;
+          out.updated += 1;
+          if (p.title !== next.title) out.replaced.push({ pendenciaId: p.id, userId: p.userId, date, oldTitle: p.title, newKind: next.kind, newTitle: next.title, newId: p.id });
+          if (dryRunOnly) continue;
+          await prisma.pendencia.update({ where: { id: p.id }, data: { title: next.title, detail, suggestionJson: nextJson, dryRun: mode === 'DRY_RUN', runId } });
+          continue;
+        }
+        if (dryRunOnly) { out.replaced.push({ pendenciaId: p.id, userId: p.userId, date, oldTitle: p.title, newKind: next.kind, newTitle: next.title, newId: '(nova)' }); continue; }
+        const clash = await prisma.pendencia.findUnique({ where: { userId_date_kind: { userId: p.userId, date, kind: next.kind } }, select: { status: true } });
+        if (clash && clash.status !== 'OPEN') {
+          // já existe uma pendência desse tipo tratada pelo gestor: atualiza a aberta no lugar (não esconde nada)
+          await prisma.pendencia.update({ where: { id: p.id }, data: { title: next.title, detail, suggestionJson: nextJson, dryRun: mode === 'DRY_RUN', runId } });
+          out.replaced.push({ pendenciaId: p.id, userId: p.userId, date, oldTitle: p.title, newKind: p.kind, newTitle: next.title, newId: p.id });
+          continue;
+        }
+        const created = await upsertPendencia(d, next.kind, next.title, detail, next.suggestion, mode === 'DRY_RUN', runId);
+        await prisma.pendencia.update({ where: { id: p.id }, data: { status: 'RESOLVED', resolution: `Substituída pela leitura inteligente: ${next.title}`, resolvedAt: new Date() } });
+        await prisma.ocorrencia.updateMany({ where: { userId: p.userId, date, status: 'ATIVA', source: 'PENDENCIA', pendenciaId: p.id }, data: { pendenciaId: created.id } });
+        out.replaced.push({ pendenciaId: p.id, userId: p.userId, date, oldTitle: p.title, newKind: next.kind, newTitle: next.title, newId: created.id });
+      }
+    } catch (error) {
+      out.errors.push({ date, error: (error as Error).message });
+    }
+  }
+  return out;
 }

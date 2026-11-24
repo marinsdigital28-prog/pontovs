@@ -11,6 +11,7 @@ import { buildTimesheetRows, formatClock, formatSigned } from './timesheet-rows'
 import { evaluateDate } from './auto-close-server';
 import { dateKeyOf, hmOf, scheduleFor } from './auto-close';
 import { label as typeLabel } from './day-guards';
+import { scheduleSummary } from './day-schedule';
 import { ABSENCE_LABEL, proposeAbsence, proposeAddPunch, proposeCancelAdjusted, proposeLaunchRequest, proposeRemoveAbsence, type ProposalCard } from './assistant-actions';
 
 export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
@@ -87,7 +88,7 @@ export async function runAssistant({ messages, actor }: { messages: { role: 'use
   const propose = (name: string, fn: (i: any) => Promise<any>) => wrap(name, async (i) => { const r = await fn(i); if (r.ok) { proposals.push(r.card); return { propostaCriada: true, titulo: r.card.title, aviso: 'Cartão exibido ao gestor; nada gravado até ele clicar Confirmar.', precisaAnexarFoto: r.card.needsDocument }; } return { propostaCriada: false, erro: r.error }; });
 
   const tools = {
-    buscarColaborador: tool({ description: 'Procura colaboradores por nome ou matrícula. Retorna id, nome, matrícula, cargo e escala.', inputSchema: z.object({ nome: z.string().min(1) }), execute: wrap('buscarColaborador', async ({ nome }) => (await findEmployees(nome)).map((e) => ({ id: e.id, nome: e.name, matricula: e.employeeNumber, cargo: e.jobTitle, ativo: e.active, escala: e.scheduleByDay ? 'por dia (ver verDia)' : `${e.workDays || 'SEG-SEX'} ${e.scheduleStart || ''}–${e.scheduleEnd || ''}` }))) }),
+    buscarColaborador: tool({ description: 'Procura colaboradores por nome ou matrícula. Retorna id, nome, matrícula, cargo e escala.', inputSchema: z.object({ nome: z.string().min(1) }), execute: wrap('buscarColaborador', async ({ nome }) => (await findEmployees(nome)).map((e) => ({ id: e.id, nome: e.name, matricula: e.employeeNumber, cargo: e.jobTitle, ativo: e.active, escala: scheduleSummary(e) }))) }),
     verDia: tool({ description: 'Batidas (hora, tipo, foto sim/não, ajuste *), atestados/abonos, pedidos do app, ocorrências e avisos de um colaborador num dia.', inputSchema: z.object({ colaboradorId: z.string(), data: dateStr }), execute: wrap('verDia', async ({ colaboradorId, data }) => dayDetail(colaboradorId, data)) }),
     resumoDoMes: tool({ description: 'Totais da folha de um colaborador no mês: horas trabalhadas, previstas, saldo, faltas, horas extras, dias com alerta.', inputSchema: z.object({ colaboradorId: z.string(), mes: z.string().regex(/^\d{4}-\d{2}$/).describe('AAAA-MM') }), execute: wrap('resumoDoMes', async ({ colaboradorId, mes }) => monthSummary(colaboradorId, mes)) }),
     diaDaEquipe: tool({ description: 'Situação de toda a equipe num dia: quem não bateu, quem tem batida faltando, quem está de atestado/folga (mesma análise da verificação 17:20).', inputSchema: z.object({ data: dateStr }), execute: wrap('diaDaEquipe', async ({ data }) => { const { decisions } = await evaluateDate(data, data < today ? 'COMPLETO' : 'TARDE'); return decisions.filter((d) => d.outcome !== 'OK').map((d) => ({ nome: d.employeeName, situacao: d.outcome === 'SKIP' ? d.reason : d.outcome === 'DEFER' ? 'ainda no expediente' : d.reason, batidas: d.punchesText, sugestao: d.proposal ? `${typeLabel(d.proposal.type)} ${d.proposal.time}*` : d.pendencia?.suggestion?.text || null })); }) }),

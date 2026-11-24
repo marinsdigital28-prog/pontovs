@@ -1,3 +1,4 @@
+import { hasScheduleByDay, scheduleForDateKey } from './day-schedule';
 import { parseWorkDays as parseStoredWorkDays } from './timesheet-schedule';
 
 const BRASIL_TIME_ZONE = 'America/Sao_Paulo';
@@ -7,6 +8,9 @@ export type AnalyticsEmployee = {
   id: string;
   workDays: string | null;
   scheduleStart: string | null;
+  scheduleEnd?: string | null;
+  scheduleByDay?: string | null;
+  employeeNumber?: string | null;
 };
 
 export type AnalyticsPunch = {
@@ -105,13 +109,15 @@ export function analyzeAttendance(employees: AnalyticsEmployee[], punches: Analy
     let late = 0;
     let delayTotal = 0;
     for (const employee of employees) {
+      // Dia de trabalho: workDays (como a folha). Horário de entrada do dia: scheduleByDay.
       const workDays = parseStoredWorkDays(employee.workDays);
       if (!workDays.has(dayCode)) continue;
+      const daySchedule = hasScheduleByDay(employee) ? scheduleForDateKey(employee, date) : null;
       scheduled += 1;
       const dayPunches = punchDays.get(`${employee.id}|${date}`) || [];
       if (!dayPunches.length) continue;
       present += 1;
-      const expected = scheduleMinutes(employee.scheduleStart);
+      const expected = scheduleMinutes(daySchedule?.start ?? employee.scheduleStart);
       const entry = dayPunches.filter((punch) => punch.type === 'ENTRADA').sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())[0];
       if (expected === null || !entry) continue;
       punctualityEvaluated += 1;
