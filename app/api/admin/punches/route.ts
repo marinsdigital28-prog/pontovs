@@ -109,6 +109,8 @@ export async function GET(request: Request) {
     punches = rows.map((row) => ({ id: `recovery-${row.sourceId}`, type: row.type, timestamp: new Date(`${row.date}T${row.time}-03:00`), status: 'VALID', origin: 'RECOVERY', syncedAt: null, syncStatus: 'SYNCED', syncAttempts: 0, syncError: null, deviceId: null, deviceOs: null, appVersion: null, connectivity: 'UNKNOWN', latitude: null, longitude: null, accuracy: null, locationCapturedAt: null, locationValid: false, unit: null, user: { id: `offline-${row.employeeNumber}`, name: row.name, employeeNumber: row.employeeNumber, jobTitle: null } }));
   }
 
+  // Tipo efetivo = leitura do sistema (a batida original continua intacta; originalType mostra o do totem).
+  if (!degraded && punches.length) punches = (await withEffectiveTypes(punches as any[])) as any;
   const photoFlags = new Map<string, boolean>();
   if (punches.length) {
     try {
@@ -152,7 +154,8 @@ export async function GET(request: Request) {
 }
 
 
-import { manualClientId, manualPunchTypes, parseManualTimestamp } from '../../../../lib/manual-punch';
+import { isSuspiciousManualTime, manualClientId, manualPunchTypes, parseManualTimestamp } from '../../../../lib/manual-punch';
+import { withEffectiveTypes } from '../../../../lib/punch-interpretation';
 
 export async function POST(request: Request) {
   const manager = await requireManager();
@@ -170,6 +173,8 @@ export async function POST(request: Request) {
   if (reason.length < 5) return NextResponse.json({ error: 'Informe o motivo do lançamento com pelo menos 5 caracteres.' }, { status: 400 });
   const timestamp = parseManualTimestamp(date, time);
   if (!timestamp) return NextResponse.json({ error: 'Informe uma data e horário válidos.' }, { status: 400 });
+  // 12:00 digitado num relógio de 12h vira 00:00 (12 AM): bloqueia madrugada salvo confirmação explícita.
+  if (isSuspiciousManualTime(time) && !body?.confirmUnusualTime) return NextResponse.json({ error: `Horário ${time} é de madrugada. Se a intenção era meio-dia, use 12:00 (formato 24h). Se for mesmo de madrugada, confirme o horário.`, unusualTime: true }, { status: 422 });
 
   if (await isPeriodClosed(periodFromDate(timestamp))) return NextResponse.json({ error: 'A competência desta data está fechada. Reabra o período com autorização e justificativa antes de alterar o ponto.' }, { status: 423 });
   const employee = await prisma.user.findFirst({ where: { id: userId, role: 'EMPLOYEE' }, select: { id: true, unitId: true, name: true, employeeNumber: true } });
@@ -177,7 +182,7 @@ export async function POST(request: Request) {
   const clientId = manualClientId(employee.id, date, time, type);
   {
     const dayStart = new Date(`${date}T00:00:00-03:00`); const dayEnd = new Date(`${date}T23:59:59.999-03:00`);
-    const sameDay = await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: dayStart, lte: dayEnd } }, select: { id: true, type: true, timestamp: true } });
+    const sameDay = await withEffectiveTypes(await prisma.punch.findMany({ where: { userId: employee.id, status: 'VALID', timestamp: { gte: dayStart, lte: dayEnd } }, select: { id: true, type: true, timestamp: true } }));
     const dup = duplicatePunchReason(sameDay, { type, timestamp });
     if (dup && !body?.allowDuplicate) return NextResponse.json({ error: dup, duplicate: true }, { status: 409 });
   }

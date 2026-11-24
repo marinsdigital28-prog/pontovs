@@ -6,6 +6,15 @@ import prisma from '@/lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../../../lib/security-controls';
 import { isPeriodClosed, periodFromDate } from '../../../../../lib/period-closure';
 import { evaluateLocation } from '../../../../../lib/punch-integrity';
+import { isOriginalPunch, loadInterpretations, applyInterpretations, setInterpretation } from '../../../../../lib/punch-interpretation';
+
+/** Batida original do totem/app (Portaria 671): nunca muda tipo/horário na tabela Punch. */
+async function isOriginal(p: { id: string; origin: string | null; clientId: string | null }) {
+  if (isOriginalPunch(p)) return true;
+  if (/^(manual|auto)-/.test(String(p.clientId || ''))) return false;
+  const audits = await prisma.punchAudit.findMany({ where: { punchId: p.id, field: { in: ['created', 'manual_create'] } }, select: { field: true } });
+  return audits.some((a) => a.field === 'created') && !audits.some((a) => a.field === 'manual_create');
+}
 
 export const dynamic = 'force-dynamic';
 const allowedTypes = new Set(['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA']);
@@ -47,9 +56,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = await request.json().catch(() => null);
   const reason = String(body?.reason ?? '').trim();
   if (reason.length < 5) return NextResponse.json({ error: 'Informe um motivo com pelo menos 5 caracteres.' }, { status: 400 });
-  const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true, userId: true } });
-  if (!existing) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
-  if (existing.status === 'REJECTED') return NextResponse.json({ error: 'Uma marcação cancelada não pode ser editada.' }, { status: 409 });
+  const stored = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true, userId: true, origin: true, clientId: true } });
+  if (!stored) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
+  if (stored.status === 'REJECTED') return NextResponse.json({ error: 'Uma marcação cancelada não pode ser editada.' }, { status: 409 });
+  const original = await isOriginal(stored);
+  // Tipo efetivo = leitura do sistema (quando houver), para comparar e checar duplicidade.
+  const [existing] = applyInterpretations([stored], await loadInterpretations([stored.id]));
   if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de editar.' }, { status: 423 });
 
   const nextType = body?.type === undefined ? existing.type : String(body.type).trim().toUpperCase();
@@ -61,11 +73,26 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (nextType !== existing.type) changes.push({ field: 'type', oldValue: existing.type, newValue: nextType });
   if (nextTimestamp.getTime() !== existing.timestamp.getTime()) changes.push({ field: 'timestamp', oldValue: existing.timestamp.toISOString(), newValue: nextTimestamp.toISOString() });
   if (!changes.length) return NextResponse.json({ error: 'Nenhuma alteração foi informada.' }, { status: 400 });
+  if (original && changes.some((c) => c.field === 'timestamp')) {
+    return NextResponse.json({ error: 'Batida original não pode ter o horário alterado (Portaria 671). Cancele-a com motivo e lance um ajuste * com o horário certo.', original: true }, { status: 409 });
+  }
   if (nextType !== existing.type && !body?.allowDuplicate) {
     const day = existing.timestamp.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
-    const sameDay = await prisma.punch.findMany({ where: { userId: existing.userId, status: 'VALID', timestamp: { gte: new Date(`${day}T00:00:00-03:00`), lte: new Date(`${day}T23:59:59.999-03:00`) } }, select: { id: true, type: true, timestamp: true } });
+    const sameDayRaw = await prisma.punch.findMany({ where: { userId: existing.userId, status: 'VALID', timestamp: { gte: new Date(`${day}T00:00:00-03:00`), lte: new Date(`${day}T23:59:59.999-03:00`) } }, select: { id: true, type: true, timestamp: true } });
+    const sameDay = applyInterpretations(sameDayRaw, await loadInterpretations(sameDayRaw.map((p) => p.id)));
     const clash = sameDay.find((p) => p.id !== id && p.type === nextType && (nextType === 'SAIDA' || nextType === 'ENTRADA'));
     if (clash) return NextResponse.json({ error: `Já existe ${nextType === 'SAIDA' ? 'uma Saída' : 'uma Entrada'} válida neste dia. Cancele a outra antes.`, duplicate: true }, { status: 409 });
+  }
+
+  if (original) {
+    // Original: o tipo certo vai para a leitura do sistema (PunchInterpretation). A linha em Punch não muda.
+    try {
+      const r = await setInterpretation({ punchId: id, type: nextType, source: 'GESTOR', actorId: manager.id, reason });
+      await appendAuditEvent({ action: 'PUNCH_INTERPRETATION_SET', actorId: manager.id, resource: 'Punch', resourceId: id, metadata: { reason, from: r.oldType, to: r.newType, source: 'GESTOR', originalType: stored.type } });
+      return NextResponse.json({ punch: { id, type: nextType, originalType: stored.type, timestamp: stored.timestamp, status: stored.status, origin: stored.origin, interpretation: { type: nextType, source: 'GESTOR' } } });
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message || 'Não foi possível registrar a leitura.' }, { status: 500 });
+    }
   }
 
   try {
@@ -91,13 +118,15 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const body = await request.json().catch(() => null);
   const reason = String(body?.reason ?? '').trim();
   if (reason.length < 5) return NextResponse.json({ error: 'Informe um motivo com pelo menos 5 caracteres.' }, { status: 400 });
-  const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true } });
+  const existing = await prisma.punch.findUnique({ where: { id }, select: { id: true, type: true, timestamp: true, status: true, origin: true, clientId: true } });
   if (!existing) return NextResponse.json({ error: 'Marcação não encontrada.' }, { status: 404 });
   if (existing.status === 'REJECTED') return NextResponse.json({ error: 'A marcação já está cancelada.' }, { status: 409 });
+  const keepOrigin = await isOriginal(existing);
   if (await isPeriodClosed(periodFromDate(existing.timestamp))) return NextResponse.json({ error: 'A competência desta marcação está fechada. Reabra o período com autorização e justificativa antes de cancelar.' }, { status: 423 });
   try {
     const updated = await prisma.$transaction(async (tx) => {
-      const punch = await tx.punch.update({ where: { id }, data: { status: 'REJECTED', origin: 'ADJUSTED' }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });
+      // Desconsiderar mantém tipo/horário/foto; a origem de batida original continua sendo a original.
+      const punch = await tx.punch.update({ where: { id }, data: keepOrigin ? { status: 'REJECTED' } : { status: 'REJECTED', origin: 'ADJUSTED' }, select: { id: true, type: true, timestamp: true, status: true, origin: true } });
       await tx.punchAudit.create({ data: { id: crypto.randomUUID(), punchId: id, changedById: manager.id, field: 'status', oldValue: existing.status, newValue: 'REJECTED', reason } });
       return punch;
     });

@@ -212,7 +212,7 @@ export async function POST(request: Request) {
     await prisma.$transaction(async (tx) => {
       await tx.punch.update({
         where: { id: punch.id },
-        data: { status: 'REJECTED', origin: 'ADJUSTED' },
+        data: { status: 'REJECTED' } /* desconsiderar: tipo/horário/origem da batida ficam intactos */,
       });
       await tx.punchAudit.create({
         data: {

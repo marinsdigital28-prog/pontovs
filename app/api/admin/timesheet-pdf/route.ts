@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { appendAuditEvent, consumeRateLimit, getRequestKey, rateLimitResponse } from '@/lib/security-controls';
+import { withEffectiveTypes } from '@/lib/punch-interpretation';
 import { createSignedTimesheetPdf, createSignedTimesheetPdfBatch } from '@/lib/signed-timesheet-pdf';
 
 export const dynamic = 'force-dynamic';
@@ -83,9 +84,9 @@ export async function POST(request: Request) {
           const [punches, certificates, requests] = await Promise.all([
             prisma.punch.findMany({
               where: { userId: emp.id, status: 'VALID', timestamp: { gte: from, lt: to } },
-              select: { type: true, timestamp: true, origin: true },
+              select: { id: true, type: true, timestamp: true, origin: true },
               orderBy: { timestamp: 'asc' },
-            }),
+            }).then(withEffectiveTypes),
             prisma.medicalCertificate.findMany({
               where: {
                 userId: emp.id,
@@ -176,9 +177,9 @@ export async function POST(request: Request) {
     const [punches, certificates, requests] = await Promise.all([
       prisma.punch.findMany({
         where: { userId: employeeId, status: 'VALID', timestamp: { gte: from, lt: to } },
-        select: { type: true, timestamp: true, origin: true },
+        select: { id: true, type: true, timestamp: true, origin: true },
         orderBy: { timestamp: 'asc' },
-      }),
+      }).then(withEffectiveTypes),
       prisma.medicalCertificate.findMany({
         where: {
           userId: employeeId,
