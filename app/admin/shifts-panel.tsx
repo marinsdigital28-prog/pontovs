@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { hasScheduleByDay, primarySchedule, scheduleSummary, weekScheduleList } from '@/lib/day-schedule';
 import './shifts-panel.css';
 
 type Employee = {
@@ -65,8 +66,16 @@ export default function ShiftsPanel({
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'TODOS' | 'OK' | 'INCOMPLETO' | 'INATIVO'>('TODOS');
 
+  // scheduleByDay é a fonte da verdade: horário/dias exibidos vêm da escala por dia, não dos campos legados.
+  const effective = useMemo(() => employees.map((e) => {
+    if (!hasScheduleByDay(e)) return { ...e, summary: null as string | null };
+    const main = primarySchedule(e);
+    const days = weekScheduleList(e).filter((d) => d.start).map((d) => d.day).join(',');
+    return { ...e, scheduleStart: main?.start ?? e.scheduleStart, scheduleEnd: main?.end ?? e.scheduleEnd, workDays: days, summary: scheduleSummary(e) };
+  }), [employees]);
+
   const rows = useMemo(() => {
-    return employees
+    return effective
       .map((e) => {
         const days = parseDays(e.workDays);
         const hasSchedule = Boolean(e.scheduleStart && e.scheduleEnd);
@@ -86,10 +95,10 @@ export default function ShiftsPanel({
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  }, [employees, filter, search]);
+  }, [effective, filter, search]);
 
   const stats = useMemo(() => {
-    const active = employees.filter((e) => e.active);
+    const active = effective.filter((e) => e.active);
     const withFull = active.filter((e) => e.scheduleStart && e.scheduleEnd && parseDays(e.workDays).size > 0);
     const incomplete = active.length - withFull.length;
     const patterns = new Map<string, number>();
@@ -103,7 +112,7 @@ export default function ShiftsPanel({
       count: active.filter((e) => parseDays(e.workDays).has(d)).length,
     }));
     return { active: active.length, withFull: withFull.length, incomplete, topPatterns, dayCoverage };
-  }, [employees]);
+  }, [effective]);
 
   return (
     <section className="shifts-panel">
@@ -183,7 +192,7 @@ export default function ShiftsPanel({
                   <i key={d} className={e.days.has(d) ? 'on' : ''} title={WEEK_LABEL[d]}>{WEEK_LABEL[d][0]}</i>
                 ))}
               </div>
-              <span className="shifts-hours">{formatSpan(e.scheduleStart, e.scheduleEnd)}</span>
+              <span className="shifts-hours" title={e.summary || undefined}>{e.summary || formatSpan(e.scheduleStart, e.scheduleEnd)}</span>
               <span className="shifts-load">{hoursLabel(e.scheduleStart, e.scheduleEnd)}</span>
               <span className={`status-pill ${!e.active ? 'off' : e.incomplete ? 'warn' : 'ok'}`}>
                 {!e.active ? 'Inativo' : e.incomplete ? 'Incompleto' : 'OK'}

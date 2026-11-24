@@ -12,7 +12,7 @@ const fmtDay = (d: string) => `${WD[new Date(`${d}T12:00:00Z`).getUTCDay()]} ${d
 const dt = (v: string | null) => v ? new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
 const CHIP: Record<string, [string, string]> = {
   AJUSTE_SUGERIDO: ['ajuste sugerido', 'y'], POUCAS_BATIDAS: ['batidas faltando', 'r'], SEM_BATIDAS: ['sem batida', 'r'], FORA_ESCALA: ['fora da escala', 'y'],
-  TIPO_ERRADO: ['tipo estranho', 'r'], PEDIDO_NAO_LANCADO: ['pedido do app não lançado', 'y'], SEM_FOTO: ['sem foto', 'r'], CONFLITO: ['abono parcial', 'y'],
+  TIPO_ERRADO: ['tipo estranho', 'r'], PEDIDO_NAO_LANCADO: ['pedido do app não lançado', 'y'], SEM_FOTO: ['sem foto', 'r'], CONFLITO: ['abono parcial', 'y'], DUVIDA: ['dúvida — confira', 'y'], HORARIO_SUSPEITO: ['horário suspeito', 'r'],
 };
 
 export default function PendenciasInbox({ onAdjust, onCount }: { onAdjust: (userId: string, date: string) => void; onCount?: (n: number) => void }) {

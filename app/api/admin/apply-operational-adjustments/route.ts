@@ -1,3 +1,4 @@
+import { isOriginalPunch } from '@/lib/punch-interpretation';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
     anaMariaPunchesCancelled: 0,
     anaMariaCertificate: false,
     vendavalSaidasAdjusted: 0,
+    vendavalOriginalsKept: 0,
     kaioCertificates: 0,
   };
 
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
       await prisma.$transaction(async (tx) => {
         await tx.punch.update({
           where: { id: punch.id },
-          data: { status: 'REJECTED', origin: 'ADJUSTED' },
+          data: { status: 'REJECTED' } /* desconsiderar: tipo/horário/origem da batida ficam intactos */,
         });
         await tx.punchAudit.create({
           data: {
@@ -118,7 +120,7 @@ export async function POST(request: Request) {
 
   const dayPunches = await prisma.punch.findMany({
     where: { status: 'VALID', timestamp: { gte: vStart, lte: vEnd } },
-    select: { id: true, userId: true, type: true, timestamp: true, status: true },
+    select: { id: true, userId: true, type: true, timestamp: true, status: true, origin: true, clientId: true },
     orderBy: { timestamp: 'asc' },
   });
   const byUser = new Map<string, typeof dayPunches>();
@@ -131,6 +133,8 @@ export async function POST(request: Request) {
     const saidas = list.filter((p) => p.type === 'SAIDA');
     if (saidas.length) {
       const last = saidas[saidas.length - 1];
+      // Portaria 671: horário de batida ORIGINAL nunca é reescrito. Só ajustes * podem mudar.
+      if (isOriginalPunch(last)) { summary.vendavalOriginalsKept += 1; continue; }
       if (last.timestamp.getTime() !== targetSaida.getTime()) {
         await prisma.$transaction(async (tx) => {
           await tx.punch.update({

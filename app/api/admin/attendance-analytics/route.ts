@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
   const employees = await prisma.user.findMany({
     where: { active: true, role: 'EMPLOYEE', ...(employeeId ? { id: employeeId } : {}) },
-    select: { id: true, name: true, employeeNumber: true, workDays: true, scheduleStart: true },
+    select: { id: true, name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true },
     orderBy: { name: 'asc' },
   });
   const punches = employees.length ? await prisma.punch.findMany({
