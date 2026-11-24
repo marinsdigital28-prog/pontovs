@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../../lib/auth';
 import prisma from '../../../../lib/prisma';
+import { primarySchedule, scheduleForNow, scheduleSummary, weekScheduleList, workDaysLabel } from '@/lib/day-schedule';
+import { withEffectiveTypes } from '@/lib/punch-interpretation';
 import { touchAppAccess } from '../../../../lib/app-access';
 
 export const dynamic = 'force-dynamic';
@@ -90,7 +92,9 @@ export async function GET() {
       take: 100,
     });
 
-    const shaped = punches.map((p) => ({
+    const todaySchedule = scheduleForNow(employee);
+    const mainSchedule = primarySchedule(employee);
+    const shaped = (await withEffectiveTypes(punches)).map((p) => ({
       id: p.id,
       type: p.type,
       timestamp: p.timestamp,
@@ -106,9 +110,13 @@ export async function GET() {
         employeeNumber: employee.employeeNumber,
         cpf: employee.cpf,
         jobTitle: employee.jobTitle,
-        workDays: employee.workDays,
-        scheduleStart: employee.scheduleStart,
-        scheduleEnd: employee.scheduleEnd,
+        // scheduleByDay é a fonte da verdade: início/fim = escala de HOJE (ou a principal, se hoje é folga).
+        workDays: workDaysLabel(employee),
+        scheduleStart: todaySchedule?.start ?? mainSchedule?.start ?? null,
+        scheduleEnd: todaySchedule?.end ?? mainSchedule?.end ?? null,
+        worksToday: Boolean(todaySchedule),
+        scheduleSummary: scheduleSummary(employee),
+        weekSchedule: weekScheduleList(employee),
         scheduleByDay: parseScheduleByDay(employee.scheduleByDay),
         profile: parseProfile(employee.profileJson),
         active: employee.active,

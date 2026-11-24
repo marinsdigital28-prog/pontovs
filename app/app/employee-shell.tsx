@@ -15,7 +15,7 @@ type EmpProfile = {
 type EmployeeData = {
   employee: {
     id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle: string | null;
-    scheduleStart: string | null; scheduleEnd: string | null; workDays: string | null;
+    scheduleStart: string | null; scheduleEnd: string | null; workDays: string | null; scheduleSummary?: string; worksToday?: boolean;
     scheduleByDay?: Record<string, { start?: string; end?: string; mode?: string }> | null;
     profile?: EmpProfile | null; active?: boolean; unitName?: string | null;
   };
@@ -243,7 +243,8 @@ export default function EmployeeAppPage() {
       if (key) hasOverride = true;
     }
     let worksToday = true;
-    if (hasOverride) worksToday = true;
+    if (typeof data?.employee?.worksToday === 'boolean') worksToday = data.employee.worksToday; // servidor já resolveu pela escala por dia
+    else if (hasOverride) worksToday = true;
     else if (workDaysRaw) {
       if (workDaysRaw.trim().startsWith('[')) {
         try {
@@ -259,7 +260,7 @@ export default function EmployeeAppPage() {
         ? 'Hoje é sua folga. Sem expediente.'
         : 'Hoje não tem expediente na sua escala.'),
     };
-  }, [data?.employee?.workDays, data?.employee?.scheduleByDay]);
+  }, [data?.employee?.workDays, data?.employee?.scheduleByDay, data?.employee?.worksToday]);
 
   const missingPunchHint = useMemo(() => {
     if (workDayInfo && !workDayInfo.worksToday) return null as null | { type: string; label: string; message: string };
@@ -595,7 +596,7 @@ export default function EmployeeAppPage() {
             <div className="emp-card emp-hero">
               <span className="emp-label">Hoje</span>
               <strong className="emp-big">{emp?.scheduleStart || '--:--'} às {emp?.scheduleEnd || '--:--'}</strong>
-              <p className="emp-muted">Jornada prevista · {emp?.workDays || 'dias não informados'}</p>
+              <p className="emp-muted">{emp?.worksToday === false ? 'Hoje é folga · ' : 'Jornada prevista · '}{emp?.scheduleSummary || emp?.workDays || 'dias não informados'}</p>
             </div>
 
             {!workDayInfo.worksToday ? (
@@ -699,7 +700,7 @@ export default function EmployeeAppPage() {
             <div className="emp-card">
               <span className="emp-label">Sua jornada cadastrada</span>
               <strong className="emp-big">{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong>
-              <p className="emp-muted">{emp?.workDays || 'Dias não informados'}</p>
+              <p className="emp-muted">{emp?.scheduleSummary || emp?.workDays || 'Dias não informados'}</p>
             </div>
           </section>
         )}
@@ -872,7 +873,7 @@ export default function EmployeeAppPage() {
             </div>
             <div className="emp-card">
               <h2>Jornada</h2>
-              <div className="emp-row"><span>Horário padrão</span><strong>{emp?.scheduleStart || '--:--'}–{emp?.scheduleEnd || '--:--'}</strong></div>
+              <div className="emp-row"><span>Horário</span><strong>{emp?.scheduleSummary || `${emp?.scheduleStart || '--:--'}–${emp?.scheduleEnd || '--:--'}`}</strong></div>
               <div className="emp-row"><span>Dias</span><strong>{emp?.workDays || '—'}</strong></div>
             </div>
             <div className="emp-card">

@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
-import { resolveDaySchedule } from '../../../lib/day-schedule';
+import { scheduleForNow } from '../../../lib/day-schedule';
+import { withEffectiveTypes } from '../../../lib/punch-interpretation';
+import { habitLunch, loadHabit } from '../../../lib/habit-server';
+import { brazilDateKey } from '../../../lib/brazil-time';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 import { isExitOverrideActive } from '../../../lib/exit-override';
 import { findEmployeeFallback } from '../../../lib/employee-fallback';
@@ -43,26 +46,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Colaborador não encontrado ou inativo' }, { status: 404 });
     }
 
-    const schedule = resolveDaySchedule(
-      user.scheduleByDay,
-      user.workDays,
-      user.scheduleStart,
-      user.scheduleEnd,
-      new Date().getDay(),
-    );
+    // Escala de HOJE em Brasília (o Worker roda em UTC) — scheduleByDay é a fonte da verdade.
+    const schedule = scheduleForNow(user);
     const mode = schedule?.mode === 'HALF' ? 'HALF' : 'FULL';
     const resolvedScheduleEnd = schedule?.end ?? user.scheduleEnd?.slice(0, 5) ?? null;
+    const punchesToday = await withEffectiveTypes(user.punches);
+    const habit = punchesToday.length ? null : await loadHabit(user.id, brazilDateKey());
     const smart = resolveSmartPunchSuggestion({
-      punchesToday: user.punches,
+      punchesToday,
       mode,
       scheduleEnd: resolvedScheduleEnd,
+      scheduleStart: schedule?.start ?? null,
+      habitLunch: habitLunch(habit),
     });
 
     // Compatibilidade: nextType continua existindo para clientes antigos
     const nextType = smart.suggestedType ?? smart.sequentialType;
 
     const last = user.punches.length ? user.punches[user.punches.length - 1] : null;
-    const todayPunches = user.punches.map((punch) => ({
+    const todayPunches = punchesToday.map((punch) => ({
       id: punch.id,
       type: punch.type,
       timestamp: punch.timestamp,
@@ -87,6 +89,7 @@ export async function POST(req: Request) {
         sequentialType: smart.sequentialType,
         allowedTypes: smart.allowedTypes,
         suggestionReason: smart.reason,
+        suggestionWarning: smart.warning ?? null,
         journeyClosed: smart.journeyClosed,
         todayPunches,
         scheduleMode: mode,
