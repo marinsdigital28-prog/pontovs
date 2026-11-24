@@ -6,6 +6,7 @@ import { pdflibAddPlaceholder } from '@signpdf/placeholder-pdf-lib';
 import signpdf from '@signpdf/signpdf';
 import { P12Signer } from '@signpdf/signer-p12';
 import { INTER_BOLD, INTER_EXTRABOLD, INTER_REGULAR, INTER_SEMIBOLD } from './fonts/inter-fonts';
+import { scheduleSummary } from './day-schedule';
 import { buildTimesheetRows, formatClock, formatSigned, type TimesheetRow, type SituationTone } from './timesheet-rows';
 
 export type TimesheetEmployee = {
@@ -205,14 +206,8 @@ export async function buildTimesheetDocument({
   p.hline(7, 290, 13.81, 0.5, C.g);
 
   // Bloco do colaborador
-  const jornadaSpan = (() => {
-    const s = employee.scheduleStart?.match(/^(\d{1,2}):(\d{2})/); const e = employee.scheduleEnd?.match(/^(\d{1,2}):(\d{2})/);
-    if (!s || !e) return null;
-    return (Number(e[1]) * 60 + Number(e[2])) - (Number(s[1]) * 60 + Number(s[2]));
-  })();
-  const jornada = employee.scheduleStart && employee.scheduleEnd
-    ? `${employee.scheduleStart.slice(0, 5)}–${employee.scheduleEnd.slice(0, 5)}${jornadaSpan !== null && jornadaSpan > 360 ? ' · 1h' : ''}`
-    : 'Conforme escala';
+  // scheduleByDay é a fonte da verdade (campos legados podem estar desatualizados).
+  const jornada = scheduleSummary(employee);
   const emp: Array<[string, string, number, number]> = [
     ['COLABORADOR(A)', employee.name, 7.26, 75.78], ['MATRÍCULA', employee.employeeNumber || '—', 83.05, 31],
     ['CPF', employee.cpf || 'Não cadastrado', 114.05, 44.78], ['CARGO', employee.jobTitle || 'Colaborador(a)', 158.83, 41.34],

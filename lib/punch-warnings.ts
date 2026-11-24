@@ -6,6 +6,7 @@
 import prisma from './prisma';
 import { brazilDateKey } from './brazil-time';
 import { evaluateDay, hmOf, type ACPunch } from './auto-close';
+import { withEffectiveTypes } from './punch-interpretation';
 import { label as typeLabel } from './day-guards';
 
 export const LOOKBACK_DAYS = 7;
@@ -61,7 +62,7 @@ export async function loadAndComputeWarnings(employee: Emp & { id: string }, now
   const from = new Date(+new Date(`${today}T00:00:00-03:00`) - LOOKBACK_DAYS * 86_400_000);
   const noonFrom = new Date(`${brazilDateKey(from)}T12:00:00.000Z`);
   const [punches, photos, certificates, requests] = await Promise.all([
-    prisma.punch.findMany({ where: { userId: employee.id, timestamp: { gte: from } }, select: { id: true, type: true, timestamp: true, status: true, origin: true, clientId: true } }),
+    prisma.punch.findMany({ where: { userId: employee.id, timestamp: { gte: from } }, select: { id: true, type: true, timestamp: true, status: true, origin: true, clientId: true } }).then(withEffectiveTypes),
     prisma.punch.findMany({ where: { userId: employee.id, timestamp: { gte: from }, photoData: { not: null } }, select: { id: true } }),
     prisma.medicalCertificate.findMany({ where: { userId: employee.id, endDate: { gte: noonFrom } }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, status: true } }),
     prisma.employeeRequest.findMany({ where: { employeeId: employee.id, endDate: { gte: from }, status: { in: ['PENDENTE', 'APROVADO'] } }, select: { type: true, startDate: true, endDate: true } }),
