@@ -1,5 +1,6 @@
 'use client';
 
+import { legacyScheduleConflicts, scheduleSummary } from '@/lib/day-schedule';
 import { useEffect, useMemo, useState } from 'react';
 
 export type EmployeeProfile = {
@@ -382,7 +383,7 @@ export default function EmployeesPanel({
                 <h2>{selected.name}</h2>
                 <p className="small-muted">
                   Matrícula <strong>{selected.employeeNumber || '—'}</strong>
-                  {' · '}Jornada <strong>{selected.scheduleStart || '—'} às {selected.scheduleEnd || '—'}</strong>
+                  {' · '}Jornada <strong>{scheduleSummary(selected)}</strong>{legacyScheduleConflicts(selected).length ? <span className="small-muted" title={legacyScheduleConflicts(selected).join('\n')}> (campos antigos divergem da escala por dia — vale a escala por dia)</span> : null}
                   {' · '}Dias <strong>{selected.workDays || '—'}</strong>
                 </p>
               </div>

@@ -1,0 +1,23 @@
+name: CI (testes + backtest da leitura inteligente)
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npx prisma generate
+      - name: Tipos (tsc)
+        run: npx tsc --noEmit -p .
+      - name: Testes + gate do backtest
+        # tests/punch-classifier.test.ts falha o CI se: < 95% das 42 batidas corrigidas por humanos,
+        # algum preenchimento com almoço < 60 min, ou Retorno ≥ 13:30 sem hábito; e os 14 alertas reais de nov/2026.
+        run: npx vitest run

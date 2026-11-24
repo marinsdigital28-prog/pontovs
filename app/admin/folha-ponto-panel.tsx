@@ -143,7 +143,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
       ).map((p) => p.id),
     );
     const dayPunches = rawDayPunches.filter((p) => allowedIds.has(p.id));
-    const weekday = new Date(`${date}T12:00:00-03:00`).getDay();
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
     const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
     const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, weekdayCodes[weekday]);
     const extraDay = !scheduled && !suppressAbono && certificates.some((item) => item.userId === employee.id && item.type === 'DIA_EXTRA' && ['APROVADO', 'ATIVO'].includes(item.status) && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);

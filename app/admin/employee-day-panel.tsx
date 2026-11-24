@@ -5,7 +5,7 @@ import { label as typeLabel, roundLunchTime } from '../../lib/day-guards';
 import './employee-day.css';
 
 type Emp = { id: string; name: string; employeeNumber: string | null; active?: boolean };
-type DayPunch = { id: string; type: string; timestamp: string; status: string; origin: string; manual: boolean; hasPhoto: boolean };
+type DayPunch = { id: string; type: string; originalType?: string; interpretationSource?: string | null; timestamp: string; status: string; origin: string; manual: boolean; hasPhoto: boolean };
 type DayCert = { id: string; type: string; startDate: string; endDate: string; startTime: string | null; endTime: string | null; status: string; observation: string | null; documentName: string | null; cancelReason: string | null };
 type DayReq = { id: string; type: string; status: string; reason: string; details: string | null; launchedAt: string | null; documentName: string | null };
 type DayData = {
@@ -177,6 +177,8 @@ export default function EmployeeDayPanel({ employees, focus }: { employees: Emp[
     if (!data) return;
     let time = newPunch.time;
     if (!/^\d{2}:\d{2}$/.test(time)) { setMsg({ tone: 'amb', text: 'Informe o horário (HH:MM).' }); return; }
+    // Seletor em 12h: "12:00" com AM vira 00:00. Madrugada nunca é lançada sem conferência.
+    if (Number(time.slice(0, 2)) < 5) { setMsg({ tone: 'red', text: `Horário ${time} é de madrugada. Se era meio-dia, escolha 12:00 PM (12:00 no formato 24h).` }); return; }
     if (newPunch.type === 'INTERVALO' || newPunch.type === 'RETORNO') time = roundLunchTime(time);
     if (newPunch.reason.trim().length < 5) { setMsg({ tone: 'amb', text: 'Informe o motivo (mínimo 5 letras).' }); return; }
     setBusy(true);
@@ -212,7 +214,7 @@ export default function EmployeeDayPanel({ employees, focus }: { employees: Emp[
         {!data.punches.length ? <div className="dc-p">Nenhuma batida neste dia.</div> : null}
         {data.punches.map((p) => <div key={p.id} className={`dc-p${p.status !== 'VALID' ? ' x' : ''}`}>
           {p.hasPhoto ? <a href={`/api/admin/punches/${p.id}/photo`} target="_blank" rel="noreferrer"><img className="dc-ph" src={`/api/admin/punches/${p.id}/photo`} alt="foto da batida" loading="lazy" /></a> : <div className="dc-ph none" />}
-          <span className="dc-t">{clock(p.timestamp)} · {typeLabel(p.type)}{p.manual ? '*' : ''}{p.status !== 'VALID' ? ' (cancelada)' : ''}</span>
+          <span className="dc-t">{clock(p.timestamp)} · {typeLabel(p.type)}{p.manual ? '*' : ''}{p.originalType && p.originalType !== p.type ? <small title="Leitura do sistema: a batida original continua gravada como no totem (Portaria 671)"> (totem: {typeLabel(p.originalType)} · {p.interpretationSource === 'GESTOR' ? 'corrigido pelo gestor' : p.interpretationSource === 'AUTO' ? 'leitura automática' : 'sugestão aceita'})</small> : null}{p.status !== 'VALID' ? ' (cancelada)' : ''}</span>
           {p.hasPhoto ? <span className="dc-chip">foto</span> : null}
           {p.status === 'VALID' ? <span className="dc-right">
             <select aria-label="Mudar tipo" value={p.type} disabled={busy} onChange={(e) => void changeType(p, e.target.value)} style={{ width: 'auto' }}>{['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'].map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}</select>
