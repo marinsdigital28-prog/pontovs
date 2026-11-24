@@ -94,11 +94,27 @@ model Punch {
   updatedAt       DateTime     @updatedAt
   audits          PunchAudit[]
   inconsistencies Inconsistency[]
+  interpretation  PunchInterpretation?
   @@index([userId, timestamp])
   @@index([unitId, timestamp])
   @@index([status])
   @@index([syncStatus])
   @@index([syncedAt])
+}
+
+/// Leitura do sistema sobre uma batida ORIGINAL (qual tipo ela representa).
+/// A batida original nunca é alterada (Portaria 671): a correção de tipo fica aqui.
+model PunchInterpretation {
+  id         String   @id @default(cuid())
+  punchId    String   @unique
+  punch      Punch    @relation(fields: [punchId], references: [id])
+  type       String
+  source     String   // GESTOR | SUGESTAO_ACEITA | AUTO | MIGRACAO
+  confidence Float?
+  reason     String?
+  actorId    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model PunchAudit {

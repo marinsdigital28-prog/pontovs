@@ -24,11 +24,18 @@ describe('verificação 17:20', () => {
     expect(d.proposal).toEqual({ type: 'ENTRADA', time: '08:00' });
   });
 
-  it('volta do almoço faltando → horário redondo', () => {
-    const d = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:07'), p('SAIDA', '17:00')] });
-    expect(d.outcome).toBe('AUTO');
-    expect(d.proposal?.type).toBe('RETORNO');
-    expect(Number(d.proposal!.time.slice(3)) % 30).toBe(0);
+  it('volta do almoço faltando → horário redondo do hábito; 1 batida de almoço sozinha é ambígua (< 75%) → sugestão, não AUTO', () => {
+    const history = ['2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-26', '2026-10-27'].map((date) => ({ date, punches: [{ type: 'ENTRADA', min: 478 }, { type: 'INTERVALO', min: 722 }, { type: 'RETORNO', min: 781 }, { type: 'SAIDA', min: 1021 }] }));
+    const d = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:07'), p('SAIDA', '17:00')], history });
+    expect(d.outcome).toBe('PENDENCIA');
+    // saiu 12:07: 13:00 daria só 53 min de almoço → 13:10 (garante 60 min, nunca +60 cego para 13:07+1h=14:07)
+    expect(d.pendencia?.suggestion).toMatchObject({ kind: 'INSERT_PUNCHES', punches: [{ type: 'RETORNO', time: '13:10' }] });
+    expect(d.confidence!).toBeLessThan(0.75);
+    const s = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:07'), p('SAIDA', '17:00')] });
+    expect(s.outcome).toBe('PENDENCIA');
+    expect(s.pendencia?.suggestion).toMatchObject({ kind: 'INSERT_PUNCHES', punches: [{ type: 'RETORNO', time: '13:10' }] });
+    const ok = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '11:58'), p('SAIDA', '17:00')], history });
+    expect(ok.pendencia?.suggestion).toMatchObject({ punches: [{ type: 'RETORNO', time: '13:00' }] });
   });
 
   it('só 2 batidas → pendência, nunca ajusta sozinho (caso Gabriela)', () => {
@@ -123,5 +130,37 @@ describe('aviso de esquecimento no ponto', () => {
   it('dia sem nenhuma batida (falta) não vira aviso de esquecimento', () => {
     const w = computeWarnings({ employee: emp as any, punches: [] as any, certificates: [], requests: [], today: '2026-11-02', now: new Date('2026-11-02T08:00:00-03:00') });
     expect(w).toEqual([]);
+  });
+});
+
+describe('leitura inteligente na verificação (casos reais de novembro)', () => {
+  const eli = { id: 'u2', name: 'Elisabete', employeeNumber: '7777', workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '07:00', scheduleEnd: '16:00', scheduleByDay: null };
+  const hist = ['2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-10', '2026-11-11', '2026-11-12'].map((date) => ({ date, punches: [{ type: 'ENTRADA', min: 418 }, { type: 'INTERVALO', min: 720 }, { type: 'RETORNO', min: 782 }, { type: 'SAIDA', min: 963 }] }));
+  const q = (type: string, hm: string) => ({ id: `${type}-${hm}`, type, timestamp: new Date(`2026-11-23T${hm}:00-03:00`), status: 'VALID', origin: 'WEB', hasPhoto: true, clientId: 'uuid' });
+  it('Elisabete 23/11: 11:59 "Entrada" é Intervalo, 13:06 "Intervalo" é Retorno, falta Entrada 07:00* — nunca Retorno 14:00', () => {
+    const d = evaluateDay({ employee: eli, date: '2026-11-23', punches: [q('ENTRADA', '11:59'), q('INTERVALO', '13:06'), q('SAIDA', '16:05')], history: hist });
+    expect(d.outcome).toBe('AUTO');
+    expect(d.proposal).toEqual({ type: 'ENTRADA', time: '07:00' });
+    expect(d.relabels).toEqual([{ punchId: 'ENTRADA-11:59', time: '11:59', from: 'ENTRADA', to: 'INTERVALO' }, { punchId: 'INTERVALO-13:06', time: '13:06', from: 'INTERVALO', to: 'RETORNO' }]);
+    expect(JSON.stringify(d)).not.toMatch(/14:00/);
+  });
+  it('leitura do gestor (fixed) é respeitada e não é relida', () => {
+    const punches = [{ ...q('INTERVALO', '11:59'), interpretation: { type: 'INTERVALO', source: 'GESTOR' } }, { ...q('RETORNO', '13:06'), interpretation: { type: 'RETORNO', source: 'GESTOR' } }, q('SAIDA', '16:05')];
+    const d = evaluateDay({ employee: eli, date: '2026-11-23', punches, history: hist });
+    expect(d.relabels).toEqual([]);
+    expect(d.proposal).toEqual({ type: 'ENTRADA', time: '07:00' });
+  });
+  it('lançamento manual às 00:00 (12 AM) vira pendência "horário suspeito", nunca é usado na leitura', () => {
+    const d = evaluateDay({ employee: eli, date: '2026-11-23', punches: [{ ...q('INTERVALO', '00:00'), origin: 'ADJUSTED', clientId: 'manual-x', hasPhoto: false }, q('ENTRADA', '07:24'), q('RETORNO', '13:03'), q('SAIDA', '16:29')], history: hist });
+    expect(d.outcome).toBe('PENDENCIA');
+    expect(d.pendencia?.kind).toBe('HORARIO_SUSPEITO');
+  });
+  it('dia completo pela leitura (gestor já lançou Intervalo 12:00*) → OK, fecha alerta antigo de Retorno 14:00', () => {
+    const d = evaluateDay({ employee: eli, date: '2026-11-23', punches: [q('ENTRADA', '08:12'), { ...q('INTERVALO', '12:00'), origin: 'ADJUSTED', clientId: 'manual-y', hasPhoto: false }, q('RETORNO', '13:01'), q('SAIDA', '17:02')], history: hist });
+    expect(d.outcome).toBe('OK');
+    // se o totem gravou 13:01 como "Intervalo", a sugestão é só reler como Retorno (nada a inserir)
+    const r = evaluateDay({ employee: eli, date: '2026-11-23', punches: [q('ENTRADA', '08:12'), { ...q('INTERVALO', '12:00'), origin: 'ADJUSTED', clientId: 'manual-y', hasPhoto: false }, q('INTERVALO', '13:01'), q('SAIDA', '17:02')], history: hist });
+    expect(r.pendencia?.kind).toBe('TIPO_ERRADO');
+    expect(r.pendencia?.suggestion).toMatchObject({ kind: 'INSERT_PUNCHES', punches: [], relabels: [{ time: '13:01', to: 'RETORNO' }] });
   });
 });

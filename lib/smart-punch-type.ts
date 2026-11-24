@@ -49,6 +49,8 @@ export type SmartPunchSuggestion = {
   reason: string;
   journeyClosed: boolean;
   requiresConfirmationOutsideSuggestion: boolean;
+  /** Aviso para mostrar no totem/app (ex.: sem Entrada hoje). */
+  warning?: string | null;
 };
 
 /**
@@ -78,6 +80,9 @@ export function resolveSmartPunchSuggestion(input: {
   punchesToday: TodayPunch[];
   mode?: PunchMode | null;
   scheduleEnd?: string | null;
+  scheduleStart?: string | null;
+  /** Hábito pessoal: horário mediano de saída para o almoço e duração (minutos). */
+  habitLunch?: { start: number; minutes: number } | null;
   now?: Date;
 }): SmartPunchSuggestion {
   const now = input.now ?? new Date();
@@ -94,8 +99,10 @@ export function resolveSmartPunchSuggestion(input: {
   const doneSet = new Set(typesDone);
 
   // Próximo na sequência = primeiro tipo da jornada que ainda não foi batido
+  // (depois da última batida feita: quem esqueceu a Entrada e bateu o Intervalo volta como Retorno, não como Entrada)
   let sequentialType: PunchType | null = null;
-  for (const type of order) {
+  const lastIdx = Math.max(-1, ...typesDone.map((t) => order.indexOf(t as PunchType)));
+  for (const type of order.slice(lastIdx + 1)) {
     if (!doneSet.has(type)) {
       sequentialType = type;
       break;
@@ -157,10 +164,26 @@ export function resolveSmartPunchSuggestion(input: {
     reason = 'Horário típico de almoço — recomendamos Intervalo.';
   }
 
-  // Sem marcações e já passou bastante da manhã
-  if (!typesDone.length && sequentialType === 'ENTRADA' && minutes >= 11 * 60) {
-    suggestedType = 'ENTRADA';
-    reason = 'Ainda não há ponto hoje. Recomendamos Entrada (mesmo com horário mais tarde).';
+  // Sem marcações hoje: a batida pode ser a do almoço (esqueceu a Entrada) ou a da saída.
+  // Nunca decide só pela ordem: usa a escala do dia (scheduleByDay) e o horário habitual de almoço.
+  let warning: string | null = null;
+  const startMinutes = parseHm(input.scheduleStart);
+  if (!typesDone.length && sequentialType === 'ENTRADA') {
+    const lunchStart = input.habitLunch?.start ?? Math.min(endMinutes - 60, Math.max(startMinutes ?? 8 * 60, 12 * 60));
+    const lunchLen = Math.max(60, Math.min(input.habitLunch?.minutes ?? 60, 120));
+    const lateForEntry = startMinutes !== null ? minutes >= startMinutes + 120 : minutes >= 11 * 60;
+    if (mode === 'FULL' && lateForEntry && minutes >= lunchStart - 45 && minutes <= lunchStart + Math.min(40, lunchLen - 15)) {
+      suggestedType = 'INTERVALO';
+      reason = `Horário do seu almoço (${String(Math.floor(lunchStart / 60)).padStart(2, '0')}:${String(lunchStart % 60).padStart(2, '0')}) — esta batida é a saída para o Intervalo.`;
+      warning = 'Você não marcou a Entrada hoje. Esta batida vale como saída para o almoço. Avise o gestor do seu horário de entrada.';
+    } else if (startMinutes !== null && minutes >= endMinutes - 30 && minutes > startMinutes + 180) {
+      suggestedType = 'SAIDA';
+      reason = 'Fim do expediente e nenhuma batida hoje — esta batida é a Saída.';
+      warning = 'Você não marcou a Entrada hoje. Esta batida vale como Saída. Avise o gestor do seu horário de entrada.';
+    } else if (minutes >= 11 * 60) {
+      suggestedType = 'ENTRADA';
+      reason = 'Ainda não há ponto hoje. Recomendamos Entrada (mesmo com horário mais tarde).';
+    }
   }
 
   // HALF: só entrada/saída; perto do fim sugere saída se já entrou
@@ -187,6 +210,7 @@ export function resolveSmartPunchSuggestion(input: {
     reason,
     journeyClosed: allowedTypes.length === 0,
     requiresConfirmationOutsideSuggestion: true,
+    warning: suggestedType && suggestedType !== 'ENTRADA' && !typesDone.length ? warning : null,
   };
 }
 
