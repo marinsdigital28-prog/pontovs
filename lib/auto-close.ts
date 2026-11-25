@@ -14,6 +14,7 @@ import { resolveDaySchedule, type DaySchedule } from './day-schedule';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { getOperationalAbono, shouldSuppressAbono } from './operational-abonos';
 import { label as typeLabel } from './day-guards';
+import { classifierProfile } from './employee-rules';
 import { AUTO_MIN_CONFIDENCE, computeHabit, describeReading, interpretDay, toClassSchedule, type HistoryDay, type Reading } from './punch-classifier';
 
 export const AUTO_CLOSE_REASON = 'Ajuste automático 17:20';
@@ -23,7 +24,7 @@ const CODES = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
 const HOURLY = new Set(['HORAS', 'PERIODO_HORAS', 'TRABALHO_EXTERNO_HORAS', 'CONSULTA_MEDICA', 'SAIDA_MEDICA']);
 const ACTIVE = new Set(['ATIVO', 'APROVADO']);
 
-export type ACEmployee = { id: string; name: string; employeeNumber: string | null; workDays: string | null; scheduleStart: string | null; scheduleEnd: string | null; scheduleByDay: string | null };
+export type ACEmployee = { id: string; name: string; employeeNumber: string | null; workDays: string | null; scheduleStart: string | null; scheduleEnd: string | null; scheduleByDay: string | null; profileJson?: string | null };
 export type ACPunch = { id: string; type: string; timestamp: Date | string; status: string; origin?: string | null; hasPhoto: boolean; clientId?: string | null; originalType?: string; interpretation?: { type: string; source: string } | null };
 export type ACCert = { id: string; type: string; startDate: Date | string; endDate: Date | string; startTime?: string | null; endTime?: string | null; status: string };
 export type ACRequest = { id: string; type: string; status: string; startDate: Date | string; endDate: Date | string; launchedAt?: Date | string | null; reason?: string | null; details?: string | null };
@@ -46,6 +47,8 @@ export type DayDecision = {
   punchesText: string;
   checks: Check[];
   proposal?: SuggestionPunch;
+  /** Tipos que faltam no dia pela leitura do sistema (com ou sem horário sugerido). */
+  missingTypes?: string[];
   /** Leitura do sistema para batidas originais com tipo errado no totem (aplicada junto com o ajuste). */
   relabels?: SuggestionRelabel[];
   confidence?: number;
@@ -85,7 +88,7 @@ export function fillMissing(present: { type: string; min: number }[], schedule: 
   const lab: Record<string, number> = {};
   for (const p of present) if (lab[p.type] === undefined) lab[p.type] = p.min;
   const reading = interpretDay({ punches: present.map((p, i) => ({ id: `f${i}`, min: p.min, type: p.type, manual: false, fixed: true })), schedule: s, habit: date ? computeHabit(history, date) : null });
-  if (reading.doubt) return null;
+  if (reading.doubt || reading.missing.length) return null;
   return reading.fills.filter((f) => required.includes(f.type)).map((f) => ({ type: f.type, time: toHm(f.min) }));
 }
 
@@ -161,19 +164,21 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
   checks.push({ label: `Escala do dia${schedule ? ` (${schedule.start}–${schedule.end})` : ''}`, ok: Boolean(cs) });
   if (!cs) return pend('POUCAS_BATIDAS', `${valid.length} batida(s) sem escala`, `${punchesText}. Sem escala no cadastro para este dia.`, { kind: 'TEXT', text: 'Sem sugestão segura: cadastre a escala (por dia) e informe os horários no Ajustar.' }, true);
 
-  const habit = computeHabit(history, date);
+  const profile = classifierProfile(employee.profileJson);
+  const habit = profile.flexible ? null : computeHabit(history, date);
   const reading = interpretDay({
+    options: { flexible: profile.flexible },
     punches: valid.map((p) => ({ id: p.id, min: toMin(hmOf(p.timestamp)), type: p.type, manual: isManual(p), fixed: isManual(p) || ['GESTOR', 'SUGESTAO_ACEITA'].includes(String(p.interpretation?.source || '')) })),
     schedule: cs,
     habit,
   });
   const pct = Math.round(reading.confidence * 100);
   const readingInfo = { confidence: reading.confidence, level: reading.level, doubt: reading.doubt, alternative: reading.alternative, resultingDay: reading.resultingDay };
-  checks.push({ label: `Leitura do sistema (${habit ? `hábito de ${habit.n} dias` : 'sem histórico: escala'}) · ${pct}%`, ok: reading.level === 'ALTA' });
+  checks.push({ label: `Leitura do sistema (${profile.flexible ? 'jornada flexível: sem padrão fixo' : habit ? `padrão real de ${habit.n} dias (${habit.nRecent} nos últimos 30)` : 'sem padrão: poucos dias de histórico'}) · ${pct}%`, ok: reading.level === 'ALTA' });
   if (reading.doubt && /mais batidas/.test(reading.doubt)) return pend('CONFLITO', 'Batidas a mais', `${punchesText}.`, { kind: 'TEXT', text: 'Confira e cancele a batida indevida no Dia do colaborador.' }, false);
   const relabels: SuggestionRelabel[] = reading.relabels.map((r) => ({ punchId: r.punchId, time: toHm(r.min), from: r.from, to: r.to }));
   const fills: SuggestionPunch[] = reading.fills.filter((f) => required.includes(f.type) || valid.length > 2).map((f) => ({ type: f.type, time: toHm(f.min) }));
-  if (!relabels.length && !fills.length) return { ...base, outcome: 'OK', reason: 'Dia completo (leitura do sistema)', reading: readingInfo };
+  if (!relabels.length && !fills.length && !reading.missing.length) return { ...base, outcome: 'OK', reason: 'Dia completo (leitura do sistema)', reading: readingInfo };
 
   const text = describeReading(reading);
   const lastP = valid[valid.length - 1];
@@ -182,15 +187,15 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
     ? { kind: 'TEXT', text: `Dúvida: ${reading.doubt} Leitura provável: ${reading.resultingDay}. Informe os horários no Ajustar.` }
     : { kind: 'INSERT_PUNCHES', punches: fills, relabels, confidence: reading.confidence, level: reading.level, resultingDay: reading.resultingDay, text: `Sugestão (${pct}%): ${text}. Dia fica: ${reading.resultingDay}.${earlyExit}` };
 
-  if (!half && valid.length === 3 && fills.length === 1 && !reading.doubt && reading.confidence >= AUTO_MIN_CONFIDENCE && photosOk && !undoneTypes.includes(fills[0].type)) {
+  if (!half && valid.length === 3 && fills.length === 1 && !reading.doubt && !reading.missing.length && !profile.flexible && reading.confidence >= AUTO_MIN_CONFIDENCE && photosOk && !undoneTypes.includes(fills[0].type)) {
     return { ...base, outcome: 'AUTO', reason: `Falta ${typeLabel(fills[0].type)}`, proposal: fills[0], relabels, confidence: reading.confidence, reading: readingInfo, pendencia: { kind: 'AJUSTE_SUGERIDO', title: `Ajuste sugerido (${pct}%): ${text}`, detail: '', suggestion }, forgotten: true };
   }
-  const missingLabels = reading.fills.map((f) => typeLabel(f.type)).join(', ');
+  const missingLabels = [...reading.fills.map((f) => typeLabel(f.type)), ...reading.missing.map((t) => typeLabel(t))].join(', ');
   const why = !photosOk ? 'batida sem foto' : reading.doubt ? reading.doubt : undoneTypes.length ? 'um ajuste automático deste dia foi desfeito' : reading.level !== 'ALTA' ? `confiança ${pct}% (< 75%)` : `${valid.length} batida(s)`;
-  const kind = !photosOk ? 'SEM_FOTO' : reading.level === 'DUVIDA' || reading.doubt ? 'DUVIDA' : !fills.length ? 'TIPO_ERRADO' : 'POUCAS_BATIDAS';
+  const kind = !photosOk ? 'SEM_FOTO' : reading.level === 'DUVIDA' || reading.doubt || reading.missing.length ? 'DUVIDA' : !fills.length ? 'TIPO_ERRADO' : 'POUCAS_BATIDAS';
   const title = kind === 'DUVIDA' ? `Dúvida (${pct}%): ${text || 'confira o dia'}` : kind === 'TIPO_ERRADO' ? `Tipo trocado no totem (${pct}%): ${text}` : valid.length <= 2 ? `Só ${valid.length} batida${valid.length > 1 ? 's' : ''} (${pct}%): ${text}` : `Sugestão (${pct}%): ${text}`;
-  const d = pend(kind, title, `${punchesText}.${missingLabels ? ` Falta: ${missingLabels}` : ''} (${why}).${reading.alternative ? ` Outra leitura possível: ${reading.alternative}.` : ''}`, suggestion, fills.length > 0);
-  return { ...d, relabels, confidence: reading.confidence, reading: readingInfo };
+  const d = pend(kind, title, `${punchesText}.${missingLabels ? ` Falta: ${missingLabels}` : ''} (${why}).${reading.alternative ? ` Outra leitura possível: ${reading.alternative}.` : ''}`, suggestion, fills.length > 0 || reading.missing.length > 0);
+  return { ...d, relabels, confidence: reading.confidence, reading: readingInfo, missingTypes: [...reading.fills.map((f) => f.type), ...reading.missing] };
 }
 
 /**

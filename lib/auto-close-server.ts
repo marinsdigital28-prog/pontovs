@@ -37,7 +37,7 @@ export async function loadDay(date: string, userIds?: string[]) {
   const { from, to, noon } = dayBounds(date);
   const employees = await prisma.user.findMany({
     where: { role: 'EMPLOYEE', active: true, ...(userIds ? { id: { in: userIds } } : {}) },
-    select: { id: true, name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, unitId: true },
+    select: { id: true, name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true, unitId: true },
     orderBy: { name: 'asc' },
   });
   const ids = employees.map((e) => e.id);

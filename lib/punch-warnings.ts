@@ -42,6 +42,8 @@ export function computeWarnings({ employee, punches, certificates, requests, tod
     let missing: ComputedWarning['missing'] = [];
     if (d.proposal) missing = [{ type: d.proposal.type, time: d.proposal.time }];
     else if (d.pendencia?.suggestion?.kind === 'INSERT_PUNCHES') missing = d.pendencia.suggestion.punches.map((p) => ({ type: p.type, time: p.time }));
+    // Leitura em dúvida (sem padrão claro): avisa o tipo que faltou, sem horário inventado.
+    else if (d.missingTypes?.length) missing = d.missingTypes.map((type) => ({ type, time: null }));
     const message = missing.length
       ? `Você esqueceu ${missing.map((m) => `${lower(m.type)}${m.time ? ` (previsto ${m.time})` : ''}`).join(' e ')} de ${when}.`
       : d.pendencia?.kind === 'TIPO_ERRADO'

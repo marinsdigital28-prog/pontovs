@@ -83,6 +83,8 @@ export function resolveSmartPunchSuggestion(input: {
   scheduleStart?: string | null;
   /** Hábito pessoal: horário mediano de saída para o almoço e duração (minutos). */
   habitLunch?: { start: number; minutes: number } | null;
+  /** Jornada flexível (ex.: vice-diretor): o totem não adivinha almoço/saída pela hora; segue a sequência. */
+  flexible?: boolean;
   now?: Date;
 }): SmartPunchSuggestion {
   const now = input.now ?? new Date();
@@ -168,7 +170,7 @@ export function resolveSmartPunchSuggestion(input: {
   // Nunca decide só pela ordem: usa a escala do dia (scheduleByDay) e o horário habitual de almoço.
   let warning: string | null = null;
   const startMinutes = parseHm(input.scheduleStart);
-  if (!typesDone.length && sequentialType === 'ENTRADA') {
+  if (!typesDone.length && sequentialType === 'ENTRADA' && !input.flexible) {
     const lunchStart = input.habitLunch?.start ?? Math.min(endMinutes - 60, Math.max(startMinutes ?? 8 * 60, 12 * 60));
     const lunchLen = Math.max(60, Math.min(input.habitLunch?.minutes ?? 60, 120));
     const lateForEntry = startMinutes !== null ? minutes >= startMinutes + 120 : minutes >= 11 * 60;
