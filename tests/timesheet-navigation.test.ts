@@ -16,7 +16,8 @@ const csvRoute = readFileSync(resolve(root, 'app/api/admin/import-csv/route.ts')
 
 describe('navegação da folha de ponto', () => {
   it('declara a Folha de ponto no menu administrativo', () => {
-    expect(dashboard).toContain("['folha', 'Folha e relatórios']");
+    // Painel v2 (arte aprovada): menu "Folha de ponto" em "Cadastro e registros".
+    expect(dashboard).toContain("['cad', 'folha', '📄 Folha de ponto']");
     expect(dashboard).toContain('aria-label="Seções administrativas"');
     expect(dashboard).toContain('aria-current={tab === key ? \'page\' : undefined}');
   });
