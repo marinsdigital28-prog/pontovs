@@ -56,6 +56,7 @@ export async function GET(request: Request) {
       startTime: true,
       endTime: true,
       status: true,
+      origin: true,
       observation: true,
       user: { select: { name: true, employeeNumber: true } },
     },
@@ -102,6 +103,7 @@ export async function GET(request: Request) {
       startTime: c.startTime,
       endTime: c.endTime,
       status: c.status,
+      origin: c.origin,
     })),
   );
 
@@ -165,6 +167,7 @@ export async function POST(request: Request) {
       startTime: true,
       endTime: true,
       status: true,
+      origin: true,
       observation: true,
     },
     take: 500,

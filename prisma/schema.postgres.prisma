@@ -177,6 +177,8 @@ model MedicalCertificate {
   documentName   String?
   documentMime   String?
   documentData   String?  @db.Text
+  /// Origem do lançamento: 'TELA_RAPIDA' = tela Lançar atestado (abona só minutos sem batida, não esconde batidas). null = legado.
+  origin         String?
   observation    String?
   status         String   @default("ATIVO")
   canceledAt     DateTime?

@@ -98,6 +98,7 @@ export async function POST(request: Request) {
               select: {
                 type: true,
                 startDate: true,
+                origin: true,
                 endDate: true,
                 startTime: true,
                 endTime: true,
@@ -193,6 +194,7 @@ export async function POST(request: Request) {
         select: {
           type: true,
           startDate: true,
+          origin: true,
           endDate: true,
           startTime: true,
           endTime: true,
