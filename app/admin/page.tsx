@@ -34,12 +34,13 @@ export default async function AdminPage() {
       return [];
     }
   };
-  const [employeeCount, punchesToday, openInconsistencies, employeeOptions] = await Promise.all([
+  const [employeeCount, punchesToday, openPendencias, employeeOptions] = await Promise.all([
     safeCount(() => prisma.user.count({ where: { active: true, role: 'EMPLOYEE' } })),
     safeCount(() => prisma.punch.count({ where: { timestamp: { gte: start } } })),
-    safeCount(() => prisma.inconsistency.count({ where: { status: 'OPEN' } })),
+    // Mesma fonte do sino e do card "Sugestões para revisar": pendências OPEN (antes contava Inconsistency e mostrava 0).
+    safeCount(() => prisma.pendencia.count({ where: { status: 'OPEN' } })),
     safeEmployees(),
   ]);
   const displayedEmployeeCount = degraded ? employeeOptions.length : employeeCount;
-  return <AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: item.active }))} stats={{ employeeCount: displayedEmployeeCount, punchesToday, openInconsistencies }} degraded={degraded} managerName={manager.name} />;
+  return <AdminDashboard employees={employeeOptions.map((item) => ({ ...item, active: item.active }))} stats={{ employeeCount: displayedEmployeeCount, punchesToday, openPendencias }} degraded={degraded} managerName={manager.name} />;
 }
