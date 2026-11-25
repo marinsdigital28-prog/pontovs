@@ -37,6 +37,8 @@ export type TimesheetRow = {
   date: string; day: number; weekday: number; future: boolean; scheduled: boolean;
   schedule: string; entrada: TimesheetCell; intervalo: TimesheetCell; retorno: TimesheetCell; saida: TimesheetCell;
   extraPunches: number;
+  /** Batidas duplicadas desconsideradas pelo sistema (horário). Não entram nas horas; a original continua gravada. */
+  disregarded?: string[];
   worked: number | null; justified: number; credited: number | null; expected: number | null;
   missing: number | null; balance: number | null;
   situation: string; tone: SituationTone; fullDayAbono: boolean;
@@ -142,7 +144,10 @@ export function buildTimesheetRows({
     const future = date > today;
     const suppress = shouldSuppressAbono(employee.employeeNumber, date);
     const hide = shouldHidePunchesForDay(employee.employeeNumber, date);
-    const raw = hide ? [] : punches.filter((p) => keyOf(p.timestamp) === date);
+    const rawAll = hide ? [] : punches.filter((p) => keyOf(p.timestamp) === date);
+    // Duplicada desconsiderada (PunchInterpretation 'DESCONSIDERADA'): fora do cálculo, com marca na folha.
+    const disregarded = rawAll.filter((p) => p.type === 'DESCONSIDERADA').map((p) => clockOf(p.timestamp));
+    const raw = rawAll.filter((p) => p.type !== 'DESCONSIDERADA');
     const conflictCerts = suppress ? [] : certificates.map((c) => ({
       userId: '', type: c.type, startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status,
     }));
@@ -186,6 +191,7 @@ export function buildTimesheetRows({
     const base = {
       date, day, weekday, future, scheduled, schedule: scheduleLabel,
       entrada: pick('ENTRADA'), intervalo: pick('INTERVALO'), retorno: pick('RETORNO'), saida: pick('SAIDA'), extraPunches,
+      ...(disregarded.length ? { disregarded } : {}),
     };
     if (future) {
       rows.push({ ...base, entrada: null, intervalo: null, retorno: null, saida: null, extraPunches: 0, worked: null, justified: 0, credited: null, expected: null, missing: null, balance: null, situation: scheduled ? '—' : 'Folga', tone: scheduled ? 'futuro' : 'folga', fullDayAbono: false });
@@ -222,6 +228,7 @@ export function buildTimesheetRows({
     else if (scheduled && (!types.has('ENTRADA') || !types.has('SAIDA'))) { situation = 'Incompleto'; tone = 'alerta'; }
     else if (request?.type === 'TROCA_DIA') { situation = 'Troca de dia'; tone = 'ok'; }
     if (extraPunches > 0 && tone !== 'falta') situation += ` · +${extraPunches} marc.`;
+    if (disregarded.length) situation += ` · ${disregarded.length === 1 ? 'batida duplicada desconsiderada' : `${disregarded.length} batidas duplicadas desconsideradas`} (${disregarded.join(', ')})`;
 
     if (credited !== null && (expected !== null || worked !== null)) totals.worked += credited;
     if (expected !== null) totals.expected += expected;
