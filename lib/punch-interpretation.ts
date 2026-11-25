@@ -4,6 +4,8 @@
  * com autor, origem e motivo, e as telas/folha usam o "tipo efetivo".
  */
 import prisma from './prisma';
+import { recordLesson } from './habit-lessons';
+import { dateKeyOf, hmOf, toMin } from './auto-close';
 
 export type InterpretationSource = 'GESTOR' | 'SUGESTAO_ACEITA' | 'AUTO' | 'MIGRACAO';
 export type Interp = { type: string; source: string; confidence: number | null; reason: string | null; actorId: string | null; updatedAt: Date };
@@ -49,7 +51,7 @@ export async function withEffectiveTypes<T extends { id: string; type: string }>
  * Se o tipo pedido for o próprio tipo original, remove a leitura (volta ao original).
  */
 export async function setInterpretation(input: { punchId: string; type: string; source: InterpretationSource; actorId: string; reason: string; confidence?: number | null }) {
-  const punch = await prisma.punch.findUnique({ where: { id: input.punchId }, select: { id: true, type: true } });
+  const punch = await prisma.punch.findUnique({ where: { id: input.punchId }, select: { id: true, type: true, userId: true, timestamp: true } });
   if (!punch) throw new Error('Batida não encontrada.');
   const current = await prisma.punchInterpretation.findUnique({ where: { punchId: punch.id } });
   const oldType = current?.type || punch.type;
@@ -64,5 +66,18 @@ export async function setInterpretation(input: { punchId: string; type: string; 
     }
     await tx.punchAudit.create({ data: { id: crypto.randomUUID(), punchId: punch.id, changedById: input.actorId, field: 'interpretation', oldValue: oldType, newValue: input.type, reason: `${input.reason} [${input.source}] (batida original preservada)` } });
   });
+  if ((input.source === 'GESTOR' || input.source === 'SUGESTAO_ACEITA') && input.type !== punch.type) {
+    await recordLesson({
+      userId: punch.userId,
+      date: dateKeyOf(punch.timestamp),
+      type: input.type,
+      minutes: toMin(hmOf(punch.timestamp)),
+      kind: 'RELABEL',
+      source: input.source,
+      actorId: input.actorId,
+      punchId: punch.id,
+      fromType: punch.type,
+    });
+  }
   return { changed: true, oldType, newType: input.type };
 }

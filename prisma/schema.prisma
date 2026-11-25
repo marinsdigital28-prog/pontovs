@@ -59,6 +59,7 @@ model User {
   certificatesCanceled MedicalCertificate[] @relation("CertificateCanceler")
   employeeRequests EmployeeRequest[] @relation("RequestEmployee")
   requestsReviewed EmployeeRequest[] @relation("RequestReviewer")
+  habitLessons  HabitLesson[]
 }
 
 
@@ -351,4 +352,26 @@ model PunchWarning {
   @@unique([userId, issueDate, kind])
   @@index([userId, ackAt])
   @@index([issueDate])
+}
+
+/// Correção do gestor usada no hábito. Nunca altera a batida original (Portaria 671).
+model HabitLesson {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      String
+  weekday   Int
+  type      String
+  minutes   Int
+  kind      String   // RELABEL | FILL
+  fromType  String?
+  punchId   String?
+  source    String   // GESTOR | SUGESTAO_ACEITA
+  actorId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, type, kind])
+  @@index([userId, date])
+  @@index([userId, weekday, type])
 }

@@ -14,6 +14,8 @@
  *    nem Retorno ≥ 13:30 se o hábito da pessoa não for esse.
  * Puro (sem banco): usado no servidor (17:20/08:00, totem) e nos testes/backtest.
  */
+import { computeHabitWithLessons, describeLearning, type Lesson } from './habit-learn';
+
 export type PType = 'ENTRADA' | 'INTERVALO' | 'RETORNO' | 'SAIDA';
 export const ORDER: readonly PType[] = ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'];
 export const LABEL: Record<PType, string> = { ENTRADA: 'Entrada', INTERVALO: 'Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída' };
@@ -45,6 +47,8 @@ export type Habit = Record<PType, number> & {
   lunchSpread: number;
   /** padrão claro por tipo (≥ CLEAR_MIN_DAYS dias e dispersão ≤ CLEAR_MAX_SPREAD) */
   clear: Record<PType, boolean>;
+  /** Correções do gestor que alimentaram este hábito (texto do recorte verde). */
+  learnedFrom?: { date: string; type: PType; kind: 'RELABEL' | 'FILL' }[];
 };
 export type ReadOptions = { flexible?: boolean };
 export type HistoryDay = { date: string; punches: { type: string; min: number }[] };
@@ -85,7 +89,8 @@ function addDays(date: string, days: number) {
  * Padrão real da pessoa: dias inequívocos (4 batidas originais já na ordem certa) dos últimos 90 dias antes de `date`,
  * mediana ponderada com peso 3× nos últimos 30 dias. Também mede a dispersão para saber se o padrão é claro.
  */
-export function computeHabit(history: HistoryDay[], date: string): Habit | null {
+export function computeHabit(history: HistoryDay[], date: string, lessons: Lesson[] = []): Habit | null {
+  if (lessons.some((l) => l.date < date)) return computeHabitWithLessons(history, date, lessons);
   const from = addDays(date, -HABIT_WINDOW_DAYS);
   const recent = addDays(date, -HABIT_RECENT_DAYS);
   const rows = history
@@ -260,6 +265,8 @@ export type Reading = {
   doubt: string | null;
   alternative: string | null;
   resultingDay: string;
+  /** Ex.: "Aprendido com sua correção de 05/10". Nulo na jornada flexível ou sem correções. */
+  learnedNote: string | null;
 };
 
 /**
@@ -299,7 +306,8 @@ export function interpretDay(input: { punches: (DayPunch & { fixed?: boolean })[
   ].sort((a, b) => a.min - b.min);
   const alternative = cls.alternative && free.length ? free.map((p, i) => `${hm(p.min)} ${LABEL[cls.alternative![i]]}`).join(' · ') : null;
   const resultingDay = [...items.map((x) => x.text), ...fill.missing.map((t) => `${LABEL[t]} ?`)].join(' · ');
-  return { labels, relabels, fills: fill.fills, missing: fill.missing, confidence, level, doubt, alternative, resultingDay };
+  const learnedNote = opts.flexible ? null : describeLearning(input.habit?.learnedFrom);
+  return { labels, relabels, fills: fill.fills, missing: fill.missing, confidence, level, doubt, alternative, resultingDay, learnedNote };
 }
 
 /** Texto curto da sugestão (título de pendência). */
