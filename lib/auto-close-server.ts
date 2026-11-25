@@ -9,7 +9,10 @@ import { duplicatePunchReason, label as typeLabel } from './day-guards';
 import { AUTO_CLOSE_REASON, dateKeyOf, evaluateDay, hmOf, summarize, toMin, type DayDecision, type Phase, type Suggestion, type SuggestionPunch, type SuggestionRelabel } from './auto-close';
 import { isOriginalPunch, loadInterpretations, applyInterpretations, setInterpretation } from './punch-interpretation';
 import { loadLessons, loadLessonsByUsers, recordLesson } from './habit-lessons';
-import type { HistoryDay } from './punch-classifier';
+import { HABIT_WINDOW_DAYS, type HistoryDay } from './punch-classifier';
+import { loadWeekStatus, reconcileFlexibleWeeks, type SwapAction } from './day-swap-server';
+import { brazilDateKey } from './brazil-time';
+import { DISREGARDED, type DupFinding } from './punch-duplicates';
 
 export type AutoCloseMode = 'DRY_RUN' | 'REAL';
 export const MODE_KEY = 'autoClose.mode';
@@ -50,8 +53,8 @@ export async function loadDay(date: string, userIds?: string[]) {
     prisma.autoAdjustment.findMany({ where: { date, userId: { in: ids }, status: 'UNDONE' }, select: { userId: true, type: true } }),
   ]);
   const photos = new Set(photoRows.map((p) => p.id));
-  // Hábito: últimos 60 dias de batidas ORIGINAIS (tipo efetivo = leitura do sistema quando houver).
-  const histFrom = new Date(from.getTime() - 61 * 86_400_000);
+  // Padrão real: últimos 90 dias de batidas ORIGINAIS (tipo efetivo = leitura do sistema quando houver).
+  const histFrom = new Date(from.getTime() - (HABIT_WINDOW_DAYS + 1) * 86_400_000);
   const histRows = await prisma.punch.findMany({ where: { userId: { in: ids }, status: 'VALID', timestamp: { gte: histFrom, lt: from } }, select: { id: true, userId: true, type: true, timestamp: true, origin: true, clientId: true }, orderBy: { timestamp: 'asc' } });
   const interp = await loadInterpretations([...punches.map((p) => p.id), ...histRows.map((p) => p.id)]);
   const history = new Map<string, HistoryDay[]>();
@@ -69,6 +72,8 @@ export async function loadDay(date: string, userIds?: string[]) {
 
 export async function evaluateDate(date: string, phase: Phase, userIds?: string[]) {
   const data = await loadDay(date, userIds);
+  const weeks = await loadWeekStatus(data.employees, date);
+  const today = brazilDateKey();
   const decisions: DayDecision[] = [];
   for (const e of data.employees) {
     decisions.push(evaluateDay({
@@ -79,6 +84,8 @@ export async function evaluateDate(date: string, phase: Phase, userIds?: string[
       undoneTypes: data.undone.filter((u) => u.userId === e.id).map((u) => u.type),
       history: data.history.get(e.id) || [],
       lessons: data.lessons.get(e.id) || [],
+      week: weeks.get(e.id),
+      today,
     }));
   }
   return { decisions, employees: data.employees };
@@ -142,6 +149,13 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
   const run = await prisma.autoCloseRun.create({ data: { date, phase, mode, trigger, actorId: actorId || null, summaryJson: JSON.stringify({ summary }) } });
   const system = actorId || (await systemActorId());
   const applied: any[] = []; const errors: any[] = []; const autoResolved: any[] = [];
+  // Batidas duplicadas: o sistema decide sozinho (pedido do gestor) — só grava a leitura; a batida original fica intacta.
+  const duplicates: any[] = [];
+  for (const d of decisions) {
+    if (!d.duplicates?.length || !system) continue;
+    try { duplicates.push(...(await applyDuplicates(d.employeeId, date, d.duplicates, system)).map((x) => ({ employeeId: d.employeeId, name: d.employeeName, ...x }))); }
+    catch (error) { errors.push({ employeeId: d.employeeId, duplicates: (error as Error).message }); }
+  }
   for (const d of decisions) {
     try {
       if (d.outcome === 'AUTO' && d.proposal) {
@@ -177,7 +191,8 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
   if (settled.length) {
     const stale = await prisma.pendencia.findMany({ where: { date, status: 'OPEN', userId: { in: settled } }, select: { id: true, userId: true, kind: true } });
     for (const p of stale) {
-      await prisma.pendencia.update({ where: { id: p.id }, data: { status: 'RESOLVED', resolution: 'Resolvido sozinho: o dia ficou completo depois da verificação', resolvedAt: new Date() } });
+      const note = decisions.find((d) => d.employeeId === p.userId)?.note;
+      await prisma.pendencia.update({ where: { id: p.id }, data: { status: 'RESOLVED', resolution: note || 'Resolvido sozinho: o dia ficou completo depois da verificação', resolvedAt: new Date() } });
       await prisma.ocorrencia.updateMany({ where: { userId: p.userId, date, status: 'ATIVA', source: 'PENDENCIA', pendenciaId: p.id }, data: { status: 'CANCELADA', canceledAt: new Date(), cancelReason: 'Dia ficou completo depois da verificação (não foi esquecimento)' } });
       autoResolved.push({ pendenciaId: p.id, employeeId: p.userId, kind: p.kind });
     }
@@ -191,11 +206,14 @@ export async function runAutoClose({ date, phase, mode, persist, trigger, actorI
   }
   // Reconfere pendências abertas de dias anteriores com a leitura atual (fecha as que se resolveram e
   // substitui sugestões antigas, ex.: Retorno 14:00 da regra +60). Nunca grava batida em dias passados.
+  // Jornada flexível: troca de dia na semana (seg–dom) fecha/reabre "Fora da escala"/"Sem nenhuma batida".
+  let swaps: SwapAction[] = [];
+  try { swaps = await reconcileFlexibleWeeks({ date, mode, runId: run.id, evaluate: (d, ids) => evaluateDate(d, 'COMPLETO', ids) }); } catch (error) { errors.push({ swaps: (error as Error).message }); }
   let rechecked: RecheckResult = { checked: 0, resolved: [], replaced: [], updated: 0, errors: [] };
   try { rechecked = await recheckOpenPendencias({ beforeDate: date, mode, runId: run.id }); } catch (error) { errors.push({ recheck: (error as Error).message }); }
-  await prisma.autoCloseRun.update({ where: { id: run.id }, data: { summaryJson: JSON.stringify({ summary, applied, errors, report, autoResolved, rechecked }) } });
+  await prisma.autoCloseRun.update({ where: { id: run.id }, data: { summaryJson: JSON.stringify({ summary, applied, errors, report, autoResolved, rechecked, swaps, duplicates }) } });
   await appendAuditEvent({ action: 'AUTO_CLOSE_RUN', actorId: system, resource: 'AutoCloseRun', resourceId: run.id, metadata: { date, phase, mode, trigger, summary, applied: applied.length, errors: errors.length, autoResolved: autoResolved.length, recheckResolved: rechecked.resolved.length, recheckReplaced: rechecked.replaced.length } });
-  return { runId: run.id, date, phase, mode, persisted: true, summary, report, applied, errors, autoResolved, rechecked };
+  return { runId: run.id, date, phase, mode, persisted: true, summary, report, applied, errors, autoResolved, rechecked, swaps, duplicates };
 }
 
 export async function undoAdjustment(adjustmentId: string, actorId: string, reason: string) {
@@ -292,6 +310,7 @@ export async function recheckOpenPendencias({ beforeDate, mode, runId, dryRunOnl
         out.checked += 1;
         const d = decisions.find((x) => x.employeeId === p.userId);
         if (!d) continue; // colaborador inativo: deixa como está
+        if (!dryRunOnly && d.duplicates?.length) { const sys = await systemActorId(); if (sys) await applyDuplicates(d.employeeId, date, d.duplicates, sys); }
         if (d.outcome === 'OK' || d.outcome === 'SKIP') {
           const resolution = `Resolvido sozinho na reconferência: ${d.reason}`;
           out.resolved.push({ pendenciaId: p.id, userId: p.userId, date, kind: p.kind, title: p.title });
@@ -330,4 +349,26 @@ export async function recheckOpenPendencias({ beforeDate, mode, runId, dryRunOnl
     }
   }
   return out;
+}
+
+/**
+ * Grava a decisão sobre batidas duplicadas em PunchInterpretation: a descartada vira 'DESCONSIDERADA'
+ * (sai do cálculo de horas; o painel e a folha mostram a marca) e a mantida, se preciso, ganha o tipo do horário.
+ * Nunca altera nem apaga a batida original (Portaria 671). Correção do gestor sempre prevalece.
+ */
+export async function applyDuplicates(userId: string, date: string, findings: DupFinding[], actorId: string) {
+  if (await isPeriodClosed(periodFromDate(new Date(`${date}T12:00:00-03:00`)))) return [];
+  const done: { discardId: string; keepId: string; reason: string }[] = [];
+  for (const f of findings) {
+    const ids = [f.discardId, f.keepId];
+    const rows = await prisma.punch.findMany({ where: { id: { in: ids }, userId, status: 'VALID' }, select: { id: true, type: true, timestamp: true, origin: true, clientId: true } });
+    if (rows.length !== 2 || rows.some((r) => !isOriginalPunch(r) || dateKeyOf(r.timestamp) !== date)) continue;
+    const interp = await loadInterpretations(ids);
+    if (ids.some((id) => ['GESTOR', 'SUGESTAO_ACEITA'].includes(String(interp.get(id)?.source || '')))) continue;
+    const a = await setInterpretation({ punchId: f.discardId, type: DISREGARDED, source: 'AUTO', actorId, reason: `${f.reason} — desconsiderada (duplicada)`, confidence: null });
+    if (f.keepAs) await setInterpretation({ punchId: f.keepId, type: f.keepAs, source: 'AUTO', actorId, reason: f.reason, confidence: null });
+    if (a.changed) done.push({ discardId: f.discardId, keepId: f.keepId, reason: f.reason });
+  }
+  if (done.length) await appendAuditEvent({ action: 'PUNCH_DUPLICATE_DISREGARDED', actorId, resource: 'Punch', resourceId: done.map((d) => d.discardId).join(','), metadata: { userId, date, findings: done } });
+  return done;
 }

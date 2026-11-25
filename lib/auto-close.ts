@@ -15,7 +15,9 @@ import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { getOperationalAbono, shouldSuppressAbono } from './operational-abonos';
 import { label as typeLabel } from './day-guards';
 import { classifierProfile } from './employee-rules';
-import { AUTO_MIN_CONFIDENCE, computeHabit, describeReading, interpretDay, toClassSchedule, type HistoryDay, type Reading } from './punch-classifier';
+import { DISREGARDED, findDuplicatePunches, type DupFinding } from './punch-duplicates';
+import { pairWeekSwaps, swapStatusFor, weekOf, dayLabel, type WeekDayStatus } from './day-swap';
+import { AUTO_MIN_CONFIDENCE, anchors, computeHabit, describeReading, interpretDay, toClassSchedule, type HistoryDay, type Reading } from './punch-classifier';
 
 export const AUTO_CLOSE_REASON = 'Ajuste automático 17:20';
 export const CUTOFF_MINUTES = 17 * 60 + 20;
@@ -42,6 +44,10 @@ export type Check = { label: string; ok: boolean };
 export type DayDecision = {
   outcome: 'OK' | 'SKIP' | 'DEFER' | 'AUTO' | 'PENDENCIA';
   reason: string;
+  /** Nota informativa do dia (ex.: "Troca de dia: veio seg 23/11 no lugar de ter 24/11"). */
+  note?: string;
+  /** Batidas duplicadas que o sistema decidiu desconsiderar (gravadas em PunchInterpretation, original intacta). */
+  duplicates?: DupFinding[];
   employeeId: string; employeeName: string; date: string;
   schedule: DaySchedule | null; scheduled: boolean;
   punchesText: string;
@@ -92,20 +98,51 @@ export function fillMissing(present: { type: string; min: number }[], schedule: 
   return reading.fills.filter((f) => required.includes(f.type)).map((f) => ({ type: f.type, time: toHm(f.min) }));
 }
 
-export function evaluateDay({ employee, date, punches, certificates = [], requests = [], phase = 'COMPLETO', undoneTypes = [], history = [], lessons = [] }: {
+export function evaluateDay({ employee, date, punches, certificates = [], requests = [], phase = 'COMPLETO', undoneTypes = [], history = [], lessons = [], week, today }: {
   employee: ACEmployee; date: string; punches: ACPunch[]; certificates?: ACCert[]; requests?: ACRequest[]; phase?: Phase; undoneTypes?: string[];
   /** Dias anteriores do colaborador (batidas originais, tipo efetivo) para o hábito pessoal. */
   history?: HistoryDay[];
   /** Correções do gestor anteriores ao dia (não se aplica à jornada flexível). */
   lessons?: import('./habit-learn').Lesson[];
+  /** Jornada flexível: situação dos dias da semana (seg–dom) para a troca de dia. */
+  week?: WeekDayStatus[];
+  /** Hoje (Brasília) — define se a semana já acabou. */
+  today?: string;
 }): DayDecision {
-  const valid = normalizePunches(punches.filter((p) => p.status === 'VALID' && dateKeyOf(p.timestamp) === date));
-  const { schedule, scheduled } = scheduleFor(employee, date);
+  let valid = normalizePunches(punches.filter((p) => p.status === 'VALID' && dateKeyOf(p.timestamp) === date));
+  const alreadyDisregarded = valid.filter((p) => p.type === DISREGARDED);
+  valid = valid.filter((p) => p.type !== DISREGARDED);
+  const profile = classifierProfile(employee.profileJson);
+  const sched0 = scheduleFor(employee, date);
+  let schedule = sched0.schedule;
+  let scheduled = sched0.scheduled;
+  // Troca de dia (só jornada flexível): grade não muda; compensação dentro da semana seg–dom.
+  const todayKey = today || date;
+  const swap = profile.flexible && week?.length ? swapStatusFor(date, pairWeekSwaps(week, todayKey)) : null;
+  const swapNote = swap?.note || null;
+  if (swap?.kind === 'TROCA' && !scheduled && valid.length) {
+    // Veio no lugar de um dia da grade: avalia como dia de trabalho, com a escala do dia trocado.
+    schedule = scheduleFor(employee, swap.swap.missed).schedule;
+    scheduled = Boolean(schedule);
+  }
+  // Duplicadas em intervalo curto: fica a mais próxima do horário real (escala/padrão); a outra é desconsiderada.
+  const habit = profile.flexible ? null : computeHabit(history, date, lessons);
+  const cs0 = toClassSchedule(schedule);
+  const duplicates = cs0 ? findDuplicatePunches(valid.map((p) => ({ id: p.id, min: toMin(hmOf(p.timestamp)), type: p.type, eligible: !isManual(p) && !['GESTOR', 'SUGESTAO_ACEITA'].includes(String(p.interpretation?.source || '')) })), anchors(cs0, habit)) : [];
+  if (duplicates.length) {
+    const drop = new Set(duplicates.map((d) => d.discardId));
+    const keepAs = new Map(duplicates.filter((d) => d.keepAs).map((d) => [d.keepId, d.keepAs!]));
+    valid = valid.filter((p) => !drop.has(p.id)).map((p) => keepAs.has(p.id) ? { ...p, type: keepAs.get(p.id)!, interpretation: { type: keepAs.get(p.id)!, source: 'AUTO' } } : p);
+  }
   const punchesText = valid.length ? valid.map((p) => `${hmOf(p.timestamp)} ${typeLabel(p.type)}${p.hasPhoto ? '' : (isManual(p) ? '*' : ' (sem foto)')}`).join(' · ') : 'nenhuma batida';
-  const base = { employeeId: employee.id, employeeName: employee.name, date, schedule, scheduled, punchesText, checks: [] as Check[], forgotten: false };
+  const base = { employeeId: employee.id, employeeName: employee.name, date, schedule, scheduled, punchesText, checks: [] as Check[], forgotten: false, ...(swapNote ? { note: swapNote } : {}) };
   const checks = base.checks;
+  if (duplicates.length) (base as any).duplicates = duplicates;
+  for (const d of duplicates) checks.push({ label: `${d.reason} → desconsiderada (duplicada)`, ok: true });
+  for (const p of alreadyDisregarded) checks.push({ label: `${hmOf(p.timestamp)} desconsiderada (duplicada)`, ok: true });
+  if (swapNote) checks.push({ label: swapNote, ok: swap?.kind === 'TROCA' });
   const pend = (kind: string, title: string, detail: string, suggestion: Suggestion | null, forgotten: boolean): DayDecision =>
-    ({ ...base, outcome: 'PENDENCIA', reason: title, pendencia: { kind, title, detail, suggestion }, forgotten: forgotten && valid.length > 0 });
+    ({ ...base, outcome: 'PENDENCIA', reason: title, pendencia: { kind, title, detail: swapNote ? `${detail} ${swapNote}.` : detail, suggestion }, forgotten: forgotten && valid.length > 0 });
 
   const suppress = shouldSuppressAbono(employee.employeeNumber, date);
   const ops = suppress ? null : getOperationalAbono(employee.employeeNumber, date);
@@ -131,7 +168,7 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
   const distinct = new Set(types);
   const inOrder = types.every((t, i) => i === 0 || PUNCH_ORDER.indexOf(t as any) > PUNCH_ORDER.indexOf(types[i - 1] as any));
   const complete = required.every((t) => distinct.has(t)) && inOrder && types.length === required.length;
-  if (complete) return { ...base, outcome: 'OK', reason: 'Dia completo' };
+  if (complete) return { ...base, outcome: 'OK', reason: swap?.kind === 'TROCA' ? `Dia completo · ${swapNote}` : 'Dia completo' };
 
   // Pedido do app (pendente, ou aprovado e ainda não lançado) no dia → dúvida, o gestor decide.
   const dayRequests = requests.filter((r) => ['PENDENTE', 'APROVADO'].includes(r.status) && dateKeyOf(r.startDate) <= date && dateKeyOf(r.endDate) >= date);
@@ -148,6 +185,10 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
     return pend('CONFLITO', 'Abono parcial no dia', `${punchesText}. Existe abono/declaração parcial (${what}); a batida que falta pode ser legítima.`, { kind: 'TEXT', text: 'Confira se a declaração cobre o horário que falta antes de ajustar.' }, false);
   }
 
+  if (!valid.length && profile.flexible && swap?.kind === 'TROCA') return { ...base, outcome: 'SKIP', reason: swapNote! };
+  if (!valid.length && profile.flexible && (swap?.kind === 'AGUARDANDO' || (week?.length && date >= todayKey && todayKey <= weekOf(date).end))) {
+    return { ...base, outcome: 'DEFER', reason: swapNote || `Aguardando compensação: pode vir em outro dia até ${dayLabel(weekOf(date).end)} (jornada flexível)` };
+  }
   if (!valid.length) return pend('SEM_BATIDAS', 'Sem nenhuma batida', `Dia de escala (${schedule?.start}–${schedule?.end}) sem batida, atestado ou abono.`, { kind: 'TEXT', text: 'Falta? Se tiver justificativa, lance no Dia do colaborador.' }, false);
 
   // Lançamento manual de madrugada (ex.: 12:00 digitado como 00:00 / 12 AM): nunca interpretar, o gestor confere.
@@ -166,8 +207,6 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
   checks.push({ label: `Escala do dia${schedule ? ` (${schedule.start}–${schedule.end})` : ''}`, ok: Boolean(cs) });
   if (!cs) return pend('POUCAS_BATIDAS', `${valid.length} batida(s) sem escala`, `${punchesText}. Sem escala no cadastro para este dia.`, { kind: 'TEXT', text: 'Sem sugestão segura: cadastre a escala (por dia) e informe os horários no Ajustar.' }, true);
 
-  const profile = classifierProfile(employee.profileJson);
-  const habit = profile.flexible ? null : computeHabit(history, date, lessons);
   const reading = interpretDay({
     options: { flexible: profile.flexible },
     punches: valid.map((p) => ({ id: p.id, min: toMin(hmOf(p.timestamp)), type: p.type, manual: isManual(p), fixed: isManual(p) || ['GESTOR', 'SUGESTAO_ACEITA'].includes(String(p.interpretation?.source || '')) })),

@@ -11,6 +11,7 @@ type DayReq = { id: string; type: string; status: string; reason: string; detail
 type DayData = {
   employee: Emp; date: string; weekday: string; scheduled: boolean; schedule: { start: string; end: string } | null;
   weekSchedule: { code: string; scheduled: boolean; start: string | null; end: string | null }[];
+  swap?: { kind: 'TROCA' | 'AGUARDANDO'; note: string } | null;
   punches: DayPunch[]; certificates: DayCert[]; requests: DayReq[]; warnings: string[];
   ocorrencias?: { id: string; kind: string; source: string; detail: string; status: string; cancelReason: string | null }[];
   monthOcorrencias?: number;
@@ -210,12 +211,13 @@ export default function EmployeeDayPanel({ employees, focus }: { employees: Emp[
         <div className="dc-sub">{data.scheduled && data.schedule ? `Escala ${data.weekday} ${data.schedule.start}–${data.schedule.end}` : `Folga na ficha (trabalha: ${scheduledDays})`}</div>
         <h3>Escala da ficha</h3>
         <div className="dc-sched">{data.weekSchedule.filter((d) => d.code !== 'DOM').map((d) => <div key={d.code} className={`dc-d${d.scheduled ? ' on' : ''}${d.code === data.weekday ? ' hl' : ''}`}>{d.code}{d.scheduled && d.start ? ` ${d.start.slice(0, 5)}–${d.end?.slice(0, 5)}` : ''}</div>)}</div>
-        {!data.scheduled && !hasExtra ? <div className="dc-w dc-amb">⚠ Dia fora da escala ({scheduledDays}). Contar como:<span className="dc-right"><button className="dc-btn g sm" type="button" disabled={busy} onClick={() => void createEntry({ type: 'TRABALHO_EXTERNO', observation: 'Passeio da escola' }, 'Passeio')}>Passeio</button><button className="dc-btn o sm" type="button" disabled={busy} onClick={() => void markExtra()}>Extra</button></span></div> : null}
+        {data.swap ? <div className={`dc-w ${data.swap.kind === 'TROCA' ? 'dc-ok' : 'dc-amb'}`}>{data.swap.kind === 'TROCA' ? '🔁 ' : '⏳ '}{data.swap.note}</div> : null}
+        {!data.scheduled && !hasExtra && data.swap?.kind !== 'TROCA' ? <div className="dc-w dc-amb">⚠ Dia fora da escala ({scheduledDays}). Contar como:<span className="dc-right"><button className="dc-btn g sm" type="button" disabled={busy} onClick={() => void createEntry({ type: 'TRABALHO_EXTERNO', observation: 'Passeio da escola' }, 'Passeio')}>Passeio</button><button className="dc-btn o sm" type="button" disabled={busy} onClick={() => void markExtra()}>Extra</button></span></div> : null}
         <h3>Batidas do dia (com foto)</h3>
         {!data.punches.length ? <div className="dc-p">Nenhuma batida neste dia.</div> : null}
         {data.punches.map((p) => <div key={p.id} className={`dc-p${p.status !== 'VALID' ? ' x' : ''}`}>
           {p.hasPhoto ? <a href={`/api/admin/punches/${p.id}/photo`} target="_blank" rel="noreferrer"><img className="dc-ph" src={`/api/admin/punches/${p.id}/photo`} alt="foto da batida" loading="lazy" /></a> : <div className="dc-ph none" />}
-          <span className="dc-t">{clock(p.timestamp)} · {typeLabel(p.type)}{p.manual ? '*' : ''}{p.originalType && p.originalType !== p.type ? <small title="Leitura do sistema: a batida original continua gravada como no totem (Portaria 671)"> (totem: {typeLabel(p.originalType)} · {p.interpretationSource === 'GESTOR' ? 'corrigido pelo gestor' : p.interpretationSource === 'AUTO' ? 'leitura automática' : 'sugestão aceita'})</small> : null}{p.status !== 'VALID' ? ' (cancelada)' : ''}</span>
+          <span className="dc-t" style={p.type === 'DESCONSIDERADA' ? { textDecoration: 'line-through', opacity: 0.6 } : undefined} title={p.type === 'DESCONSIDERADA' ? 'Batida duplicada: o sistema manteve a mais próxima do horário real e desconsiderou esta (não entra nas horas). A batida original continua gravada (Portaria 671); para reverter, mude o tipo.' : undefined}>{clock(p.timestamp)} · {typeLabel(p.type)}{p.manual ? '*' : ''}{p.originalType && p.originalType !== p.type ? <small title="Leitura do sistema: a batida original continua gravada como no totem (Portaria 671)"> (totem: {typeLabel(p.originalType)} · {p.interpretationSource === 'GESTOR' ? 'corrigido pelo gestor' : p.interpretationSource === 'AUTO' ? 'leitura automática' : 'sugestão aceita'})</small> : null}{p.status !== 'VALID' ? ' (cancelada)' : ''}</span>
           {p.hasPhoto ? <span className="dc-chip">foto</span> : null}
           {p.status === 'VALID' ? <span className="dc-right">
             <select aria-label="Mudar tipo" value={p.type} disabled={busy} onChange={(e) => void changeType(p, e.target.value)} style={{ width: 'auto' }}>{['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'].map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}</select>

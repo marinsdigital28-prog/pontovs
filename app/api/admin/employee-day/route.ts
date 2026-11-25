@@ -10,6 +10,7 @@ import { classifierProfile } from '../../../../lib/employee-rules';
 import { loadHabit } from '../../../../lib/habit-server';
 import { interpretDay, toClassSchedule } from '../../../../lib/punch-classifier';
 import { toMin, hmOf } from '../../../../lib/auto-close';
+import { swapInfoFor } from '../../../../lib/day-swap-server';
 
 export const dynamic = 'force-dynamic';
 const CODES = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -50,6 +51,8 @@ export async function GET(request: Request) {
   const workDays = employee.workDays ? parseWorkDays(employee.workDays) : new Set(['SEG', 'TER', 'QUA', 'QUI', 'SEX']);
   const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, CODES[weekday]);
   const valid = punches.filter((p) => p.status === 'VALID');
+  // Jornada flexível: troca de dia na semana (seg–dom) — só informativo, a grade não muda.
+  const swap = await swapInfoFor(employee as any, date).catch(() => null);
   const weekSchedule = CODES.map((code, idx) => {
     const s = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, idx, employee.employeeNumber);
     return { code, scheduled: Boolean(s) && isScheduledDay(workDays, code), start: s?.start || null, end: s?.end || null };
@@ -73,6 +76,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     employee: { id: employee.id, name: employee.name, employeeNumber: employee.employeeNumber },
     date, weekday: CODES[weekday], scheduled, schedule: daySchedule, weekSchedule,
+    swap: swap ? { kind: swap.kind, note: swap.note } : null,
     punches: punches.map((p) => ({ id: p.id, type: p.type, originalType: p.originalType, interpretationSource: p.interpretation?.source || null, timestamp: p.timestamp, status: p.status, origin: p.origin, manual: p.origin === 'ADJUSTED' || /^(manual|auto)-/.test(String(p.clientId || '')), hasPhoto: photoIds.has(p.id) })),
     certificates, requests,
     ocorrencias, monthOcorrencias, adjustments,
@@ -85,7 +89,7 @@ export async function GET(request: Request) {
     reading,
     warnings: [
       ...sequenceWarnings(valid),
-      ...(!scheduled && valid.length && !certificates.some((c) => c.type === 'DIA_EXTRA' && ['ATIVO', 'APROVADO'].includes(c.status)) ? ['Dia fora da escala da ficha — conte como Extra ou lance Passeio/Evento.'] : []),
+      ...(!scheduled && valid.length && swap?.kind !== 'TROCA' && !certificates.some((c) => c.type === 'DIA_EXTRA' && ['ATIVO', 'APROVADO'].includes(c.status)) ? ['Dia fora da escala da ficha — conte como Extra ou lance Passeio/Evento.'] : []),
     ],
   });
 }
