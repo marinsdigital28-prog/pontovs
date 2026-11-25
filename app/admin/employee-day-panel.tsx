@@ -23,7 +23,7 @@ type DayData = {
 const dt = (v: string | null) => v ? new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 type Conflict = { body: Record<string, unknown>; overlaps: { id: string; type: string; startTime: string | null; endTime: string | null }[]; message: string };
 
-const CERT_LABEL: Record<string, string> = { DIA_INTEGRAL: 'Atestado dia inteiro', PERIODO_DIAS: 'Atestado (período)', HORAS: 'Declaração por horas', PERIODO_HORAS: 'Declaração por horas', CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica', TRABALHO_EXTERNO: 'Trabalho/Evento externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo (horas)', OUTRO: 'Abono', DIA_EXTRA: 'Dia extra (fora da escala)' };
+const CERT_LABEL: Record<string, string> = { DIA_INTEGRAL: 'Atestado dia inteiro', PERIODO_DIAS: 'Atestado (período)', HORAS: 'Declaração por horas', PERIODO_HORAS: 'Declaração por horas', CONSULTA_MEDICA: 'Consulta médica', PERICIA_JUDICIAL: 'Perícia judicial', DECLARACAO_COMPARECIMENTO: 'Declaração de comparecimento', SAIDA_MEDICA: 'Saída médica', TRABALHO_EXTERNO: 'Trabalho/Evento externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo (horas)', OUTRO: 'Abono', DIA_EXTRA: 'Dia extra (fora da escala)' };
 const ACTIVE = ['ATIVO', 'APROVADO'];
 const clock = (v: string) => new Date(v).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const hm = (v: string) => clock(v).slice(0, 5);

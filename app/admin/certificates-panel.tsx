@@ -29,6 +29,8 @@ const certificateTypeLabels: Record<string, string> = {
   HORAS: 'Horas',
   PERIODO_HORAS: 'Período de horas',
   CONSULTA_MEDICA: 'Consulta médica',
+  PERICIA_JUDICIAL: 'Perícia judicial',
+  DECLARACAO_COMPARECIMENTO: 'Declaração de comparecimento',
   SAIDA_MEDICA: 'Saída médica',
   TRABALHO_EXTERNO: 'Trabalho externo — dia integral',
   TRABALHO_EXTERNO_HORAS: 'Trabalho externo — horas (metade do dia)',

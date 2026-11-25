@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 const allowedMimes = new Set(['application/pdf', 'image/jpeg', 'image/png']);
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
-const certificateTypes = ['DIA_INTEGRAL','PERIODO_DIAS','HORAS','PERIODO_HORAS','CONSULTA_MEDICA','SAIDA_MEDICA','TRABALHO_EXTERNO','TRABALHO_EXTERNO_HORAS','OUTRO','DIA_EXTRA'] as const;
+const certificateTypes = ['DIA_INTEGRAL','PERIODO_DIAS','HORAS','PERIODO_HORAS','CONSULTA_MEDICA','SAIDA_MEDICA','TRABALHO_EXTERNO','TRABALHO_EXTERNO_HORAS','OUTRO','DIA_EXTRA','PERICIA_JUDICIAL','DECLARACAO_COMPARECIMENTO'] as const;
 const hourlyTypes = new Set(['HORAS', 'PERIODO_HORAS', 'TRABALHO_EXTERNO_HORAS']);
 
 const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);
@@ -63,7 +63,7 @@ export async function GET() {
     select: {
       id: true, userId: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true,
       hoursPerDayMinutes: true, daysCount: true, workDaysCount: true, documentName: true, documentMime: true,
-      observation: true, status: true, canceledAt: true, cancelReason: true, createdAt: true,
+      observation: true, status: true, origin: true, canceledAt: true, cancelReason: true, createdAt: true,
       user: { select: { name: true, employeeNumber: true, cpf: true } },
     },
   });
@@ -158,7 +158,7 @@ export async function PATCH(request: Request) {
   if (!body?.id) return NextResponse.json({ error: 'Atestado obrigatório.' }, { status: 400 });
   const existing = await prisma.medicalCertificate.findUnique({
     where: { id: body.id },
-    select: { id: true, userId: true, status: true, startDate: true, endDate: true, startTime: true, endTime: true, type: true },
+    select: { id: true, userId: true, status: true, startDate: true, endDate: true, startTime: true, endTime: true, type: true, origin: true },
   });
   if (!existing) return NextResponse.json({ error: 'Atestado não encontrado.' }, { status: 404 });
   if (body.action === 'approve' || body.action === 'reject') {
@@ -181,7 +181,7 @@ export async function PATCH(request: Request) {
       const pairs = findConflictingPunches(punches, [{
         id: updated.id, userId: existing.userId, type: existing.type,
         startDate: existing.startDate, endDate: existing.endDate,
-        startTime: existing.startTime, endTime: existing.endTime, status: 'APROVADO',
+        startTime: existing.startTime, endTime: existing.endTime, status: 'APROVADO', origin: existing.origin,
       }]);
       for (const { punch } of pairs) {
         const window = existing.startTime && existing.endTime ? `${existing.startTime}–${existing.endTime}` : 'dia integral';
