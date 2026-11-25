@@ -12,7 +12,7 @@ import { isPartialRequest, requestCreditMinutes } from './request-credit';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { resolveDaySchedule } from './day-schedule';
 import { filterPunchesOutsideCertificates } from './certificate-conflicts';
-import { certificateMinutesForDay, isHourCoverage } from './certificate-calculation';
+import { certificateMinutesForDay, dayMinuteOf, isHourCoverage } from './certificate-calculation';
 import {
   getOperationalAbono, isHolidayAbono, operationalJustifiedMinutes, shouldHidePunchesForDay, shouldSuppressAbono,
   type OperationalAbono,
@@ -30,7 +30,7 @@ export type RowsEmployee = {
 export type RowsPunch = { type: string; timestamp: Date; origin?: string | null };
 export type RowsCertificate = {
   type?: string | null; startDate: Date; endDate: Date; startTime?: string | null; endTime?: string | null;
-  hoursPerDayMinutes?: number | null; status: string;
+  hoursPerDayMinutes?: number | null; status: string; origin?: string | null;
 };
 export type RowsRequest = { type: string; startDate: Date; endDate: string | Date; status: string; reason: string; classification?: string | null; details?: string | null; returnExpected?: boolean | null; launchedAt?: Date | string | null };
 
@@ -53,6 +53,7 @@ export type TimesheetTotals = { worked: number; expected: number; missing: numbe
 export const CERTIFICATE_LABELS: Record<string, string> = {
   DIA_INTEGRAL: 'Atestado', PERIODO_DIAS: 'Atestado', HORAS: 'Atestado', PERIODO_HORAS: 'Atestado',
   CONSULTA_MEDICA: 'Consulta médica', SAIDA_MEDICA: 'Saída médica',
+  PERICIA_JUDICIAL: 'Perícia judicial', DECLARACAO_COMPARECIMENTO: 'Declaração',
   TRABALHO_EXTERNO: 'Trabalho externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo', OUTRO: 'Atestado', DIA_EXTRA: 'Dia extra',
 };
 
@@ -80,6 +81,19 @@ function certKey(value: Date | string) {
 function minutesFromClock(value: string | null | undefined) {
   const m = value?.match(/^(\d{1,2}):(\d{2})/);
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+/** Trechos trabalhados (Entrada→Saída int., Retorno→Saída; sem o par completo, primeira→última). */
+export function workedPairs(punches: RowsPunch[]): Array<[Date, Date]> {
+  const ordered = [...punches].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  const entry = ordered.find((p) => p.type === 'ENTRADA');
+  const interval = ordered.find((p) => p.type === 'INTERVALO' && entry && p.timestamp > entry.timestamp);
+  const retorno = ordered.find((p) => p.type === 'RETORNO' && interval && p.timestamp > interval.timestamp);
+  const saida = ordered.find((p) => p.type === 'SAIDA' && retorno && p.timestamp > retorno.timestamp);
+  const pairs: Array<[Date, Date]> = [];
+  if (entry && interval) pairs.push([entry.timestamp, interval.timestamp]);
+  if (retorno && saida) pairs.push([retorno.timestamp, saida.timestamp]);
+  if (!pairs.length && ordered.length >= 2) pairs.push([ordered[0].timestamp, ordered[ordered.length - 1].timestamp]);
+  return pairs;
 }
 export function workedMinutes(punches: RowsPunch[]) {
   const ordered = [...punches].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
@@ -112,6 +126,7 @@ function conciseReason(reason: string) {
 /** Minutos de atestado no dia, com as regras de lib/certificate-calculation. */
 export function certificateDayMinutes(
   cert: RowsCertificate, date: string, dayStart: number | null, dayEnd: number | null, fullDay: boolean, expected: number | null,
+  worked: Array<[number, number]> = [],
 ) {
   const startDate = certKey(cert.startDate); const endDate = certKey(cert.endDate);
   if (startDate > date || endDate < date) return 0;
@@ -124,7 +139,7 @@ export function certificateDayMinutes(
     // período por horas em vários dias: vale em cada dia do intervalo
     return certificateMinutesForDay(
       { type: cert.type, coverageType: 'HOURS', startDate, endDate, eventDate: date, startTime: cert.startTime, endTime: cert.endTime, status: cert.status },
-      date, dayStart, dayEnd, fullDay, expected,
+      date, dayStart, dayEnd, fullDay, expected, worked,
     );
   }
   return certificateMinutesForDay({ type: cert.type, coverageType: 'DAYS', startDate, endDate, status: cert.status }, date, dayStart, dayEnd, fullDay, expected);
@@ -153,8 +168,9 @@ export function buildTimesheetRows({
     // Duplicada desconsiderada (PunchInterpretation 'DESCONSIDERADA'): fora do cálculo, com marca na folha.
     const disregarded = rawAll.filter((p) => p.type === 'DESCONSIDERADA').map((p) => clockOf(p.timestamp));
     const raw = rawAll.filter((p) => p.type !== 'DESCONSIDERADA');
+    // Atestado da tela Lançar atestado (origin TELA_RAPIDA) não esconde batidas (ver punchConflictsWithCertificate).
     const conflictCerts = suppress ? [] : certificates.map((c) => ({
-      userId: '', type: c.type, startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status,
+      userId: '', type: c.type, startDate: c.startDate, endDate: c.endDate, startTime: c.startTime, endTime: c.endTime, status: c.status, origin: c.origin ?? null,
     }));
     const kept = new Set(filterPunchesOutsideCertificates(
       raw.map((p, i) => ({ id: String(i), userId: '', type: p.type, timestamp: p.timestamp, status: 'VALID' })),
@@ -175,9 +191,14 @@ export function buildTimesheetRows({
 
     const cert = suppress ? undefined : certificates.find((c) =>
       c.type !== 'DIA_EXTRA' && ['APROVADO', 'ATIVO'].includes(c.status) && certKey(c.startDate) <= date && certKey(c.endDate) >= date);
-    const certMinutes = cert ? certificateDayMinutes(cert, date, dayStart, dayEnd, fullDay, expectedRaw) : 0;
+    // Regra nova SÓ para atestado da tela Lançar atestado: abona só os minutos sem batida; os legados seguem iguais.
+    const quickCert = cert?.origin === 'TELA_RAPIDA';
+    const workedSpans = quickCert ? workedPairs(dayPunches).map(([a, b]) => [dayMinuteOf(a, date), dayMinuteOf(b, date)] as [number, number]) : [];
+    const certMinutes = cert ? certificateDayMinutes(cert, date, dayStart, dayEnd, fullDay, expectedRaw, workedSpans) : 0;
+    // Atestado da tela com horário prevalece sobre a ausência pedida pelo app (pedido vinculado; não abona em dobro).
+    const certHasTimes = Boolean(quickCert && cert?.startTime && cert?.endTime);
     const request = suppress ? undefined : requests.find((r) => r.status === 'APROVADO' && Boolean(r.launchedAt) && (
-      (r.type === 'AUSENCIA' && keyOf(r.startDate) <= date && keyOf(r.endDate) >= date)
+      (r.type === 'AUSENCIA' && !certHasTimes && keyOf(r.startDate) <= date && keyOf(r.endDate) >= date)
       || (r.type === 'TROCA_DIA' && (keyOf(r.startDate) === date || keyOf(r.endDate) === date))));
     let abono = getOperationalAbono(employee.employeeNumber, date);
     if (!abono && extraHolidays[date]) abono = { kind: 'FULL_DAY', reason: `Feriado — ${extraHolidays[date]}` };

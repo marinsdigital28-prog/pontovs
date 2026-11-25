@@ -13,7 +13,7 @@ import { insertAdjustedPunch } from './auto-close-server';
 import { dateKeyOf, hmOf } from './auto-close';
 import { isOriginal } from './punch-warnings';
 
-export const MEDICAL_TYPES = new Set(['DIA_INTEGRAL', 'PERIODO_DIAS', 'HORAS', 'PERIODO_HORAS', 'CONSULTA_MEDICA', 'SAIDA_MEDICA']);
+export const MEDICAL_TYPES = new Set(['DIA_INTEGRAL', 'PERIODO_DIAS', 'HORAS', 'PERIODO_HORAS', 'CONSULTA_MEDICA', 'SAIDA_MEDICA', 'PERICIA_JUDICIAL', 'DECLARACAO_COMPARECIMENTO']);
 const HOURLY = new Set(['HORAS', 'PERIODO_HORAS', 'TRABALHO_EXTERNO_HORAS']);
 export const ABSENCE_LABEL: Record<string, string> = { DIA_INTEGRAL: 'Atestado dia inteiro', PERIODO_DIAS: 'Atestado (período)', HORAS: 'Declaração por horas', TRABALHO_EXTERNO: 'Trabalho/Evento externo', TRABALHO_EXTERNO_HORAS: 'Trabalho externo (horas)', DIA_EXTRA: 'Dia extra (fora da escala)', OUTRO: 'Abono' };
 const EXPIRES_MS = 15 * 60_000;

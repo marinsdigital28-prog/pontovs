@@ -66,7 +66,7 @@ export async function loadAndComputeWarnings(employee: Emp & { id: string }, now
   const [punches, photos, certificates, requests] = await Promise.all([
     prisma.punch.findMany({ where: { userId: employee.id, timestamp: { gte: from } }, select: { id: true, type: true, timestamp: true, status: true, origin: true, clientId: true } }).then(withEffectiveTypes),
     prisma.punch.findMany({ where: { userId: employee.id, timestamp: { gte: from }, photoData: { not: null } }, select: { id: true } }),
-    prisma.medicalCertificate.findMany({ where: { userId: employee.id, endDate: { gte: noonFrom } }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, status: true } }),
+    prisma.medicalCertificate.findMany({ where: { userId: employee.id, endDate: { gte: noonFrom } }, select: { id: true, type: true, startDate: true, endDate: true, startTime: true, endTime: true, status: true, origin: true } }),
     prisma.employeeRequest.findMany({ where: { employeeId: employee.id, endDate: { gte: from }, status: { in: ['PENDENTE', 'APROVADO'] } }, select: { type: true, startDate: true, endDate: true } }),
   ]);
   const ph = new Set(photos.map((p) => p.id));
