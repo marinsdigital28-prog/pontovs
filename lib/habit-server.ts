@@ -2,6 +2,7 @@
 import prisma from './prisma';
 import { dateKeyOf, hmOf, toMin } from './auto-close';
 import { computeHabit, HABIT_WINDOW_DAYS, lunchReference, slot, toClassSchedule, type Habit, type HistoryDay } from './punch-classifier';
+import { loadLessons } from './habit-lessons';
 import type { DaySchedule } from './day-schedule';
 import { applyInterpretations, isOriginalPunch, loadInterpretations } from './punch-interpretation';
 
@@ -19,7 +20,8 @@ export async function loadHabit(userId: string, beforeDate: string): Promise<Hab
       if (!day || day.date !== date) { day = { date, punches: [] }; days.push(day); }
       day.punches.push({ type: p.type, min: toMin(hmOf(p.timestamp)) });
     }
-    return computeHabit(days, beforeDate);
+    const lessons = await loadLessons(userId, beforeDate);
+    return computeHabit(days, beforeDate, lessons);
   } catch {
     return null;
   }

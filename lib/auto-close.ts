@@ -33,10 +33,10 @@ export type Phase = 'TARDE' | 'MANHA' | 'COMPLETO';
 export type SuggestionPunch = { type: string; time: string };
 export type SuggestionRelabel = { punchId: string; time: string; from: string; to: string };
 export type Suggestion =
-  | { kind: 'INSERT_PUNCHES'; punches: SuggestionPunch[]; relabels?: SuggestionRelabel[]; confidence?: number; level?: string; resultingDay?: string; text: string }
-  | { kind: 'DIA_EXTRA'; text: string }
-  | { kind: 'LAUNCH_REQUEST'; requestId: string; text: string }
-  | { kind: 'TEXT'; text: string };
+  | { kind: 'INSERT_PUNCHES'; punches: SuggestionPunch[]; relabels?: SuggestionRelabel[]; confidence?: number; level?: string; resultingDay?: string; text: string; learnedNote?: string | null }
+  | { kind: 'DIA_EXTRA'; text: string; learnedNote?: string | null }
+  | { kind: 'LAUNCH_REQUEST'; requestId: string; text: string; learnedNote?: string | null }
+  | { kind: 'TEXT'; text: string; learnedNote?: string | null };
 
 export type Check = { label: string; ok: boolean };
 export type DayDecision = {
@@ -92,10 +92,12 @@ export function fillMissing(present: { type: string; min: number }[], schedule: 
   return reading.fills.filter((f) => required.includes(f.type)).map((f) => ({ type: f.type, time: toHm(f.min) }));
 }
 
-export function evaluateDay({ employee, date, punches, certificates = [], requests = [], phase = 'COMPLETO', undoneTypes = [], history = [] }: {
+export function evaluateDay({ employee, date, punches, certificates = [], requests = [], phase = 'COMPLETO', undoneTypes = [], history = [], lessons = [] }: {
   employee: ACEmployee; date: string; punches: ACPunch[]; certificates?: ACCert[]; requests?: ACRequest[]; phase?: Phase; undoneTypes?: string[];
   /** Dias anteriores do colaborador (batidas originais, tipo efetivo) para o hábito pessoal. */
   history?: HistoryDay[];
+  /** Correções do gestor anteriores ao dia (não se aplica à jornada flexível). */
+  lessons?: import('./habit-learn').Lesson[];
 }): DayDecision {
   const valid = normalizePunches(punches.filter((p) => p.status === 'VALID' && dateKeyOf(p.timestamp) === date));
   const { schedule, scheduled } = scheduleFor(employee, date);
@@ -165,7 +167,7 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
   if (!cs) return pend('POUCAS_BATIDAS', `${valid.length} batida(s) sem escala`, `${punchesText}. Sem escala no cadastro para este dia.`, { kind: 'TEXT', text: 'Sem sugestão segura: cadastre a escala (por dia) e informe os horários no Ajustar.' }, true);
 
   const profile = classifierProfile(employee.profileJson);
-  const habit = profile.flexible ? null : computeHabit(history, date);
+  const habit = profile.flexible ? null : computeHabit(history, date, lessons);
   const reading = interpretDay({
     options: { flexible: profile.flexible },
     punches: valid.map((p) => ({ id: p.id, min: toMin(hmOf(p.timestamp)), type: p.type, manual: isManual(p), fixed: isManual(p) || ['GESTOR', 'SUGESTAO_ACEITA'].includes(String(p.interpretation?.source || '')) })),
@@ -173,7 +175,7 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
     habit,
   });
   const pct = Math.round(reading.confidence * 100);
-  const readingInfo = { confidence: reading.confidence, level: reading.level, doubt: reading.doubt, alternative: reading.alternative, resultingDay: reading.resultingDay };
+  const readingInfo = { confidence: reading.confidence, level: reading.level, doubt: reading.doubt, alternative: reading.alternative, resultingDay: reading.resultingDay, learnedNote: reading.learnedNote };
   checks.push({ label: `Leitura do sistema (${profile.flexible ? 'jornada flexível: sem padrão fixo' : habit ? `padrão real de ${habit.n} dias (${habit.nRecent} nos últimos 30)` : 'sem padrão: poucos dias de histórico'}) · ${pct}%`, ok: reading.level === 'ALTA' });
   if (reading.doubt && /mais batidas/.test(reading.doubt)) return pend('CONFLITO', 'Batidas a mais', `${punchesText}.`, { kind: 'TEXT', text: 'Confira e cancele a batida indevida no Dia do colaborador.' }, false);
   const relabels: SuggestionRelabel[] = reading.relabels.map((r) => ({ punchId: r.punchId, time: toHm(r.min), from: r.from, to: r.to }));
@@ -183,9 +185,10 @@ export function evaluateDay({ employee, date, punches, certificates = [], reques
   const text = describeReading(reading);
   const lastP = valid[valid.length - 1];
   const earlyExit = reading.labels[lastP.id] === 'SAIDA' && toMin(hmOf(lastP.timestamp)) < toMin(schedule!.end) - 5 ? ` Saída antecipada às ${hmOf(lastP.timestamp)} fica como está.` : '';
+  const learned = reading.learnedNote ? ` ${reading.learnedNote}.` : '';
   const suggestion: Suggestion = reading.doubt
-    ? { kind: 'TEXT', text: `Dúvida: ${reading.doubt} Leitura provável: ${reading.resultingDay}. Informe os horários no Ajustar.` }
-    : { kind: 'INSERT_PUNCHES', punches: fills, relabels, confidence: reading.confidence, level: reading.level, resultingDay: reading.resultingDay, text: `Sugestão (${pct}%): ${text}. Dia fica: ${reading.resultingDay}.${earlyExit}` };
+    ? { kind: 'TEXT', text: `Dúvida: ${reading.doubt} Leitura provável: ${reading.resultingDay}. Informe os horários no Ajustar.${learned}`, learnedNote: reading.learnedNote }
+    : { kind: 'INSERT_PUNCHES', punches: fills, relabels, confidence: reading.confidence, level: reading.level, resultingDay: reading.resultingDay, text: `Sugestão (${pct}%): ${text}. Dia fica: ${reading.resultingDay}.${earlyExit}${learned}`, learnedNote: reading.learnedNote };
 
   if (!half && valid.length === 3 && fills.length === 1 && !reading.doubt && !reading.missing.length && !profile.flexible && reading.confidence >= AUTO_MIN_CONFIDENCE && photosOk && !undoneTypes.includes(fills[0].type)) {
     return { ...base, outcome: 'AUTO', reason: `Falta ${typeLabel(fills[0].type)}`, proposal: fills[0], relabels, confidence: reading.confidence, reading: readingInfo, pendencia: { kind: 'AJUSTE_SUGERIDO', title: `Ajuste sugerido (${pct}%): ${text}`, detail: '', suggestion }, forgotten: true };
