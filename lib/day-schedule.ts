@@ -1,5 +1,6 @@
 export type PunchMode = 'FULL' | 'HALF';
-export type DaySchedule = { start: string; end: string; mode: PunchMode };
+/** lunchStart/lunchEnd (opcionais): almoço fixo configurado na escala (ex.: Robson 10:30–11:30). */
+export type DaySchedule = { start: string; end: string; mode: PunchMode; lunchStart?: string; lunchEnd?: string };
 
 export const DAY_ORDER = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'] as const;
 export const DEFAULT_FULL_SCHEDULE: DaySchedule = { start: '08:00', end: '17:00', mode: 'FULL' };
@@ -38,6 +39,9 @@ export function parseScheduleByDay(value: string | null | undefined): Record<str
               start: String(item.start),
               end: String(item.end),
               mode: item.mode === 'HALF' ? 'HALF' : 'FULL',
+              ...(/^\d{2}:\d{2}$/.test(String(item.lunchStart)) && /^\d{2}:\d{2}$/.test(String(item.lunchEnd)) && String(item.lunchStart) < String(item.lunchEnd)
+                ? { lunchStart: String(item.lunchStart), lunchEnd: String(item.lunchEnd) }
+                : {}),
             },
           ],
         ];
@@ -146,7 +150,7 @@ export function scheduleSummary(employee: ScheduleEmployee): string {
   for (const wd of [1, 2, 3, 4, 5, 6, 0]) {
     const s = effectiveDaySchedule(employee, wd);
     if (!s) continue;
-    const key = `${s.start}–${s.end}`;
+    const key = `${s.start}–${s.end}${s.lunchStart ? ` (almoço ${s.lunchStart}–${s.lunchEnd})` : ''}`;
     groups.set(key, [...(groups.get(key) || []), DAY_ORDER[wd]]);
   }
   if (!groups.size) return 'Conforme escala';
@@ -162,7 +166,7 @@ export function scheduleSummary(employee: ScheduleEmployee): string {
 export function weekScheduleList(employee: ScheduleEmployee) {
   return [1, 2, 3, 4, 5, 6, 0].map((wd) => {
     const s = effectiveDaySchedule(employee, wd);
-    return { day: DAY_ORDER[wd], start: s?.start || null, end: s?.end || null, mode: s?.mode || null };
+    return { day: DAY_ORDER[wd], start: s?.start || null, end: s?.end || null, mode: s?.mode || null, lunchStart: s?.lunchStart || null, lunchEnd: s?.lunchEnd || null };
   });
 }
 
