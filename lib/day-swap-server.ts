@@ -24,7 +24,9 @@ export async function loadWeekStatus(employees: ACEmployee[], date: string): Pro
     out.set(e.id, days.map((d) => {
       const ops = shouldSuppressAbono(e.employeeNumber, d) ? null : getOperationalAbono(e.employeeNumber, d);
       const covered = ops?.kind === 'FULL_DAY' || certs.some((c) => c.userId === e.id && c.type !== 'DIA_EXTRA' && !HOURLY.has(c.type) && !(c.startTime && c.endTime) && certKey(c.startDate) <= d && certKey(c.endDate) >= d);
-      return { date: d, scheduled: scheduleFor(e, d).scheduled, worked: punches.some((p) => p.userId === e.id && dateKeyOf(p.timestamp) === d), covered };
+      // Dia extra lançado pelo gestor (hora extra) não conta como troca.
+      const launchedExtra = certs.some((c) => c.userId === e.id && c.type === 'DIA_EXTRA' && certKey(c.startDate) <= d && certKey(c.endDate) >= d);
+      return { date: d, scheduled: scheduleFor(e, d).scheduled, worked: !launchedExtra && punches.some((p) => p.userId === e.id && dateKeyOf(p.timestamp) === d), covered };
     }));
   }
   return out;

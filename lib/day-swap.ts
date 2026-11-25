@@ -69,3 +69,30 @@ export function swapStatusFor(date: string, r: WeekSwapResult): { kind: 'TROCA';
   if (r.waiting.includes(date)) return { kind: 'AGUARDANDO', note: `Aguardando compensação: pode vir em outro dia até ${dayLabel(r.weekEnd)} (jornada flexível)` };
   return null;
 }
+
+/** Marca de troca para a folha: 'EXTRA' = dia em que veio (fora da grade); 'MISSED' = dia da grade trocado. */
+export type SwapMark = { role: 'EXTRA' | 'MISSED'; other: string; text: string };
+
+/**
+ * Trocas de um mês (ou qualquer lista de dias), agrupando por semana seg–dom.
+ * Semanas que cruzam a virada do mês só enxergam os dias da lista.
+ */
+export function monthSwapMarks(days: WeekDayStatus[], today: string): Map<string, SwapMark> {
+  const out = new Map<string, SwapMark>();
+  const byWeek = new Map<string, WeekDayStatus[]>();
+  for (const d of days) { const k = weekOf(d.date).start; byWeek.set(k, [...(byWeek.get(k) || []), d]); }
+  for (const list of byWeek.values()) {
+    for (const s of pairWeekSwaps(list, today).swaps) {
+      out.set(s.extra, { role: 'EXTRA', other: s.missed, text: `veio no lugar de ${dayLabel(s.missed)}` });
+      out.set(s.missed, { role: 'MISSED', other: s.extra, text: `trocado por ${dayLabel(s.extra)}` });
+    }
+  }
+  return out;
+}
+
+/** Jornada flexível a partir do cadastro (profileJson do banco ou profile já convertido pela API). */
+export function isFlexibleEmployee(e: { profileJson?: string | null; profile?: unknown }) {
+  if (e.profile && typeof e.profile === 'object') return (e.profile as { jornadaFlexivel?: unknown }).jornadaFlexivel === true;
+  if (!e.profileJson) return false;
+  try { return JSON.parse(e.profileJson)?.jornadaFlexivel === true; } catch { return false; }
+}

@@ -18,6 +18,7 @@ export type TimesheetEmployee = {
   scheduleStart: string | null;
   scheduleEnd: string | null;
   scheduleByDay?: string | null;
+  profileJson?: string | null;
   department?: string | null;
   unit?: string | null;
 };
@@ -247,7 +248,8 @@ export async function buildTimesheetDocument({
     p.text(`${String(row.day).padStart(2, '0')}/${String(monthNumber).padStart(2, '0')}`, xs[0] + 1.8, base, BODY, f.b, row.future ? C.fut : C.gd);
     center(1, days[row.weekday], f.sb, row.future ? C.fut : C.mut);
     p.text(row.schedule, xs[2] + 1.8, base, BODY, f.sb, color);
-    ([row.entrada, row.intervalo, row.retorno, row.saida] as const).forEach((cell, k) => {
+    if (row.swap?.role === 'MISSED' && !row.entrada && !row.intervalo && !row.retorno && !row.saida) { /* texto desenhado depois da grade */ }
+    else ([row.entrada, row.intervalo, row.retorno, row.saida] as const).forEach((cell, k) => {
       const col = 3 + k;
       if (!cell) { center(col, '—', f.sb); return; }
       if (cell.manual) {
@@ -297,6 +299,13 @@ export async function buildTimesheetDocument({
     if (k > 0 && k < xs.length - 1) p.vline(x, TABLE.top, TABLE.top + TABLE.headH, BORDER, C.gd);
     p.vline(x, TABLE.top + TABLE.headH, k > 0 && k < 7 ? footTop : bottom, BORDER, C.cell);
     if (k === 0 || k === xs.length - 1) p.vline(x, TABLE.top, TABLE.top + TABLE.headH, BORDER, C.gd);
+  });
+  // Troca de dia: no dia trocado, "— trocado por seg 23/11 —" ocupa as 4 colunas de batidas (sem as divisórias).
+  rows.forEach((row: TimesheetRow, i) => {
+    if (row.swap?.role !== 'MISSED' || row.entrada || row.intervalo || row.retorno || row.saida) return;
+    const top = TABLE.top + TABLE.headH + i * TABLE.rowH;
+    p.rect(xs[3] + BORDER, top + BORDER, xs[7] - xs[3] - 2 * BORDER, TABLE.rowH - 2 * BORDER, { fill: i % 2 === 1 ? C.gz : C.white });
+    p.text(`— ${row.swap.text} —`, (xs[3] + xs[7]) / 2, mid(top, TABLE.rowH, 10), 10, f.sb, C.mut, 'center');
   });
 
   // Nota do *

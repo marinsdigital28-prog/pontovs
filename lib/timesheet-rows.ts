@@ -7,6 +7,7 @@
  *  - Dias FUTUROS (depois de hoje, fuso SP) não entram em nenhum total.
  *  - Atestado por horas: lib/certificate-calculation (recorta pela escala e desconta o almoço 12–13h em jornada integral).
  */
+import { isFlexibleEmployee, monthSwapMarks, type SwapMark } from './day-swap';
 import { isPartialRequest, requestCreditMinutes } from './request-credit';
 import { isScheduledDay, parseWorkDays } from './timesheet-schedule';
 import { resolveDaySchedule } from './day-schedule';
@@ -23,6 +24,8 @@ const APP_TZ = 'America/Sao_Paulo';
 export type RowsEmployee = {
   name: string; employeeNumber: string | null; workDays: string | null;
   scheduleStart: string | null; scheduleEnd: string | null; scheduleByDay?: string | null;
+  /** Cadastro (jornada flexível → troca de dia na semana). */
+  profileJson?: string | null; profile?: unknown;
 };
 export type RowsPunch = { type: string; timestamp: Date; origin?: string | null };
 export type RowsCertificate = {
@@ -39,6 +42,8 @@ export type TimesheetRow = {
   extraPunches: number;
   /** Batidas duplicadas desconsideradas pelo sistema (horário). Não entram nas horas; a original continua gravada. */
   disregarded?: string[];
+  /** Troca de dia (jornada flexível): 'EXTRA' = veio fora da grade; 'MISSED' = dia da grade trocado. Só rótulo: horas não mudam. */
+  swap?: SwapMark;
   worked: number | null; justified: number; credited: number | null; expected: number | null;
   missing: number | null; balance: number | null;
   situation: string; tone: SituationTone; fullDayAbono: boolean;
@@ -239,6 +244,24 @@ export function buildTimesheetRows({
     if (worked !== null) totals.workedDays += 1;
 
     rows.push({ ...base, worked, justified, credited: expected === null && worked === null ? null : credited, expected, missing, balance: balance ?? (expected === null && worked !== null ? worked : null), situation, tone, fullDayAbono });
+  }
+  // Jornada flexível: troca de dia na semana (seg–dom). Só muda o rótulo; horas, previsto e saldo ficam iguais.
+  if (isFlexibleEmployee(employee)) {
+    const marks = monthSwapMarks(rows.filter((r) => !r.future).map((r) => ({
+      date: r.date, scheduled: r.scheduled,
+      // dia extra lançado pelo gestor (hora extra) não é troca
+      worked: Boolean(r.entrada || r.intervalo || r.retorno || r.saida || r.extraPunches) && r.schedule !== 'Dia extra',
+      covered: r.tone === 'abono' || r.tone === 'feriado',
+    })), today);
+    for (const r of rows) {
+      const m = marks.get(r.date);
+      if (!m) continue;
+      if (r.tone === 'falta') totals.absences -= 1;
+      r.swap = m;
+      r.situation = 'Troca de dia';
+      r.tone = 'ok';
+      if (m.role === 'EXTRA') r.schedule = 'Troca de dia';
+    }
   }
   return { rows, totals };
 }
