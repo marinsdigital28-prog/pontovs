@@ -31,24 +31,42 @@ export function minutesBetweenClocks(start: string | null | undefined, end: stri
   return startMinutes === null || endMinutes === null ? null : endMinutes - startMinutes;
 }
 
-function clampHourMinutes(item: CertificateCoverageItem, scheduleStart: number, scheduleEnd: number, fullDay: boolean, expected: number | null) {
+/** Minutos do dia (fuso SP, com fração de segundos) de um instante, relativos à data YYYY-MM-DD. */
+export function dayMinuteOf(ts: Date | string, date: string) {
+  return (new Date(ts).getTime() - new Date(`${date}T00:00:00-03:00`).getTime()) / 60000;
+}
+
+/** Tamanho de [from,to] menos a união dos trechos `subs` (recortados a [from,to]). */
+function uncoveredMinutes(from: number, to: number, subs: Array<[number, number]>) {
+  const cut = subs.map(([a, b]) => [Math.max(from, a), Math.min(to, b)] as [number, number]).filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
+  let covered = 0; let cursor = from;
+  for (const [a, b] of cut) { const s = Math.max(a, cursor); if (b > s) { covered += b - s; cursor = b; } }
+  return Math.max(0, to - from - covered);
+}
+
+/**
+ * Atestado parcial (com horário): abona só os minutos da janela que ficaram SEM batida, dentro da escala,
+ * descontando o almoço 12–13h na jornada integral. `worked` = trechos trabalhados do dia (minutos do dia).
+ * Sem trechos trabalhados dentro da janela, o resultado é o mesmo de antes (janela ∩ escala − almoço).
+ */
+function clampHourMinutes(item: CertificateCoverageItem, scheduleStart: number, scheduleEnd: number, fullDay: boolean, expected: number | null, worked: Array<[number, number]> = []) {
   const start = clockMinutes(item.startTime); const end = clockMinutes(item.endTime);
   if (start === null || end === null || end <= start) return 0;
   const from = Math.max(scheduleStart, start); const to = Math.min(scheduleEnd, end);
   if (to <= from) return 0;
-  let minutes = to - from;
-  if (fullDay) minutes -= Math.max(0, Math.min(to, 13 * 60) - Math.max(from, 12 * 60));
+  const subs: Array<[number, number]> = [...(fullDay ? [[12 * 60, 13 * 60] as [number, number]] : []), ...worked];
+  const minutes = Math.round(uncoveredMinutes(from, to, subs));
   return Math.max(0, expected === null ? minutes : Math.min(expected, minutes));
 }
 
-export function certificateMinutesForDay(item: CertificateCoverageItem, date: string, scheduleStart: number | null, scheduleEnd: number | null, fullDay: boolean, expected: number | null) {
+export function certificateMinutesForDay(item: CertificateCoverageItem, date: string, scheduleStart: number | null, scheduleEnd: number | null, fullDay: boolean, expected: number | null, worked: Array<[number, number]> = []) {
   if (!['APROVADO', 'ATIVO'].includes(item.status)) return 0;
   if (item.type === 'DIA_EXTRA') return 0; // dia extra não abona: conta as batidas reais
   const startDate = dateKey(item.startDate); const endDate = dateKey(item.endDate);
   const itemDate = dateKey(item.eventDate || item.startDate);
   if (isHourCoverage(item)) {
     if (itemDate !== date || scheduleStart === null || scheduleEnd === null) return 0;
-    return clampHourMinutes(item, scheduleStart, scheduleEnd, fullDay, expected);
+    return clampHourMinutes(item, scheduleStart, scheduleEnd, fullDay, expected, worked);
   }
   if (startDate > date || endDate < date || expected === null) return 0;
   return expected;

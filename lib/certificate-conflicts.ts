@@ -15,6 +15,8 @@ export type ConflictCertificate = {
   startTime?: string | null;
   endTime?: string | null;
   status: string;
+  /** 'TELA_RAPIDA' = lançado pela tela Lançar atestado: as batidas valem (abono só do que ficou sem batida). */
+  origin?: string | null;
 };
 
 export type ConflictPunch = {
@@ -59,6 +61,7 @@ export function punchConflictsWithCertificate(
 ): boolean {
   if (!isActiveCertificateStatus(certificate.status)) return false;
   if (certificate.type === 'DIA_EXTRA') return false; // dia extra não é ausência: as batidas valem
+  if (certificate.origin === 'TELA_RAPIDA') return false; // tela Lançar atestado: batidas valem, nunca são escondidas/rejeitadas
   if (certificate.userId && punch.userId && certificate.userId !== punch.userId) return false;
 
   const punchDate = toDateKey(punch.timestamp);
