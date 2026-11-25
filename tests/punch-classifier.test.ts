@@ -93,11 +93,18 @@ describe('regras unitárias', () => {
   it('batida do almoço sem Entrada vira Intervalo, não Entrada', () => {
     expect(classify([720, 781, 1022], s, null).labels).toEqual(['INTERVALO', 'RETORNO', 'SAIDA']);
   });
-  it('Retorno faltando usa hábito redondo, nunca +60 cego', () => {
-    expect(proposeFill({ ENTRADA: 480, INTERVALO: 722, SAIDA: 1020 }, s, null).fills).toEqual([{ type: 'RETORNO', min: 780 }]);
+  const regular = computeHabit(Array.from({ length: 20 }, (_, i) => ({ date: `2026-10-${String(i + 1).padStart(2, '0')}`, punches: [{ type: 'ENTRADA', min: 478 + (i % 5) }, { type: 'INTERVALO', min: 719 + (i % 4) }, { type: 'RETORNO', min: 779 + (i % 4) }, { type: 'SAIDA', min: 1020 + (i % 3) }] })), '2026-10-30');
+  it('Retorno faltando usa o padrão real redondo, nunca +60 cego', () => {
+    expect(proposeFill({ ENTRADA: 480, INTERVALO: 722, SAIDA: 1020 }, s, regular).fills).toEqual([{ type: 'RETORNO', min: 780 }]);
   });
-  it('Intervalo esquecido com Retorno 13:01 → 12:00', () => {
-    expect(proposeFill({ ENTRADA: 480, RETORNO: 781, SAIDA: 1020 }, s, null).fills).toEqual([{ type: 'INTERVALO', min: 720 }]);
+  it('Intervalo esquecido com Retorno 13:01 → 12:00 (padrão real)', () => {
+    expect(proposeFill({ ENTRADA: 480, RETORNO: 781, SAIDA: 1020 }, s, regular).fills).toEqual([{ type: 'INTERVALO', min: 720 }]);
+  });
+  it('sem padrão real (sem histórico) → não inventa almoço: falta sem horário + dúvida', () => {
+    const r = proposeFill({ ENTRADA: 480, RETORNO: 781, SAIDA: 1020 }, s, null);
+    expect(r.fills).toEqual([]);
+    expect(r.missing).toEqual(['INTERVALO']);
+    expect(r.doubt).toMatch(/Sem padrão claro/);
   });
   it('meio expediente: 2 batidas = Entrada/Saída', () => {
     expect(classify([452, 692], { start: 450, end: 690, mode: 'HALF' }, null).labels).toEqual(['ENTRADA', 'SAIDA']);

@@ -4,6 +4,9 @@ import { computeWarnings } from '../lib/punch-warnings';
 
 const emp = { id: 'u1', name: 'Fulano Teste', employeeNumber: '9999', workDays: 'SEG,TER,QUA,QUI,SEX', scheduleStart: '08:00', scheduleEnd: '17:00', scheduleByDay: null };
 const D = '2026-10-30'; // sexta
+// Padrão real regular (15 dias úteis antes de D): 08:00 · 12:00 · 13:00 · 17:00 com pequenas variações.
+const H = ['2026-10-09', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23', '2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-08']
+  .map((date, i) => ({ date, punches: [{ type: 'ENTRADA', min: 478 + (i % 5) }, { type: 'INTERVALO', min: 719 + (i % 4) }, { type: 'RETORNO', min: 779 + (i % 4) }, { type: 'SAIDA', min: 1020 + (i % 3) }] }));
 let n = 0;
 const p = (type: string, hm: string, extra: Partial<{ hasPhoto: boolean; origin: string; clientId: string; date: string }> = {}) =>
   ({ id: `p${++n}`, type, timestamp: new Date(`${extra.date || D}T${hm}:00-03:00`), status: 'VALID', origin: extra.origin || 'ONLINE', hasPhoto: extra.hasPhoto ?? true, clientId: extra.clientId || null });
@@ -12,14 +15,14 @@ describe('verificação 17:20', () => {
   it('motivo padrão', () => expect(AUTO_CLOSE_REASON).toBe('Ajuste automático 17:20'));
 
   it('3 batidas sem saída → AUTO com saída da escala (caso Gilvan)', () => {
-    const d = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '07:58'), p('INTERVALO', '12:01'), p('RETORNO', '13:02')] });
+    const d = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '07:58'), p('INTERVALO', '12:01'), p('RETORNO', '13:02')], history: H });
     expect(d.outcome).toBe('AUTO');
     expect(d.proposal).toEqual({ type: 'SAIDA', time: '17:00' });
     expect(d.forgotten).toBe(true);
   });
 
   it('3 batidas sem entrada → AUTO Entrada 08:00 (caso Suelen)', () => {
-    const d = evaluateDay({ employee: emp, date: D, punches: [p('INTERVALO', '12:00'), p('RETORNO', '13:00'), p('SAIDA', '17:03')] });
+    const d = evaluateDay({ employee: emp, date: D, punches: [p('INTERVALO', '12:00'), p('RETORNO', '13:00'), p('SAIDA', '17:03')], history: H });
     expect(d.outcome).toBe('AUTO');
     expect(d.proposal).toEqual({ type: 'ENTRADA', time: '08:00' });
   });
@@ -31,9 +34,13 @@ describe('verificação 17:20', () => {
     // saiu 12:07: 13:00 daria só 53 min de almoço → 13:10 (garante 60 min, nunca +60 cego para 13:07+1h=14:07)
     expect(d.pendencia?.suggestion).toMatchObject({ kind: 'INSERT_PUNCHES', punches: [{ type: 'RETORNO', time: '13:10' }] });
     expect(d.confidence!).toBeLessThan(0.75);
+    // Sem histórico (sem padrão real): NÃO inventa horário — vira dúvida com "falta Retorno".
     const s = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:07'), p('SAIDA', '17:00')] });
     expect(s.outcome).toBe('PENDENCIA');
-    expect(s.pendencia?.suggestion).toMatchObject({ kind: 'INSERT_PUNCHES', punches: [{ type: 'RETORNO', time: '13:10' }] });
+    expect(s.pendencia?.kind).toBe('DUVIDA');
+    expect(s.pendencia?.suggestion?.kind).toBe('TEXT');
+    expect(s.pendencia?.title).toMatch(/falta Retorno \(sem horário sugerido\)/);
+    expect(s.pendencia?.title).not.toMatch(/1[34]:\d\d\*/);
     const ok = evaluateDay({ employee: emp, date: D, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '11:58'), p('SAIDA', '17:00')], history });
     expect(ok.pendencia?.suggestion).toMatchObject({ punches: [{ type: 'RETORNO', time: '13:00' }] });
   });
@@ -81,13 +88,13 @@ describe('verificação 17:20', () => {
     const d = evaluateDay({ employee: emp, date: D, phase: 'TARDE', punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] });
     expect(d.outcome).toBe('DEFER');
     expect(d.forgotten).toBe(false);
-    const manha = evaluateDay({ employee: emp, date: D, phase: 'MANHA', punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] });
+    const manha = evaluateDay({ employee: emp, date: D, phase: 'MANHA', punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')], history: H });
     expect(manha.outcome).toBe('AUTO');
     expect(manha.proposal).toEqual({ type: 'SAIDA', time: '17:00' });
   });
 
   it('às 17:20 quem já saiu e esqueceu a entrada é fechado na hora', () => {
-    const d = evaluateDay({ employee: emp, date: D, phase: 'TARDE', punches: [p('INTERVALO', '12:00'), p('RETORNO', '13:00'), p('SAIDA', '17:01')] });
+    const d = evaluateDay({ employee: emp, date: D, phase: 'TARDE', punches: [p('INTERVALO', '12:00'), p('RETORNO', '13:00'), p('SAIDA', '17:01')], history: H });
     expect(d.outcome).toBe('AUTO');
     expect(d.proposal).toEqual({ type: 'ENTRADA', time: '08:00' });
   });
@@ -103,18 +110,19 @@ describe('verificação 17:20', () => {
   });
 
   it('fillMissing respeita ordem e almoço redondo', () => {
-    expect(fillMissing([{ type: 'ENTRADA', min: 480 }, { type: 'RETORNO', min: 13 * 60 + 4 }, { type: 'SAIDA', min: 1020 }], { start: '08:00', end: '17:00' } as any, ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'])).toEqual([{ type: 'INTERVALO', time: '12:00' }]);
-    expect(fillMissing([{ type: 'ENTRADA', min: 480 }, { type: 'INTERVALO', min: 720 }, { type: 'RETORNO', min: 1030 }], { start: '08:00', end: '17:00' } as any, ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'])).toBeNull();
+    expect(fillMissing([{ type: 'ENTRADA', min: 480 }, { type: 'RETORNO', min: 13 * 60 + 4 }, { type: 'SAIDA', min: 1020 }], { start: '08:00', end: '17:00' } as any, ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'], H, D)).toEqual([{ type: 'INTERVALO', time: '12:00' }]);
+    // sem padrão real → não inventa
+    expect(fillMissing([{ type: 'ENTRADA', min: 480 }, { type: 'RETORNO', min: 13 * 60 + 4 }, { type: 'SAIDA', min: 1020 }], { start: '08:00', end: '17:00' } as any, ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'])).toBeNull();
+    expect(fillMissing([{ type: 'ENTRADA', min: 480 }, { type: 'INTERVALO', min: 720 }, { type: 'RETORNO', min: 1030 }], { start: '08:00', end: '17:00' } as any, ['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'], H, D)).toBeNull();
   });
 });
 
 describe('aviso de esquecimento no ponto', () => {
-  it('avisa a saída esquecida de ontem com horário previsto', () => {
+  it('avisa a saída esquecida de ontem (sem padrão carregado: sem horário inventado)', () => {
     const w = computeWarnings({ employee: emp as any, punches: [p('ENTRADA', '08:00'), p('INTERVALO', '12:00'), p('RETORNO', '13:00')] as any, certificates: [], requests: [], today: '2026-11-02', now: new Date('2026-11-02T08:00:00-03:00') });
     expect(w.length).toBe(1);
     expect(w[0].issueDate).toBe(D);
     expect(w[0].message).toMatch(/saída/i);
-    expect(w[0].message).toMatch(/17:00/);
   });
 
   it('dia completo não avisa', () => {

@@ -3,7 +3,8 @@ import prisma from '../../../lib/prisma';
 import { brazilDayRange } from '../../../lib/brazil-time';
 import { scheduleForNow } from '../../../lib/day-schedule';
 import { withEffectiveTypes } from '../../../lib/punch-interpretation';
-import { habitLunch, loadHabit } from '../../../lib/habit-server';
+import { loadHabit, lunchHint } from '../../../lib/habit-server';
+import { classifierProfile } from '../../../lib/employee-rules';
 import { brazilDateKey } from '../../../lib/brazil-time';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 import { isExitOverrideActive } from '../../../lib/exit-override';
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
         scheduleStart: true,
         scheduleEnd: true,
         scheduleByDay: true,
+        profileJson: true,
         active: true,
         punches: {
           where: { status: 'VALID', timestamp: { gte: start, lt: end } },
@@ -51,13 +53,15 @@ export async function POST(req: Request) {
     const mode = schedule?.mode === 'HALF' ? 'HALF' : 'FULL';
     const resolvedScheduleEnd = schedule?.end ?? user.scheduleEnd?.slice(0, 5) ?? null;
     const punchesToday = await withEffectiveTypes(user.punches);
-    const habit = punchesToday.length ? null : await loadHabit(user.id, brazilDateKey());
+    const flexible = classifierProfile(user.profileJson).flexible;
+    const habit = punchesToday.length || flexible ? null : await loadHabit(user.id, brazilDateKey());
     const smart = resolveSmartPunchSuggestion({
       punchesToday,
       mode,
       scheduleEnd: resolvedScheduleEnd,
       scheduleStart: schedule?.start ?? null,
-      habitLunch: habitLunch(habit),
+      habitLunch: flexible ? null : lunchHint(schedule, habit),
+      flexible,
     });
 
     // Compatibilidade: nextType continua existindo para clientes antigos

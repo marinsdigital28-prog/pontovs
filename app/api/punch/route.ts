@@ -6,7 +6,8 @@ import prisma from '../../../lib/prisma';
 import { brazilDateKey, brazilDayRange } from '../../../lib/brazil-time';
 import { scheduleForNow } from '../../../lib/day-schedule';
 import { withEffectiveTypes } from '../../../lib/punch-interpretation';
-import { habitLunch, loadHabit } from '../../../lib/habit-server';
+import { loadHabit, lunchHint } from '../../../lib/habit-server';
+import { classifierProfile } from '../../../lib/employee-rules';
 import { databaseUnavailableResponse, isDatabaseQuotaExceeded } from '../../../lib/database-errors';
 import { isExitOverrideActive } from '../../../lib/exit-override';
 import { consumeRateLimit, getRequestKey, rateLimitResponse } from '../../../lib/security-controls';
@@ -74,13 +75,15 @@ export async function POST(req: Request) {
         // Escala de HOJE em Brasília (Worker em UTC) — scheduleByDay é a fonte da verdade.
         const schedule = scheduleForNow(user, now);
         const mode = schedule?.mode === 'HALF' ? 'HALF' : 'FULL';
-        const habit = punchesToday.length ? null : await loadHabit(user.id, brazilDateKey(now));
+        const flexible = classifierProfile(user.profileJson).flexible;
+        const habit = punchesToday.length || flexible ? null : await loadHabit(user.id, brazilDateKey(now));
         const smart = resolveSmartPunchSuggestion({
           punchesToday,
           mode,
           scheduleEnd: schedule?.end ?? user.scheduleEnd?.slice(0, 5),
           scheduleStart: schedule?.start ?? null,
-          habitLunch: habitLunch(habit),
+          habitLunch: flexible ? null : lunchHint(schedule, habit),
+          flexible,
           now,
         });
 
