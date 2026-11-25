@@ -6,6 +6,7 @@ import { isScheduledDay, parseWorkDays } from '@/lib/timesheet-schedule';
 import { resolveDaySchedule } from '@/lib/day-schedule';
 import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay, shouldSuppressAbono } from '@/lib/operational-abonos';
 import { filterPunchesOutsideCertificates } from '@/lib/certificate-conflicts';
+import { certificateMinutesForDay as libCertificateMinutesForDay, dayMinuteOf } from '@/lib/certificate-calculation';
 import { brazilDateKey } from '@/lib/brazil-time';
 import { isFlexibleEmployee, monthSwapMarks, type SwapMark } from '@/lib/day-swap';
 import './folha-ponto.css';
@@ -31,7 +32,7 @@ type DayRow = {
 };
 type CertificateItem = {
   userId: string; type?: string; startDate: string; endDate: string;
-  startTime?: string | null; endTime?: string | null; hoursPerDayMinutes?: number | null; status: string;
+  startTime?: string | null; endTime?: string | null; hoursPerDayMinutes?: number | null; status: string; origin?: string | null;
 };
 type ApprovedRequest = {
   employeeId: string; type: 'AUSENCIA' | 'TROCA_DIA'; status: string; startDate: string; endDate: string; reason: string;
@@ -49,6 +50,8 @@ const certificateTypeLabels: Record<string, string> = {
   HORAS: 'Atestado',
   PERIODO_HORAS: 'Atestado',
   CONSULTA_MEDICA: 'Consulta médica',
+  PERICIA_JUDICIAL: 'Perícia judicial',
+  DECLARACAO_COMPARECIMENTO: 'Declaração de comparecimento',
   SAIDA_MEDICA: 'Saída médica',
   TRABALHO_EXTERNO: 'Trabalho externo',
   TRABALHO_EXTERNO_HORAS: 'Trabalho externo',
@@ -104,9 +107,23 @@ function calculateWorked(punches: RecordItem[]) {
   for (const [start, end] of pairs) total += minutesBetween(start, end);
   return ordered.length ? total : null;
 }
-function certificateMinutesForDay(item: CertificateItem, date: string, scheduleStart: number, scheduleEnd: number, fullDay: boolean, expected: number | null) {
+function workedSpans(punches: RecordItem[], date: string): Array<[number, number]> {
+  const ordered = [...punches].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  const entry = ordered.find((punch) => punch.type === 'ENTRADA');
+  const interval = ordered.find((punch) => punch.type === 'INTERVALO' && entry && new Date(punch.timestamp) > new Date(entry.timestamp));
+  const retorno = ordered.find((punch) => punch.type === 'RETORNO' && interval && new Date(punch.timestamp) > new Date(interval.timestamp));
+  const saida = ordered.find((punch) => punch.type === 'SAIDA' && retorno && new Date(punch.timestamp) > new Date(retorno.timestamp));
+  const pairs: Array<[string, string]> = [];
+  if (entry && interval) pairs.push([entry.timestamp, interval.timestamp]);
+  if (retorno && saida) pairs.push([retorno.timestamp, saida.timestamp]);
+  if (!pairs.length && ordered.length >= 2) pairs.push([ordered[0].timestamp, ordered[ordered.length - 1].timestamp]);
+  return pairs.map(([a, b]) => [dayMinuteOf(a, date), dayMinuteOf(b, date)]);
+}
+function certificateMinutesForDay(item: CertificateItem, date: string, scheduleStart: number, scheduleEnd: number, fullDay: boolean, expected: number | null, worked: Array<[number, number]> = []) {
   if (!['APROVADO', 'ATIVO'].includes(item.status) || item.startDate.slice(0, 10) > date || item.endDate.slice(0, 10) < date || expected === null) return 0;
   if (!item.startTime || !item.endTime) return expected;
+  // Atestado parcial: só os minutos sem batida (mesma regra do PDF, lib/certificate-calculation).
+  if (worked.length) return libCertificateMinutesForDay({ type: item.type, coverageType: 'HOURS', startDate: date, endDate: date, eventDate: date, startTime: item.startTime.slice(0, 5), endTime: item.endTime.slice(0, 5), status: item.status }, date, scheduleStart, scheduleEnd, fullDay, expected, worked);
   const [startHour, startMinute] = item.startTime.split(':').map(Number);
   const [endHour, endMinute] = item.endTime.split(':').map(Number);
   const start = Math.max(scheduleStart, startHour * 60 + startMinute);
@@ -160,7 +177,7 @@ function buildDayRowsBase(employee: Employee, records: RecordItem[], month: stri
           .filter((item) => item.userId === employee.id)
       .map((item) => ({
         userId: item.userId, type: item.type, startDate: item.startDate, endDate: item.endDate,
-        startTime: item.startTime, endTime: item.endTime, status: item.status,
+        startTime: item.startTime, endTime: item.endTime, status: item.status, origin: item.origin ?? null,
       }));
     const allowedIds = new Set(
       filterPunchesOutsideCertificates(
@@ -188,8 +205,10 @@ function buildDayRowsBase(employee: Employee, records: RecordItem[], month: stri
     const certificate = suppressAbono
       ? undefined
       : certificates.find((item) => item.userId === employee.id && item.type !== 'DIA_EXTRA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
-    const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && Boolean((item as any).launchedAt) && ((item.type === 'AUSENCIA' && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
-    const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected) : 0;
+    const quickCert = certificate?.origin === 'TELA_RAPIDA';
+    const certHasTimes = Boolean(quickCert && certificate && ['APROVADO', 'ATIVO'].includes(certificate.status) && certificate.startTime && certificate.endTime);
+    const approvedRequest = requests.find((item) => item.employeeId === employee.id && item.status === 'APROVADO' && Boolean((item as any).launchedAt) && ((item.type === 'AUSENCIA' && !certHasTimes && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date) || (item.type === 'TROCA_DIA' && (item.startDate.slice(0, 10) === date || item.endDate.slice(0, 10) === date))));
+    const justifiedByCertificate = !suppressAbono && certificate && dayStart !== null && dayEnd !== null ? certificateMinutesForDay(certificate, date, dayStart, dayEnd, daySchedule?.mode === 'FULL', expected, quickCert ? workedSpans(dayPunches.filter((p) => p.type !== 'DESCONSIDERADA'), date) : []) : 0;
     const justifiedByRequest = suppressAbono ? 0 : (approvedRequest ? requestCreditMinutes(approvedRequest, expected, worked, dayStart, dayEnd) : 0);
     const opsAbono = getOperationalAbono(employee.employeeNumber, date);
     const justifiedByOps = opsAbono && scheduled ? operationalJustifiedMinutes(opsAbono, daySchedule?.start || employee.scheduleStart, daySchedule?.end || employee.scheduleEnd, expected) : 0;

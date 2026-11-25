@@ -24,6 +24,7 @@ import InconsistenciesPanel from './inconsistencies-panel';
 import EmployeeDayPanel from './employee-day-panel';
 import AutoCloseCard from './auto-close-card';
 import PendenciasInbox from './pendencias-inbox';
+import AtestadoRapido from './atestado-rapido';
 import HojeV2, { SuggestionsPanel, useHojeData, shortName } from './hoje-v2';
 import './painel-v2.css';
 import './auto-robo.css';
@@ -88,8 +89,8 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
   const nowLabel = `${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' }).replace('-feira', '')}, ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: 'numeric', month: 'long', year: 'numeric' })} · ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })} (Brasília)`;
   const competencia = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', month: 'long', year: 'numeric' }).replace(' de ', '/').replace(/^./, (c) => c.toUpperCase());
   const initialsOf = (name: string) => shortName(name).split(' ').map((p) => p[0]).join('').toUpperCase().slice(0, 2);
-  const TITLES: Record<string, string> = { hoje: 'Hoje', sugestoes: 'Sugestões', pedidos: 'Pedidos', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', folha: 'Folha de ponto', config: 'Configurações' };
-  const NAV: [string, string, string][] = [['rotina', 'hoje', '◎ Hoje'], ['rotina', 'sugestoes', '✦ Sugestões'], ['rotina', 'pedidos', '✉ Pedidos'], ['cad', 'pessoas', '👥 Pessoas'], ['cad', 'ponto', '🕘 Ponto'], ['cad', 'ausencias', '📅 Ausências'], ['cad', 'folha', '📄 Folha de ponto'], ['sis', 'config', '⚙ Configurações']];
+  const TITLES: Record<string, string> = { hoje: 'Hoje', sugestoes: 'Sugestões', pedidos: 'Pedidos', pessoas: 'Pessoas', ponto: 'Ponto', ausencias: 'Ausências', atestado: 'Lançar atestado', folha: 'Folha de ponto', config: 'Configurações' };
+  const NAV: [string, string, string][] = [['rotina', 'hoje', '◎ Hoje'], ['rotina', 'sugestoes', '✦ Sugestões'], ['rotina', 'pedidos', '✉ Pedidos'], ['rotina', 'atestado', '🩺 Lançar atestado'], ['cad', 'pessoas', '👥 Pessoas'], ['cad', 'ponto', '🕘 Ponto'], ['cad', 'ausencias', '📅 Ausências'], ['cad', 'folha', '📄 Folha de ponto'], ['sis', 'config', '⚙ Configurações']];
   const badge = (key: string) => key === 'sugestoes' && pendCount ? <em>{pendCount}</em> : key === 'pedidos' && pedidosCount ? <em className="gold">{pedidosCount}</em> : null;
   const navBtn = ([, key, label]: [string, string, string]) => <button key={key} type="button" className={tab === key ? 'on' : ''} aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)}>{label} {badge(key)}</button>;
 
@@ -128,6 +129,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       <div className="overview-ops" style={{ marginBottom: 20 }}><OverviewInbox onOpenRequests={() => go('ausencias')} onOpenIssues={() => go('ponto')} /></div>
       <RequestsPanel />
     </section> : null}
+    {tab === 'atestado' ? <section><AtestadoRapido employees={employees.filter((item) => item.active)} /></section> : null}
     {tab === 'pessoas' ? <section>
       <EmployeesPanel employees={employees} onChanged={() => void loadEmployees()} focusId={focusEmployee?.id} focusNonce={focusEmployee?.nonce} />
       <div className="admin-shifts-layout" style={{ marginTop: 20 }}>
@@ -168,13 +170,13 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     {/* Pontinho flutuante oculto: a arte aprovada não tem o mascote flutuante e o Pontinho está pausado (sem custo de IA). */}
     <footer className="admin-footer">Desenvolvido por Marins Digital</footer>
     </main>
-    {moreOpen ? <div className="pv2-more" role="menu">{(['pedidos', 'ponto', 'folha', 'config'] as const).map((k) => <button key={k} type="button" className={tab === k ? 'on' : ''} onClick={() => go(k)}>{NAV.find((n) => n[1] === k)?.[2]} {badge(k)}</button>)}<a href="/ponto">↗ Abrir ponto</a><a href="/modulo-3">↗ Módulo 3 · Beneficiários</a></div> : null}
+    {moreOpen ? <div className="pv2-more" role="menu">{(['atestado', 'pedidos', 'ponto', 'folha', 'config'] as const).map((k) => <button key={k} type="button" className={tab === k ? 'on' : ''} onClick={() => go(k)}>{NAV.find((n) => n[1] === k)?.[2]} {badge(k)}</button>)}<a href="/ponto">↗ Abrir ponto</a><a href="/modulo-3">↗ Módulo 3 · Beneficiários</a></div> : null}
     <nav className="pv2-tabbar" aria-label="Navegação">
       <button type="button" className={tab === 'hoje' ? 'on' : ''} onClick={() => go('hoje')}><b>◎</b>Hoje</button>
       <button type="button" className={tab === 'sugestoes' ? 'on' : ''} onClick={() => go('sugestoes')}><b>✦</b>Sugestões{pendCount ? <em>{pendCount}</em> : null}</button>
       <button type="button" className={tab === 'pessoas' ? 'on' : ''} onClick={() => go('pessoas')}><b>👥</b>Pessoas</button>
       <button type="button" className={tab === 'ausencias' ? 'on' : ''} onClick={() => go('ausencias')}><b>📅</b>Ausências</button>
-      <button type="button" className={['pedidos', 'ponto', 'folha', 'config'].includes(tab) || moreOpen ? 'on' : ''} onClick={() => setMoreOpen((v) => !v)}><b>☰</b>Mais</button>
+      <button type="button" className={['atestado', 'pedidos', 'ponto', 'folha', 'config'].includes(tab) || moreOpen ? 'on' : ''} onClick={() => setMoreOpen((v) => !v)}><b>☰</b>Mais</button>
     </nav>
     </div>
   </>;
