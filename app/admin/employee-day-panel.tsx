@@ -16,7 +16,8 @@ type DayData = {
   monthOcorrencias?: number;
   adjustments?: { id: string; punchId: string; type: string; time: string; status: string; reason: string }[];
   punchWarnings?: { id: string; message: string; shownCount: number; firstShownAt: string | null; lastShownAt: string | null; ackAt: string | null }[];
-  pendencias?: { id: string; kind: string; title: string; detail: string; status: string; resolution: string | null; dryRun: boolean }[];
+  pendencias?: { id: string; kind: string; title: string; detail: string; status: string; resolution: string | null; dryRun: boolean; suggestion?: { kind: string; text: string; learnedNote?: string | null } | null }[];
+  reading?: { learnedNote: string | null; resultingDay: string | null; level?: string; doubt?: string | null } | null;
 };
 const dt = (v: string | null) => v ? new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—';
 type Conflict = { body: Record<string, unknown>; overlaps: { id: string; type: string; startTime: string | null; endTime: string | null }[]; message: string };
@@ -230,7 +231,11 @@ export default function EmployeeDayPanel({ employees, focus }: { employees: Emp[
           {o.status === 'ATIVA' ? <button className="dc-btn o sm dc-right" type="button" disabled={busy} onClick={() => void cancelOcorrencia(o.id)}>Retirar</button> : null}
         </div>)}
         {(data.punchWarnings || []).map((w) => <div key={w.id} className={`dc-w ${w.ackAt ? 'dc-ok' : 'dc-amb'}`}>🔔 Aviso no ponto: “{w.message}” · mostrado {w.shownCount}x (1ª {dt(w.firstShownAt)}) · {w.ackAt ? `Ciente em ${dt(w.ackAt)}` : 'ainda sem Ciente'}</div>)}
-        {(data.pendencias || []).map((x) => <div key={x.id} className="dc-p"><span className="dc-t">🔔 Pendência 17:20: {x.title} · {x.status === 'OPEN' ? 'aberta' : x.status === 'IGNORED' ? 'ignorada' : `resolvida${x.resolution ? ` (${x.resolution})` : ''}`}</span></div>)}
+        {data.reading?.learnedNote ? <div className="dc-learn">✦ <b>{data.reading.learnedNote}.</b>{data.reading.resultingDay ? <> Dia fica: {data.reading.resultingDay}.</> : null}</div> : null}
+        {(data.pendencias || []).map((x) => {
+          const note = x.suggestion?.learnedNote || (x.suggestion?.text || '').match(/Aprendido com sua[^.]*/)?.[0] || data.reading?.learnedNote || null;
+          return <div key={x.id} className="dc-p"><span className="dc-t">🔔 Pendência 17:20: {x.title} · {x.status === 'OPEN' ? 'aberta' : x.status === 'IGNORED' ? 'ignorada' : `resolvida${x.resolution ? ` (${x.resolution})` : ''}`}</span>{note && !data.reading?.learnedNote ? <div className="dc-learn">✦ <b>{note.replace(/\.$/, '')}.</b></div> : null}</div>;
+        })}
         <h3>Ajuste de batida *</h3>
         <div className="dc-row">
           <div><label>Tipo</label><select value={newPunch.type} onChange={(e) => setNewPunch({ ...newPunch, type: e.target.value })}>{['ENTRADA', 'INTERVALO', 'RETORNO', 'SAIDA'].map((t) => <option key={t} value={t}>{typeLabel(t)}</option>)}</select></div>

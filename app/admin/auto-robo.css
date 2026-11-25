@@ -39,3 +39,6 @@
 .ar-inp{display:flex;gap:8px;padding:10px 12px}.ar-inp input{flex:1;padding:10px;border:1px solid #cfdcd2;border-radius:20px;font-size:13px}
 .ar-lock{font-size:11px;color:#4d6b55;padding:0 12px 10px;text-align:center}
 @media(max-width:600px){.ar-kpis b{font-size:22px}.ar-fab{width:60px;height:60px;right:14px;bottom:14px}.ar-hello{display:none}.ar-chat{right:6px;left:6px;width:auto;bottom:84px;height:calc(100vh - 100px)}}
+
+.ar-learn{margin-top:8px;background:#e8f6ee;border:1px solid #cfe6d7;border-radius:10px;padding:8px 10px;line-height:1.45;color:#143d1f}
+.ar-learn b{color:#0b5c42}

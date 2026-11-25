@@ -21,3 +21,6 @@
 .dc-card label{font-size:12px;color:#4d6b55}.dc-row{display:flex;gap:8px}.dc-row>div{flex:1}
 .dc-right{margin-left:auto;display:flex;gap:6px}
 @media (max-width:600px){.dc-acts{grid-template-columns:1fr}}
+
+.dc-learn{margin:8px 0;background:#e8f6ee;border:1px solid #cfe6d7;border-radius:10px;padding:8px 10px;line-height:1.45;color:#143d1f}
+.dc-learn b{color:#0b5c42}

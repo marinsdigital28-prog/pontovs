@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 type Item = {
   id: string; userId: string; date: string; kind: string; status: string; title: string; detail: string; dryRun: boolean; resolution: string | null;
-  suggestion: { kind: string; text: string } | null; employee: { name: string } | null;
+  suggestion: { kind: string; text: string; learnedNote?: string | null } | null; employee: { name: string } | null;
   warning: { shownCount: number; firstShownAt: string | null; lastShownAt: string | null; ackAt: string | null } | null;
 };
 const WD = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
@@ -50,6 +50,7 @@ export default function PendenciasInbox({ onAdjust, onCount }: { onAdjust: (user
       <div className="h"><b>{i.employee?.name?.split(' ').slice(0, 2).join(' ') || '—'} · {fmtDay(i.date)}</b><span className={`ar-chip ${CHIP[i.kind]?.[1] || 'y'}`}>{CHIP[i.kind]?.[0] || i.kind.toLowerCase()}{i.dryRun && i.kind === 'AJUSTE_SUGERIDO' ? ' · teste' : ''}</span></div>
       <div className="ar-sub">{i.detail}</div>
       {i.suggestion?.text ? <div className="sug">💡 {i.suggestion.text}</div> : null}
+      {(() => { const note = i.suggestion?.learnedNote || (i.suggestion?.text || '').match(/Aprendido com sua[^.]*/)?.[0] || null; return note ? <div className="ar-learn">✦ <b>{note.replace(/\.$/, '')}.</b></div> : null; })()}
       {i.warning ? <div className="ar-sub" style={{ fontSize: 12 }}>{i.warning.ackAt ? `✔ Colaborador deu Ciente no aviso do ponto em ${dt(i.warning.ackAt)}` : `🔔 Aviso mostrado no ponto ${i.warning.shownCount}x (último ${dt(i.warning.lastShownAt)}) · ainda sem Ciente`}</div> : i.status === 'OPEN' ? <div className="ar-sub" style={{ fontSize: 12 }}>Colaborador ainda não viu o aviso no ponto.</div> : null}
       {i.status !== 'OPEN' ? <div className="ar-sub" style={{ fontSize: 12 }}>{i.status === 'IGNORED' ? 'Ignorada' : `Resolvida: ${i.resolution || ''}`}</div> : null}
       {i.status === 'OPEN' ? <div className="ar-acts">
