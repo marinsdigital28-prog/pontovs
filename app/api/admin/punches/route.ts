@@ -156,6 +156,8 @@ export async function GET(request: Request) {
 
 import { isSuspiciousManualTime, manualClientId, manualPunchTypes, parseManualTimestamp } from '../../../../lib/manual-punch';
 import { withEffectiveTypes } from '../../../../lib/punch-interpretation';
+import { recordLesson } from '../../../../lib/habit-lessons';
+import { toMin } from '../../../../lib/auto-close';
 
 export async function POST(request: Request) {
   const manager = await requireManager();
@@ -197,6 +199,7 @@ export async function POST(request: Request) {
     });
     if (result.duplicate) return NextResponse.json({ error: 'Já existe uma marcação manual igual para este colaborador, data, horário e tipo.' }, { status: 409 });
     await appendAuditEvent({ action: 'PUNCH_CREATED_MANUAL', actorId: manager.id, resource: 'Punch', resourceId: result.punch?.id, metadata: { userId: employee.id, employeeNumber: employee.employeeNumber, type, date, time, reason } });
+    await recordLesson({ userId: employee.id, date, type, minutes: toMin(time), kind: 'FILL', source: 'GESTOR', actorId: manager.id, punchId: result.punch?.id });
     return NextResponse.json({ ok: true, punch: result.punch, employee: { name: employee.name, employeeNumber: employee.employeeNumber } }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Não foi possível lançar a marcação manual.' }, { status: 500 });

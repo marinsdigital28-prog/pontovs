@@ -8,6 +8,7 @@ import { isPeriodClosed, periodFromDate } from './period-closure';
 import { duplicatePunchReason, label as typeLabel } from './day-guards';
 import { AUTO_CLOSE_REASON, dateKeyOf, evaluateDay, hmOf, summarize, toMin, type DayDecision, type Phase, type Suggestion, type SuggestionPunch, type SuggestionRelabel } from './auto-close';
 import { isOriginalPunch, loadInterpretations, applyInterpretations, setInterpretation } from './punch-interpretation';
+import { loadLessons, loadLessonsByUsers, recordLesson } from './habit-lessons';
 import type { HistoryDay } from './punch-classifier';
 
 export type AutoCloseMode = 'DRY_RUN' | 'REAL';
@@ -62,7 +63,8 @@ export async function loadDay(date: string, userIds?: string[]) {
     day.punches.push({ type: p.type, min: toMin(hmOf(p.timestamp)) });
     history.set(p.userId, list);
   }
-  return { employees, punches: applyInterpretations(punches, interp).map((p) => ({ ...p, hasPhoto: photos.has(p.id) })), certificates, requests, undone, history };
+  const lessons = await loadLessonsByUsers(ids, date);
+  return { employees, punches: applyInterpretations(punches, interp).map((p) => ({ ...p, hasPhoto: photos.has(p.id) })), certificates, requests, undone, history, lessons };
 }
 
 export async function evaluateDate(date: string, phase: Phase, userIds?: string[]) {
@@ -76,6 +78,7 @@ export async function evaluateDate(date: string, phase: Phase, userIds?: string[
       requests: data.requests.filter((r) => r.employeeId === e.id),
       undoneTypes: data.undone.filter((u) => u.userId === e.id).map((u) => u.type),
       history: data.history.get(e.id) || [],
+      lessons: data.lessons.get(e.id) || [],
     }));
   }
   return { decisions, employees: data.employees };
@@ -102,7 +105,7 @@ async function upsertPendencia(d: DayDecision, kind: string, title: string, deta
 }
 
 /** Insere uma batida ajustada (*). Revalida duplicidade/competência no momento da gravação. */
-export async function insertAdjustedPunch({ userId, unitId, date, punch, actorId, reason, runId, track = true }: { userId: string; unitId: string | null; date: string; punch: SuggestionPunch; actorId: string; reason: string; runId?: string | null; track?: boolean }) {
+export async function insertAdjustedPunch({ userId, unitId, date, punch, actorId, reason, runId, track = true, learnSource = null }: { userId: string; unitId: string | null; date: string; punch: SuggestionPunch; actorId: string; reason: string; runId?: string | null; track?: boolean; learnSource?: 'GESTOR' | 'SUGESTAO_ACEITA' | null }) {
   const timestamp = new Date(`${date}T${punch.time}:00-03:00`);
   if (Number.isNaN(timestamp.getTime())) throw new Error('Horário inválido.');
   if (await isPeriodClosed(periodFromDate(timestamp))) throw new Error('Competência fechada: reabra o período antes de ajustar.');
@@ -120,6 +123,9 @@ export async function insertAdjustedPunch({ userId, unitId, date, punch, actorId
     return { punch: created, adjustment: adj };
   });
   await appendAuditEvent({ action: track ? 'AUTO_CLOSE_PUNCH_CREATED' : 'PUNCH_CREATED_MANUAL', actorId, resource: 'Punch', resourceId: result.punch.id, metadata: { userId, date, type: punch.type, time: punch.time, reason, adjustmentId: result.adjustment?.id || null } });
+  if (learnSource) {
+    await recordLesson({ userId, date, type: punch.type, minutes: toMin(punch.time), kind: 'FILL', source: learnSource, actorId, punchId: result.punch.id });
+  }
   return result;
 }
 
@@ -221,7 +227,7 @@ export async function resolvePendencia(id: string, action: 'ACEITAR' | 'IGNORAR'
       const emp = await prisma.user.findUnique({ where: { id: p.userId }, select: { unitId: true } });
       const done: string[] = await applyRelabels(p.userId, p.date, s.relabels || [], actorId, 'SUGESTAO_ACEITA', s.confidence ?? null, `${AUTO_CLOSE_REASON} (sugestão aceita pelo gestor)`);
       for (const punch of s.punches) {
-        await insertAdjustedPunch({ userId: p.userId, unitId: emp?.unitId || null, date: p.date, punch, actorId, reason: `${AUTO_CLOSE_REASON} (sugestão aceita pelo gestor)` });
+        await insertAdjustedPunch({ userId: p.userId, unitId: emp?.unitId || null, date: p.date, punch, actorId, reason: `${AUTO_CLOSE_REASON} (sugestão aceita pelo gestor)`, learnSource: 'SUGESTAO_ACEITA' });
         done.push(`${typeLabel(punch.type)} ${punch.time}*`);
       }
       resolution = `Aceito: ${done.join(', ')}`;

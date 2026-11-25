@@ -6,6 +6,10 @@ import { resolveDaySchedule } from '../../../../lib/day-schedule';
 import { withEffectiveTypes } from '../../../../lib/punch-interpretation';
 import { isScheduledDay, parseWorkDays } from '../../../../lib/timesheet-schedule';
 import { sequenceWarnings } from '../../../../lib/day-guards';
+import { classifierProfile } from '../../../../lib/employee-rules';
+import { loadHabit } from '../../../../lib/habit-server';
+import { interpretDay, toClassSchedule } from '../../../../lib/punch-classifier';
+import { toMin, hmOf } from '../../../../lib/auto-close';
 
 export const dynamic = 'force-dynamic';
 const CODES = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -24,7 +28,7 @@ export async function GET(request: Request) {
   const userId = String(url.searchParams.get('userId') || '').trim();
   const date = String(url.searchParams.get('date') || '').trim();
   if (!userId || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: 'Informe colaborador e data.' }, { status: 400 });
-  const employee = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true } });
+  const employee = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true } });
   if (!employee) return NextResponse.json({ error: 'Colaborador não encontrado.' }, { status: 404 });
   const from = new Date(`${date}T00:00:00-03:00`); const to = new Date(`${date}T23:59:59.999-03:00`);
   const noon = new Date(`${date}T12:00:00.000Z`);
@@ -50,6 +54,22 @@ export async function GET(request: Request) {
     const s = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, idx, employee.employeeNumber);
     return { code, scheduled: Boolean(s) && isScheduledDay(workDays, code), start: s?.start || null, end: s?.end || null };
   });
+  const profile = classifierProfile(employee.profileJson);
+  const cs = toClassSchedule(daySchedule);
+  let reading: { learnedNote: string | null; resultingDay: string | null; level?: string; doubt?: string | null } | null = null;
+  if (cs && !profile.flexible) {
+    try {
+      const habit = await loadHabit(userId, date);
+      const r = interpretDay({
+        punches: valid.map((p) => ({ id: p.id, min: toMin(hmOf(p.timestamp)), type: p.type, manual: p.origin === 'ADJUSTED' || /^(manual|auto)-/.test(String((p as { clientId?: string }).clientId || '')), fixed: ['GESTOR', 'SUGESTAO_ACEITA'].includes(String(p.interpretation?.source || '')) })),
+        schedule: cs,
+        habit,
+        options: { flexible: false },
+      });
+      reading = { learnedNote: r.learnedNote, resultingDay: r.resultingDay, level: r.level, doubt: r.doubt };
+    } catch { /* leitura opcional */ }
+  }
+
   return NextResponse.json({
     employee: { id: employee.id, name: employee.name, employeeNumber: employee.employeeNumber },
     date, weekday: CODES[weekday], scheduled, schedule: daySchedule, weekSchedule,
@@ -57,7 +77,12 @@ export async function GET(request: Request) {
     certificates, requests,
     ocorrencias, monthOcorrencias, adjustments,
     punchWarnings: punchWarnings.map((w) => ({ id: w.id, message: w.message, shownCount: w.shownCount, firstShownAt: w.firstShownAt, lastShownAt: w.lastShownAt, ackAt: w.ackAt })),
-    pendencias: pendencias.map((x) => ({ id: x.id, kind: x.kind, title: x.title, detail: x.detail, status: x.status, resolution: x.resolution, dryRun: x.dryRun })),
+    pendencias: pendencias.map((x) => {
+      let suggestion = null as { kind: string; text: string; learnedNote?: string | null } | null;
+      try { suggestion = x.suggestionJson ? JSON.parse(x.suggestionJson) : null; } catch { /* ignore */ }
+      return { id: x.id, kind: x.kind, title: x.title, detail: x.detail, status: x.status, resolution: x.resolution, dryRun: x.dryRun, suggestion };
+    }),
+    reading,
     warnings: [
       ...sequenceWarnings(valid),
       ...(!scheduled && valid.length && !certificates.some((c) => c.type === 'DIA_EXTRA' && ['ATIVO', 'APROVADO'].includes(c.status)) ? ['Dia fora da escala da ficha — conte como Extra ou lance Passeio/Evento.'] : []),
