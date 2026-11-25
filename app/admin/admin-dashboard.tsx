@@ -84,6 +84,10 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
 
   const go = useCallback((key: string) => { setTab(key); setMoreOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }, []);
   const openPerson = useCallback((userId: string) => { setTab('ponto'); setDayFocus({ userId, date: hoje.data?.today || new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }), nonce: Date.now() }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, [hoje.data?.today]);
+  const [atestadoFocus, setAtestadoFocus] = useState<{ userId: string; date: string; nonce: number } | null>(null);
+  const [folhaFocus, setFolhaFocus] = useState<{ userId?: string; nonce: number } | null>(null);
+  const openAtestado = useCallback((userId: string, date: string) => { setTab('atestado'); setAtestadoFocus({ userId, date, nonce: Date.now() }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, []);
+  const openFolha = useCallback((userId?: string) => { setTab('folha'); setFolhaFocus({ userId, nonce: Date.now() }); window.scrollTo({ top: 0, behavior: 'smooth' }); }, []);
   const searchHits = useMemo(() => { const q = search.trim().toLowerCase(); if (!q) return []; return employees.filter((e) => e.active && (e.name.toLowerCase().includes(q) || String(e.employeeNumber || '').includes(q))).slice(0, 8); }, [search, employees]);
   const pickEmployee = (employee: Employee) => { setSearch(''); setTab('pessoas'); startEdit(employee); };
   const nowLabel = `${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long' }).replace('-feira', '')}, ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: 'numeric', month: 'long', year: 'numeric' })} · ${new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })} (Brasília)`;
@@ -110,14 +114,14 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
     <header className="pv2-top">
       <h1>{TITLES[tab]}</h1><span className="date">{nowLabel}</span><span className="sp" />
       <div className="pv2-search"><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="🔍 Buscar pessoa ou matrícula…" aria-label="Buscar pessoa ou matrícula" onKeyDown={(e) => { if (e.key === 'Enter' && searchHits[0]) pickEmployee(searchHits[0]); }} />{searchHits.length ? <ul>{searchHits.map((e) => <li key={e.id}><button type="button" onClick={() => pickEmployee(e)}>{shortName(e.name)} <small style={{ color: 'var(--mut)' }}>{e.employeeNumber || ''}</small></button></li>)}</ul> : null}</div>
-      <button type="button" className="pv2-pill comp" onClick={() => go('folha')}>Competência {competencia} ▾</button>
+      <button type="button" className="pv2-pill comp" onClick={() => go('folha')} title="Abrir a folha deste mês">Folha de {competencia}</button>
       <button type="button" className="pv2-bell" aria-label={`Pendências do ponto: ${pendCount}`} title="Pendências do ponto (mesmo número do card Sugestões)" onClick={() => setPendOpen(true)}>🔔{pendCount ? <em>{pendCount}</em> : null}</button>
     </header>
     {pendOpen ? <><div className="ar-drawer-bg" onClick={() => setPendOpen(false)} /><div className="ar-drawer" role="dialog" aria-label="Pendências"><div style={{ textAlign: 'right' }}><button type="button" className="ar-btn o s" onClick={() => setPendOpen(false)}>✕ Fechar</button></div><PendenciasInbox onAdjust={openDay} onCount={onPendCount} /></div></> : null}
     {degraded ? <div className="status-msg admin-toast" role="status">Modo contingência: o banco está temporariamente indisponível.</div> : null}
     {message ? <div className="status-msg admin-toast">{message}</div> : null}
 
-    {tab === 'hoje' ? <HojeV2 data={hoje.data} error={hoje.error} reload={() => void hoje.reload()} onAdjust={openDay} onOpenPerson={openPerson} go={go} /> : null}
+    {tab === 'hoje' ? <HojeV2 data={hoje.data} error={hoje.error} reload={() => void hoje.reload()} onAdjust={openDay} onOpenPerson={openPerson} go={go} onOpenAtestado={openAtestado} onOpenFolha={openFolha} /> : null}
     {tab === 'sugestoes' ? <section>
       <div className="pvh">{hoje.data ? <SuggestionsPanel data={hoje.data} onAdjust={openDay} onChanged={() => void hoje.reload()} /> : <div className="panel">{hoje.error || 'Carregando…'}</div>}</div>
       <div className="admin-two-col" style={{ alignItems: 'start' }}>
@@ -129,7 +133,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       <div className="overview-ops" style={{ marginBottom: 20 }}><OverviewInbox onOpenRequests={() => go('ausencias')} onOpenIssues={() => go('ponto')} /></div>
       <RequestsPanel />
     </section> : null}
-    {tab === 'atestado' ? <section><AtestadoRapido employees={employees.filter((item) => item.active)} /></section> : null}
+    {tab === 'atestado' ? <section><AtestadoRapido employees={employees.filter((item) => item.active)} initialEmployeeId={atestadoFocus?.userId} initialDate={atestadoFocus?.date} initialNonce={atestadoFocus?.nonce} /></section> : null}
     {tab === 'pessoas' ? <section>
       <EmployeesPanel employees={employees} onChanged={() => void loadEmployees()} focusId={focusEmployee?.id} focusNonce={focusEmployee?.nonce} />
       <div className="admin-shifts-layout" style={{ marginTop: 20 }}>
@@ -154,7 +158,7 @@ export default function AdminDashboard({ employees: initialEmployees, stats, deg
       <div style={{ marginTop: 20 }}><CertificateConflictsPanel /></div>
     </section> : null}
     {tab === 'folha' ? <section>
-      <FolhaPontoPanel employees={employees.filter((item) => item.active)} />
+      <FolhaPontoPanel employees={employees.filter((item) => item.active)} initialEmployeeId={folhaFocus?.userId} initialNonce={folhaFocus?.nonce} />
       <PeriodClosureCard />
       <div style={{ marginTop: 20 }}><BackupPanel /></div>
       <div className="overview-analytics" style={{ marginTop: 20 }}><AttendanceAnalytics employees={employees.filter((item) => item.active).map(({ id, name, employeeNumber }) => ({ id, name, employeeNumber }))} /></div>

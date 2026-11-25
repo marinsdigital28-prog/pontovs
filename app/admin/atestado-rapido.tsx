@@ -26,11 +26,12 @@ const fmtDay = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('pt-
 const shift = (d: string, n: number) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
 const TYPE_TXT: Record<string, string> = { ENTRADA: 'Entrada', INTERVALO: 'Marcada como Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída' };
 
-export default function AtestadoRapido({ employees }: { employees: Emp[] }) {
+export default function AtestadoRapido({ employees, initialEmployeeId, initialDate, initialNonce }: { employees: Emp[]; initialEmployeeId?: string; initialDate?: string; initialNonce?: number }) {
   const today = brazilDateKey(new Date());
-  const [emp, setEmp] = useState<Emp | null>(null);
+  const pick = () => employees.find((e) => e.id === initialEmployeeId) || null;
+  const [emp, setEmp] = useState<Emp | null>(pick);
   const [q, setQ] = useState('');
-  const [date, setDate] = useState(shift(today, -1));
+  const [date, setDate] = useState(initialDate || shift(today, -1));
   const [kind, setKind] = useState<QuickKind>('ATESTADO_MEDICO');
   const [partial, setPartial] = useState(true);
   const [docStart, setDocStart] = useState('');
@@ -44,6 +45,14 @@ export default function AtestadoRapido({ employees }: { employees: Emp[] }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!initialNonce && !initialEmployeeId) return;
+    const e = pick();
+    if (e) { setEmp(e); setQ(''); }
+    if (initialDate) setDate(initialDate);
+    setDone(''); setErr(''); setPreview(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialNonce, initialEmployeeId, initialDate]);
 
   const hits = useMemo(() => {
     const t = q.trim().toLowerCase(); if (!t) return [];

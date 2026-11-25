@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { shortName } from '@/lib/short-name';
+import { isLate14Suggestion, kpiGroups, pendenciaCounts } from '@/lib/hoje-kpis';
+import HojeKpiDrawers, { type DrawerKey } from './hoje-drawers';
 
 /* Tela "Hoje" do painel v2 — fiel à arte aprovada. Só lê dados reais de /api/admin/hoje.
  * Ações usam as rotas existentes (pendências e pedidos). Nenhuma batida original é alterada (Portaria 671). */
@@ -9,7 +11,7 @@ import { shortName } from '@/lib/short-name';
 type P = { id: string; time: string; type: string; originalType: string; manual: boolean; rejected: boolean };
 type Person = { id: string; name: string; employeeNumber: string | null; jobTitle: string | null; scheduled: boolean; schedule: { start: string; end: string; mode: string; lunchStart: string | null; lunchEnd: string | null } | null; punches: P[]; lastType: string | null; absence: { reason: string; classification: string | null } | null };
 type Sug = { kind: string; text: string; punches?: { type: string; time: string }[]; relabels?: { punchId: string; time: string; from: string; to: string }[]; confidence?: number; level?: string; resultingDay?: string; requestId?: string; learnedNote?: string | null };
-type Pend = { id: string; userId: string; date: string; kind: string; title: string; detail: string; dryRun: boolean; suggestion: Sug | null; level: 'ALTA' | 'MEDIA' | 'DUVIDA' | 'CONFERIR'; employee: { name: string; jobTitle: string | null } | null };
+export type Pend = { id: string; userId: string; date: string; kind: string; title: string; detail: string; dryRun: boolean; suggestion: Sug | null; level: 'ALTA' | 'MEDIA' | 'DUVIDA' | 'CONFERIR'; employee: { name: string; jobTitle: string | null } | null };
 type Absence = { id: string; employeeId: string; name: string; status: string; start: string; end: string; reason: string; details: string | null; classification: string | null; launched: boolean };
 export type HojeData = {
   now: string; today: string; nowMin: number; weekday: string; week: { from: string; to: string };
@@ -262,27 +264,23 @@ export function useHojeData(enabled: boolean) {
   return { data, error, reload: load };
 }
 
-export default function HojeV2({ data, error, reload, onAdjust, onOpenPerson, go }: { data: HojeData | null; error: string; reload: () => void; onAdjust: (userId: string, date: string) => void; onOpenPerson: (userId: string) => void; go: (tab: string) => void }) {
+export default function HojeV2({ data, error, reload, onAdjust, onOpenPerson, go, onOpenAtestado, onOpenFolha }: { data: HojeData | null; error: string; reload: () => void; onAdjust: (userId: string, date: string) => void; onOpenPerson: (userId: string) => void; go: (tab: string) => void; onOpenAtestado: (userId: string, date: string) => void; onOpenFolha: (userId?: string) => void }) {
+  const [drawer, setDrawer] = useState<DrawerKey | null>(null);
   if (!data) return <div className="pvh"><div className="panel">{error || 'Carregando o dia…'}</div></div>;
   const people = data.people;
-  const today = people.filter((p) => p.scheduled || p.punches.some((x) => !x.rejected));
-  const working = people.filter((p) => p.lastType && p.lastType !== 'SAIDA');
-  const inLunch = people.filter((p) => p.lastType === 'INTERVALO').length;
-  const left = people.filter((p) => p.lastType === 'SAIDA');
-  const leftHalf = left.filter((p) => p.schedule?.mode === 'HALF').length;
-  const leftAbs = left.filter((p) => p.absence).length;
-  const noRecord = people.filter((p) => p.scheduled && p.schedule && !p.absence && !p.punches.some((x) => !x.rejected) && data.nowMin >= toMin(p.schedule.start));
-  const lv = (l: string) => data.pendencias.filter((p) => p.level === l).length;
-  const conferir = lv('DUVIDA') + lv('CONFERIR');
+  const groups = kpiGroups(people, data.nowMin);
+  const { today, working, inLunch, left, leftHalf, leftAbs, noRecord } = groups;
+  const { alta, media, conferir } = pendenciaCounts(data.pendencias);
+  const open = (k: DrawerKey) => setDrawer(k);
   return <div className="pvh">
-    <div className="smart"><PontinhoFace /><p><b>Classificação inteligente ligada.</b> Cada batida é lida pela <b>escala do dia</b> e pelo <b>padrão real da pessoa (até 90 dias)</b> — nunca só pela ordem. A batida original nunca é alterada (Portaria 671): o sistema só propõe o rótulo e os ajustes *.</p><span className="tag">“Retorno 14:00” recalculadas · {data.late14} {data.late14 === 1 ? 'restante' : 'restantes'}</span></div>
+    <div className="smart"><PontinhoFace /><p><b>Classificação inteligente ligada.</b> Cada batida é lida pela <b>escala do dia</b> e pelo <b>padrão real da pessoa (até 90 dias)</b> — nunca só pela ordem. A batida original nunca é alterada (Portaria 671): o sistema só propõe o rótulo e os ajustes *.</p>{data.late14 > 0 ? <button type="button" className="tag btn" onClick={() => open('late14')}>“Retorno 14:00” recalculadas · {data.late14} {data.late14 === 1 ? 'restante' : 'restantes'}</button> : <span className="tag">“Retorno 14:00” recalculadas · 0 restantes</span>}</div>
     {error ? <div className="msg">{error}</div> : null}
     <section className="kpis">
-      <div className="kpi"><small>Trabalhando agora</small><b>{working.length} / {today.length}</b><span>{inLunch ? `${inLunch} no almoço agora` : data.nowMin >= 13 * 60 ? 'todos já voltaram do almoço' : 'ninguém no almoço agora'}</span></div>
-      <div className="kpi"><small>Já saíram</small><b>{left.length}</b><span>{leftHalf} meio período · {leftAbs} ausência aprovada</span></div>
-      <div className="kpi warn"><small>Sem registro hoje</small><b>{noRecord.length}</b><span>{noRecord.length ? noRecord.slice(0, 3).map((p) => shortName(p.name)).join(' · ') + (noRecord.length > 3 ? ` +${noRecord.length - 3}` : '') : 'todos bateram'}</span></div>
-      <button type="button" className="kpi gold" onClick={() => go('sugestoes')}><small>Sugestões para revisar</small><b>{data.openCount}</b><span>{lv('ALTA')} alta · {lv('MEDIA')} média · {conferir} para conferir</span></button>
-      <div className="kpi"><small>Fechamento de {data.closing.monthLabel}</small><b>{data.closing.businessDays} {data.closing.businessDays === 1 ? 'dia útil' : 'dias úteis'}</b><span>folha fecha em {data.closing.lastDay.slice(8, 10)}/{data.closing.lastDay.slice(5, 7)}</span></div>
+      <button type="button" className={`kpi${drawer === 'trabalhando' ? ' open' : ''}`} onClick={() => open('trabalhando')}><small>Trabalhando agora</small><b>{working.length} / {today.length}</b><span>{inLunch.length ? `${inLunch.length} no almoço agora` : data.nowMin >= 13 * 60 ? 'todos já voltaram do almoço' : 'ninguém no almoço agora'}</span><i className="go" aria-hidden="true">›</i></button>
+      <button type="button" className={`kpi${drawer === 'sairam' ? ' open' : ''}`} onClick={() => open('sairam')}><small>Já saíram</small><b>{left.length}</b><span>{leftHalf.length} meio período · {leftAbs.length} ausência aprovada</span><i className="go" aria-hidden="true">›</i></button>
+      <button type="button" className={`kpi warn${drawer === 'sem-registro' ? ' open' : ''}`} onClick={() => open('sem-registro')}><small>Sem registro hoje</small><b>{noRecord.length}</b><span>{noRecord.length ? noRecord.slice(0, 3).map((p) => shortName(p.name)).join(' · ') + (noRecord.length > 3 ? ` +${noRecord.length - 3}` : '') : 'todos bateram'}</span><i className="go" aria-hidden="true">›</i></button>
+      <button type="button" className={`kpi gold${drawer === 'sugestoes' ? ' open' : ''}`} onClick={() => open('sugestoes')}><small>Sugestões para revisar</small><b>{data.openCount}</b><span>{alta} alta · {media} média · {conferir} para conferir</span><i className="go" aria-hidden="true">›</i></button>
+      <button type="button" className={`kpi${drawer === 'fechamento' ? ' open' : ''}`} onClick={() => open('fechamento')}><small>Fechamento de {data.closing.monthLabel}</small><b>{data.closing.businessDays} {data.closing.businessDays === 1 ? 'dia útil' : 'dias úteis'}</b><span>folha fecha em {data.closing.lastDay.slice(8, 10)}/{data.closing.lastDay.slice(5, 7)}</span><i className="go" aria-hidden="true">›</i></button>
     </section>
     <div className="grid"><div>
       <SuggestionsPanel data={data} onAdjust={onAdjust} onChanged={reload} limit={5} />
@@ -291,5 +289,6 @@ export default function HojeV2({ data, error, reload, onAdjust, onOpenPerson, go
       <PontinhoPaused data={data} go={go} />
       <AbsencesPanel data={data} onChanged={reload} go={go} />
     </div></div>
+    <HojeKpiDrawers data={data} open={drawer} late14Only={drawer === 'late14'} onClose={() => setDrawer(null)} onOpenDay={(userId, date) => { setDrawer(null); onAdjust(userId, date); }} onOpenAtestado={(userId, date) => { setDrawer(null); onOpenAtestado(userId, date); }} onOpenFolha={(userId) => { setDrawer(null); onOpenFolha(userId); }} onChanged={reload} />
   </div>;
 }

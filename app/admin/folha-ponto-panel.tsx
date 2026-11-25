@@ -267,9 +267,9 @@ function buildDayRowsBase(employee: Employee, records: RecordItem[], month: stri
   });
 }
 
-export default function FolhaPontoPanel({ employees }: { employees: Employee[] }) {
+export default function FolhaPontoPanel({ employees, initialEmployeeId, initialNonce }: { employees: Employee[]; initialEmployeeId?: string; initialNonce?: number }) {
   const [month, setMonth] = useState(currentMonth());
-  const [employeeId, setEmployeeId] = useState(allEmployeesValue);
+  const [employeeId, setEmployeeId] = useState(initialEmployeeId || allEmployeesValue);
   const [printOnlyId, setPrintOnlyId] = useState<string | null>(null);
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [certificates, setCertificates] = useState<CertificateItem[]>([]);
@@ -280,6 +280,10 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
   const [signing, setSigning] = useState(false);
   const [batchProgress, setBatchProgress] = useState('');
   const [ocorrencias, setOcorrencias] = useState<Array<{ userId: string; date: string; status: string }>>([]);
+  useEffect(() => {
+    if (initialNonce == null && !initialEmployeeId) return;
+    setEmployeeId(initialEmployeeId || allEmployeesValue);
+  }, [initialEmployeeId, initialNonce]);
   useEffect(() => {
     let alive = true;
     fetch(`/api/admin/ocorrencias?month=${month}`, { cache: 'no-store' }).then((r) => r.ok ? r.json() : { items: [] }).then((d) => { if (alive) setOcorrencias(Array.isArray(d.items) ? d.items : []); }).catch(() => undefined);
