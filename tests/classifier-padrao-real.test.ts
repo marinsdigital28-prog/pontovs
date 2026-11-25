@@ -111,3 +111,30 @@ describe('gate: nenhuma sugestão ≥ 13:30 fora do padrão real (todos os dias 
     expect(bad).toEqual([]);
   });
 });
+
+describe('lições do gestor não furam as regras novas', () => {
+  it('Cássio (flexível) continua sem horário mesmo com várias correções * anteriores', () => {
+    const lessons = [
+      { date: '2026-11-06', type: 'SAIDA' as const, min: 990, kind: 'FILL' as const, source: 'GESTOR' as const },
+      { date: '2026-11-09', type: 'SAIDA' as const, min: 996, kind: 'FILL' as const, source: 'GESTOR' as const },
+    ];
+    const h = computeHabit(F.history[FLEX], '2026-11-13', lessons);
+    const r = interpretDay({ punches: drop(FLEX, '2026-11-13', 'SAIDA'), schedule: cassioSchedule, habit: h, options: { flexible: true } });
+    expect(r.level).toBe('DUVIDA');
+    expect(r.fills).toEqual([]);
+    expect(r.missing.length).toBeGreaterThan(0);
+    expect(r.learnedNote).toBeNull();
+  });
+
+  it('almoço fixo do Robson (10:30–11:30) vence lições de 12:00/13:00', () => {
+    const lessons = [
+      { date: '2026-10-15', type: 'INTERVALO' as const, min: 720, kind: 'FILL' as const, source: 'GESTOR' as const },
+      { date: '2026-10-15', type: 'RETORNO' as const, min: 780, kind: 'FILL' as const, source: 'GESTOR' as const },
+      { date: '2026-11-03', type: 'INTERVALO' as const, min: 720, kind: 'FILL' as const, source: 'GESTOR' as const },
+      { date: '2026-11-03', type: 'RETORNO' as const, min: 780, kind: 'FILL' as const, source: 'GESTOR' as const },
+    ];
+    const h = computeHabit(F.history[ROB], '2026-11-17', lessons);
+    const r = proposeFill({ ENTRADA: 450, SAIDA: 990 }, robSchedule, h);
+    expect(r.fills.filter((x) => x.type === 'INTERVALO' || x.type === 'RETORNO').map((x) => hm(x.min))).toEqual(['10:30', '11:30']);
+  });
+});
