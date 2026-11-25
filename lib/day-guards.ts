@@ -20,7 +20,7 @@ export function duplicatePunchReason(existing: GuardPunch[], next: GuardPunch): 
 
 /** Avisa quando a sequência Entrada → Intervalo → Retorno → Saída fica fora de ordem ou com buraco. */
 export function sequenceWarnings(punches: GuardPunch[]): string[] {
-  const sorted = [...punches].sort((a, b) => ms(a.timestamp) - ms(b.timestamp));
+  const sorted = [...punches].filter((p) => p.type !== 'DESCONSIDERADA').sort((a, b) => ms(a.timestamp) - ms(b.timestamp));
   const out: string[] = [];
   let last = -1;
   for (const p of sorted) {
@@ -36,7 +36,7 @@ export function sequenceWarnings(punches: GuardPunch[]): string[] {
 }
 
 export function label(type: string) {
-  return ({ ENTRADA: 'Entrada', INTERVALO: 'Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída' } as Record<string, string>)[type] || type;
+  return ({ ENTRADA: 'Entrada', INTERVALO: 'Intervalo', RETORNO: 'Retorno', SAIDA: 'Saída', DESCONSIDERADA: 'Desconsiderada (duplicada)' } as Record<string, string>)[type] || type;
 }
 
 /** Ao trocar só o tipo (ou o mesmo minuto), mantém os segundos originais. */
