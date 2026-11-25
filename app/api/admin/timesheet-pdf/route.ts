@@ -70,6 +70,7 @@ export async function POST(request: Request) {
           scheduleStart: true,
           scheduleEnd: true,
           scheduleByDay: true,
+          profileJson: true,
           unit: { select: { name: true } },
         },
         orderBy: [{ employeeNumber: 'asc' }, { name: 'asc' }],
@@ -124,6 +125,7 @@ export async function POST(request: Request) {
               scheduleStart: emp.scheduleStart,
               scheduleEnd: emp.scheduleEnd,
               scheduleByDay: emp.scheduleByDay,
+              profileJson: emp.profileJson,
               unit: emp.unit?.name || null,
             },
             punches,
@@ -169,6 +171,7 @@ export async function POST(request: Request) {
         scheduleStart: true,
         scheduleEnd: true,
         scheduleByDay: true,
+        profileJson: true,
         unit: { select: { name: true } },
       },
     });

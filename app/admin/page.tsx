@@ -28,7 +28,7 @@ export default async function AdminPage() {
   };
   const safeEmployees = async () => {
     try {
-      return await prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, active: true }, orderBy: { name: 'asc' } });
+      return await prisma.user.findMany({ where: { role: 'EMPLOYEE' }, select: { id: true, name: true, employeeNumber: true, cpf: true, jobTitle: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true, active: true }, orderBy: { name: 'asc' } });
     } catch (error) {
       if (isDatabaseQuotaExceeded(error)) { degraded = true; return listEmployeeFallbacks(); }
       return [];

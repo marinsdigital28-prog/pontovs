@@ -7,12 +7,14 @@ import { resolveDaySchedule } from '@/lib/day-schedule';
 import { getOperationalAbono, operationalJustifiedMinutes, shouldHidePunchesForDay, shouldSuppressAbono } from '@/lib/operational-abonos';
 import { filterPunchesOutsideCertificates } from '@/lib/certificate-conflicts';
 import { brazilDateKey } from '@/lib/brazil-time';
+import { isFlexibleEmployee, monthSwapMarks, type SwapMark } from '@/lib/day-swap';
 import './folha-ponto.css';
 import './folha-preclose.css';
 
 type Employee = {
   id: string; name: string; employeeNumber: string | null; cpf?: string | null; jobTitle?: string | null;
   workDays?: string | null; scheduleStart?: string | null; scheduleEnd?: string | null; scheduleByDay?: string | null;
+  profileJson?: string | null; profile?: unknown;
 };
 type RecordItem = {
   id: string; type: string; timestamp: string; status: string; origin: string;
@@ -23,6 +25,9 @@ type DayRow = {
   justified: number | null; missing: number | null; surplus: number | null; balance: number | null;
   absent: boolean; late: boolean; certificate: boolean; incomplete: boolean; schedule: string;
   eventLabel: string; eventTime: string;
+  scheduled?: boolean; extraDay?: boolean;
+  /** Troca de dia (jornada flexível): só rótulo; horas não mudam. */
+  swap?: SwapMark;
 };
 type CertificateItem = {
   userId: string; type?: string; startDate: string; endDate: string;
@@ -113,6 +118,16 @@ function certificateMinutesForDay(item: CertificateItem, date: string, scheduleS
 }
 
 function buildDayRows(employee: Employee, records: RecordItem[], month: string, certificates: CertificateItem[], requests: ApprovedRequest[]): DayRow[] {
+  const rows = buildDayRowsBase(employee, records, month, certificates, requests);
+  if (!isFlexibleEmployee(employee)) return rows;
+  // Jornada flexível: troca de dia na semana (seg–dom) — o dia trocado não é falta; horas, previsto e saldo não mudam.
+  const today = brazilDateKey(new Date());
+  const marks = monthSwapMarks(rows.filter((r) => r.date <= today).map((r) => ({
+    date: r.date, scheduled: Boolean(r.scheduled), worked: r.punches.length > 0 && !r.extraDay, covered: r.certificate,
+  })), today);
+  return rows.map((r) => { const m = marks.get(r.date); return m ? { ...r, swap: m, absent: false } : r; });
+}
+function buildDayRowsBase(employee: Employee, records: RecordItem[], month: string, certificates: CertificateItem[], requests: ApprovedRequest[]): DayRow[] {
   const [year, monthNumber] = month.split('-').map(Number);
   const lastDay = new Date(year, monthNumber, 0).getDate();
   const hasSchedule = Boolean(employee.scheduleStart && employee.scheduleEnd);
@@ -147,7 +162,8 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
     const daySchedule = resolveDaySchedule(employee.scheduleByDay, employee.workDays, employee.scheduleStart, employee.scheduleEnd, weekday, employee.employeeNumber);
     const scheduled = Boolean(daySchedule) && isScheduledDay(workDays, weekdayCodes[weekday]);
     const extraDay = !scheduled && !suppressAbono && certificates.some((item) => item.userId === employee.id && item.type === 'DIA_EXTRA' && ['APROVADO', 'ATIVO'].includes(item.status) && item.startDate.slice(0, 10) <= date && item.endDate.slice(0, 10) >= date);
-    const worked = calculateWorked(dayPunches);
+    // Duplicada desconsiderada (leitura do sistema): aparece riscada, fora do cálculo.
+    const worked = calculateWorked(dayPunches.filter((p) => p.type !== 'DESCONSIDERADA'));
     const firstPunch = dayPunches[0];
     const firstPunchMinutes = firstPunch ? minutesFromClock(formatTime(firstPunch.timestamp)) : null;
     const late = Boolean(scheduled && firstPunchMinutes !== null && scheduleStart !== null && firstPunchMinutes > scheduleStart + 15);
@@ -215,6 +231,7 @@ function buildDayRows(employee: Employee, records: RecordItem[], month: string, 
       absent: configuredWorkday && !dayPunches.length && !covered, late: configuredWorkday && late && !covered,
       certificate: covered, incomplete, schedule: scheduleLabel,
       eventLabel: registeredEventLabel, eventTime: registeredEventTime,
+      scheduled, extraDay,
     };
   });
 }
@@ -522,6 +539,7 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                     const isFolga = row.schedule.startsWith('Folga');
                     const situation = row.eventLabel
                       ? row.eventLabel
+                      : row.swap ? 'TROCA DE DIA'
                       : row.absent ? 'FALTA'
                       : row.incomplete ? 'INCOMPLETO'
                       : row.late ? ''
@@ -531,15 +549,17 @@ export default function FolhaPontoPanel({ employees }: { employees: Employee[] }
                       situation === 'FALTA' ? 'folha-sit-falta'
                       : situation === 'INCOMPLETO' ? 'folha-sit-incompleto'
                       : situation === 'FOLGA' ? 'folha-sit-folga'
-                      : situation === 'OK' ? 'folha-sit-ok'
+                      : situation === 'OK' || situation === 'TROCA DE DIA' ? 'folha-sit-ok'
                       : '';
                     return (
                       <tr key={row.date} className={[isFolga ? 'folha-row-folga' : '', row.absent ? 'folha-row-falta' : '', row.incomplete ? 'folha-row-incompleto' : '', row.certificate ? 'folha-row-abono' : ''].filter(Boolean).join(' ')}>
                         <td className="folha-col-date"><b>{row.date.slice(8)}</b><span>{row.weekday}</span></td>
-                        <td className="folha-col-scale">{row.schedule}</td>
-                        <td className="folha-col-marks">{row.punches.length ? row.punches.map((punch) => (
+                        <td className="folha-col-scale">{row.swap?.role === 'EXTRA' ? `Troca de dia · ${row.swap.text}` : row.schedule}</td>
+                        <td className="folha-col-marks">{row.punches.length ? row.punches.map((punch) => punch.type === 'DESCONSIDERADA' ? (
+                          <span key={punch.id} className="folha-mark" style={{ textDecoration: 'line-through', opacity: 0.55 }} title="Batida duplicada desconsiderada pelo sistema (não entra nas horas; original gravada)">{formatTime(punch.timestamp)} dup.</span>
+                        ) : (
                           <span key={punch.id} className="folha-mark">{formatTime(punch.timestamp)} {typeLabels[punch.type] || punch.type}</span>
-                        )) : '—'}</td>
+                        )) : row.swap?.role === 'MISSED' ? <span style={{ color: '#667085' }}>— {row.swap.text} —</span> : '—'}</td>
                         <td>{formatMinutes(row.creditedWorked)}</td>
                         <td>{formatMinutes(row.expected)}</td>
                         <td>{formatMinutes(row.missing)}</td>

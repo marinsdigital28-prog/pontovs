@@ -65,7 +65,7 @@ async function monthSummary(userId: string, month: string) {
   const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
   const end = new Date(`${next}-01T00:00:00-03:00`);
   const [emp, punches, certs, reqs, ocorr] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true, employeeNumber: true, workDays: true, scheduleStart: true, scheduleEnd: true, scheduleByDay: true, profileJson: true } }),
     prisma.punch.findMany({ where: { userId, status: 'VALID', timestamp: { gte: from, lt: end } }, select: { type: true, timestamp: true, origin: true } }),
     prisma.medicalCertificate.findMany({ where: { userId, status: { not: 'CANCELADO' }, startDate: { lt: end }, endDate: { gte: from } }, select: { type: true, startDate: true, endDate: true, startTime: true, endTime: true, hoursPerDayMinutes: true, status: true } }),
     prisma.employeeRequest.findMany({ where: { employeeId: userId, status: 'APROVADO', startDate: { lt: end }, endDate: { gte: from } }, select: { type: true, startDate: true, endDate: true, status: true, reason: true, classification: true, details: true, returnExpected: true, launchedAt: true } }),
