@@ -120,12 +120,24 @@ function certificateMinutesForDay(item: CertificateItem, date: string, scheduleS
 function buildDayRows(employee: Employee, records: RecordItem[], month: string, certificates: CertificateItem[], requests: ApprovedRequest[]): DayRow[] {
   const rows = buildDayRowsBase(employee, records, month, certificates, requests);
   if (!isFlexibleEmployee(employee)) return rows;
-  // Jornada flexível: troca de dia na semana (seg–dom) — o dia trocado não é falta; horas, previsto e saldo não mudam.
+  // Jornada flexível: troca de dia na semana (seg–dom), inclusive "Dia extra" lançado pelo gestor.
+  // O previsto do dia trocado vai para o dia em que veio (faltado: previsto 0, sem saldo negativo). Saldo do mês igual.
   const today = brazilDateKey(new Date());
   const marks = monthSwapMarks(rows.filter((r) => r.date <= today).map((r) => ({
-    date: r.date, scheduled: Boolean(r.scheduled), worked: r.punches.length > 0 && !r.extraDay, covered: r.certificate,
+    date: r.date, scheduled: Boolean(r.scheduled), worked: r.punches.length > 0, covered: r.certificate,
   })), today);
-  return rows.map((r) => { const m = marks.get(r.date); return m ? { ...r, swap: m, absent: false } : r; });
+  const out = rows.map((r) => { const m = marks.get(r.date); return m ? { ...r, swap: m, absent: false } : r; });
+  for (const r of out) {
+    if (r.swap?.role !== 'EXTRA') continue;
+    const mr = out.find((x) => x.date === r.swap!.other);
+    if (!mr || mr.expected === null) continue;
+    const exp = (r.expected ?? 0) + mr.expected;
+    const done = r.creditedWorked ?? 0;
+    Object.assign(r, { expected: exp, creditedWorked: done, missing: Math.max(0, exp - done), surplus: Math.max(0, done - exp), balance: done - exp });
+    const mDone = mr.creditedWorked ?? 0;
+    Object.assign(mr, { expected: 0, missing: 0, surplus: mDone, balance: mDone });
+  }
+  return out;
 }
 function buildDayRowsBase(employee: Employee, records: RecordItem[], month: string, certificates: CertificateItem[], requests: ApprovedRequest[]): DayRow[] {
   const [year, monthNumber] = month.split('-').map(Number);

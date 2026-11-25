@@ -245,12 +245,13 @@ export function buildTimesheetRows({
 
     rows.push({ ...base, worked, justified, credited: expected === null && worked === null ? null : credited, expected, missing, balance: balance ?? (expected === null && worked !== null ? worked : null), situation, tone, fullDayAbono });
   }
-  // Jornada flexível: troca de dia na semana (seg–dom). Só muda o rótulo; horas, previsto e saldo ficam iguais.
+  // Jornada flexível: troca de dia na semana (seg–dom), inclusive dia lançado como "Dia extra".
+  // O previsto do dia trocado passa para o dia em que veio: dia faltado fica previsto 0 (sem saldo negativo),
+  // dia trabalhado fica com o previsto do dia da grade. Trabalhado, previsto total e saldo do mês não mudam.
   if (isFlexibleEmployee(employee)) {
     const marks = monthSwapMarks(rows.filter((r) => !r.future).map((r) => ({
       date: r.date, scheduled: r.scheduled,
-      // dia extra lançado pelo gestor (hora extra) não é troca
-      worked: Boolean(r.entrada || r.intervalo || r.retorno || r.saida || r.extraPunches) && r.schedule !== 'Dia extra',
+      worked: Boolean(r.entrada || r.intervalo || r.retorno || r.saida || r.extraPunches),
       covered: r.tone === 'abono' || r.tone === 'feriado',
     })), today);
     for (const r of rows) {
@@ -261,6 +262,22 @@ export function buildTimesheetRows({
       r.situation = 'Troca de dia';
       r.tone = 'ok';
       if (m.role === 'EXTRA') r.schedule = 'Troca de dia';
+    }
+    for (const r of rows) {
+      if (r.swap?.role !== 'EXTRA') continue;
+      const mr = rows.find((x) => x.date === r.swap!.other);
+      if (!mr || mr.expected === null) continue;
+      const exp = mr.expected;
+      const done = r.credited ?? 0;
+      // tira as contribuições antigas das duas linhas dos totais
+      totals.missing -= (mr.missing ?? 0) + (r.missing ?? 0);
+      totals.balance -= (mr.balance ?? 0) + (r.balance ?? 0);
+      totals.expected -= (mr.expected ?? 0) + (r.expected ?? 0);
+      r.expected = (r.expected ?? 0) + exp; r.missing = Math.max(0, r.expected - done); r.balance = done - r.expected; r.credited = done;
+      mr.expected = 0; mr.missing = 0; mr.balance = (mr.credited ?? 0);
+      totals.missing += r.missing + mr.missing;
+      totals.balance += r.balance + mr.balance;
+      totals.expected += r.expected + mr.expected;
     }
   }
   return { rows, totals };
